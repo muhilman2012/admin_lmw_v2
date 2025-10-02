@@ -18,6 +18,7 @@ class Reporter extends Model
         'gender',
         'address',
         'ktp_document_id',
+        'checkin_status',
     ];
 
     public function ktpDocument()

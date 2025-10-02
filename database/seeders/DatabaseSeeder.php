@@ -21,6 +21,10 @@ class DatabaseSeeder extends Seeder
             UnitKerjaSeeder::class,
             SuperadminSeeder::class,
             CategorySeeder::class,
+            StatusTemplateSeeder::class,
+            DocumentTemplateSeeder::class,
+            TestingUsersSeeder::class,
+            CategoryUnitSeeder::class,
         ]);
     }
 }

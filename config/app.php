@@ -144,6 +144,7 @@ return [
         App\Providers\AppServiceProvider::class,
         App\Providers\RouteServiceProvider::class,
         Spatie\Permission\PermissionServiceProvider::class,
+        Barryvdh\DomPDF\ServiceProvider::class,
     ])->toArray(),
     
     /*
@@ -158,7 +159,7 @@ return [
     */
 
     'aliases' => Facade::defaultAliases()->merge([
-        //
+        'Pdf' => Barryvdh\DomPDF\Facade\Pdf::class,
     ])->toArray(),
 
 ];

@@ -18,8 +18,10 @@
                     <div class="subheader my-2 mt-4">Pengaturan Profil</div>
                     <a class="list-group-item list-group-item-action" data-bs-toggle="list" data-bs-target="#pane-reset-password" role="button" id="tab-reset-password">Ubah Kata Sandi</a>
 
-                    <div class="subheader my-2 mt-4">Pengaturan APP API</div>
-                    <a class="list-group-item list-group-item-action" data-bs-toggle="list" data-bs-target="#pane-api-app-setting" role="button" id="tab-api-app-setting">Pengaturan API</a>
+                    <div class="subheader my-2 mt-4">Pengaturan API</div>
+                    <a class="list-group-item list-group-item-action" data-bs-toggle="list" data-bs-target="#pane-api-lmw" role="button">API LMW</a>
+                    <a class="list-group-item list-group-item-action" data-bs-toggle="list" data-bs-target="#pane-api-lapor" role="button">API LAPOR!</a>
+                    <a class="list-group-item list-group-item-action" data-bs-toggle="list" data-bs-target="#pane-api-dukcapil" role="button">API DUKCAPIL</a>
                 </div>
             </div>
         </div>
@@ -158,56 +160,121 @@
                         </div>
                     </div>
                     
-                    <div class="tab-pane fade" id="pane-api-app-setting" role="tabpanel" aria-labelledby="tab-api-app-setting">
+                    {{-- Tab Pane: API LMW --}}
+                    <div class="tab-pane fade" id="pane-api-lmw" role="tabpanel">
                         <div class="row justify-content-between">
                             <div class="col">
-                                <h3 class="card-title">Pengaturan API</h3>
+                                <h3 class="card-title">API LMW</h3>
                             </div>
                             <div class="col-auto">
                                 <label class="form-check form-switch form-switch-lg">
-                                    <input id="edit-toggle-api" class="form-check-input" type="checkbox" />
+                                    <input id="edit-toggle-lmw-api" class="form-check-input" type="checkbox" />
                                     <span class="form-check-label form-check-label-on">Edit</span>
                                     <span class="form-check-label form-check-label-off">Edit</span>
                                 </label>
                             </div>
                         </div>
-                        <p class="card-subtitle">Manajemen token API Anda.</p>
-                        <div class="mt-4">
-                            <label class="form-label">X-LMW-API-KEY</label>
-                            <div class="input-group">
-                                <input id="api-key-input" type="text" class="form-control" value="{{ env('LMW_API_TOKEN') }}" readonly />
-                                <button id="refresh-api-key-btn" class="btn btn-primary" type="button">
-                                    <i class="ti ti-refresh me-1"></i> Refresh Token
-                                </button>
-                            </div>
-                            <small class="form-hint">Salin token ini untuk digunakan dalam permintaan API Anda.</small>
-                        </div>
-                        <form id="api-settings-form" action="{{ route('users.profile.api.update') }}" method="POST">
+                        <p class="card-subtitle">Manajemen endpoint API internal LMW</p>
+                        <form id="lmw-api-settings-form" action="{{ route('users.profile.api.update') }}" method="POST">
                             @csrf
+                            <input type="hidden" name="api_name" value="lmw_api">
                             <div class="mt-4">
-                                <h3 class="card-title">Pengaturan API Eksternal</h3>
-                                <p class="card-subtitle">Manajemen endpoint API eksternal.</p>
+                                <label class="form-label">Base URL</label>
+                                <input id="lmw-base-url-input" type="text" name="base_url" class="form-control" value="{{ $apiSettings['lmw_api']['base_url'] ?? '' }}" disabled />
                             </div>
+                            <div class="mt-4">
+                                <label class="form-label">X-LMW-API-KEY</label>
+                                <div class="input-group">
+                                    <input id="lmw-api-key-input" type="text" class="form-control" value="{{ env('LMW_API_TOKEN') }}" readonly />
+                                    <button id="refresh-lmw-api-key-btn" class="btn btn-primary" type="button">
+                                        <i class="ti ti-refresh me-1"></i> Refresh Token
+                                    </button>
+                                </div>
+                                <small class="form-hint">Salin token ini untuk digunakan dalam permintaan API internal.</small>
+                            </div>
+                            <div class="card-footer bg-transparent mt-4 d-none ps-0" id="lmw-api-footer">
+                                <div class="btn-list justify-content-start">
+                                    <button type="button" class="btn btn-1" id="cancel-lmw-api">Batal</button>
+                                    <button type="submit" form="lmw-api-settings-form" class="btn btn-primary btn-2">Simpan</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    {{-- Tab Pane: API LAPOR! --}}
+                    <div class="tab-pane fade" id="pane-api-lapor" role="tabpanel">
+                        <div class="row justify-content-between">
+                            <div class="col">
+                                <h3 class="card-title">API LAPOR!</h3>
+                            </div>
+                            <div class="col-auto">
+                                <label class="form-check form-switch form-switch-lg">
+                                    <input id="edit-toggle-lapor-api" class="form-check-input" type="checkbox" />
+                                    <span class="form-check-label form-check-label-on">Edit</span>
+                                    <span class="form-check-label form-check-label-off">Edit</span>
+                                </label>
+                            </div>
+                        </div>
+                        <p class="card-subtitle">Manajemen endpoint API eksternal LAPOR!.</p>
+                        <form id="lapor-api-settings-form" action="{{ route('users.profile.api.update') }}" method="POST">
+                            @csrf
+                            <input type="hidden" name="api_name" value="lapor_api">
                             <div class="mt-3">
                                 <label class="form-label">Base URL</label>
-                                <input type="text" name="base_url" class="form-control" value="{{ $apiSettings['base_url'] ?? '' }}" disabled />
-                                @error('base_url') <span class="text-danger">{{ $message }}</span> @enderror
+                                <input type="text" name="base_url" class="form-control" value="{{ $apiSettings['lapor_api']['base_url'] ?? '' }}" disabled />
                             </div>
                             <div class="mt-3">
                                 <label class="form-label">Authorization</label>
-                                <input type="text" name="authorization" class="form-control" value="{{ $apiSettings['authorization'] ?? '' }}" disabled />
-                                @error('authorization') <span class="text-danger">{{ $message }}</span> @enderror
+                                <input type="text" name="authorization" class="form-control" value="{{ $apiSettings['lapor_api']['authorization'] ?? '' }}" disabled />
                             </div>
                             <div class="mt-3">
                                 <label class="form-label">Token</label>
-                                <input type="text" name="token" class="form-control" value="{{ $apiSettings['token'] ?? '' }}" disabled />
-                                @error('token') <span class="text-danger">{{ $message }}</span> @enderror
+                                <input type="text" name="token" class="form-control" value="{{ $apiSettings['lapor_api']['token'] ?? '' }}" disabled />
                             </div>
                         </form>
-                        <div class="card-footer bg-transparent mt-4 d-none ps-0" id="api-footer">
+                        <div class="card-footer bg-transparent mt-4 d-none ps-0" id="lapor-api-footer">
                             <div class="btn-list justify-content-start">
-                                <a href="#" class="btn btn-1">Batal</a>
-                                <button type="submit" form="api-settings-form" class="btn btn-primary btn-2">Simpan</button>
+                                <button type="button" class="btn btn-1" id="cancel-lapor-api">Batal</button>
+                                <button type="submit" form="lapor-api-settings-form" class="btn btn-primary btn-2">Simpan</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Tab Pane: API DUKCAPIL --}}
+                    <div class="tab-pane fade" id="pane-api-dukcapil" role="tabpanel">
+                        <div class="row justify-content-between">
+                            <div class="col">
+                                <h3 class="card-title">API DUKCAPIL</h3>
+                            </div>
+                            <div class="col-auto">
+                                <label class="form-check form-switch form-switch-lg">
+                                    <input id="edit-toggle-dukcapil-api" class="form-check-input" type="checkbox" />
+                                    <span class="form-check-label form-check-label-on">Edit</span>
+                                    <span class="form-check-label form-check-label-off">Edit</span>
+                                </label>
+                            </div>
+                        </div>
+                        <p class="card-subtitle">Manajemen endpoint API eksternal DUKCAPIL.</p>
+                        <form id="dukcapil-api-settings-form" action="{{ route('users.profile.api.update') }}" method="POST">
+                            @csrf
+                            <input type="hidden" name="api_name" value="dukcapil_api">
+                            <div class="mt-3">
+                                <label class="form-label">Base URL</label>
+                                <input type="text" name="base_url" class="form-control" value="{{ $apiSettings['dukcapil_api']['base_url'] ?? '' }}" disabled />
+                            </div>
+                            <div class="mt-3">
+                                <label class="form-label">Authorization</label>
+                                <input type="text" name="authorization" class="form-control" value="{{ $apiSettings['dukcapil_api']['authorization'] ?? '' }}" disabled />
+                            </div>
+                            <div class="mt-3">
+                                <label class="form-label">Token</label>
+                                <input type="text" name="token" class="form-control" value="{{ $apiSettings['dukcapil_api']['token'] ?? '' }}" disabled />
+                            </div>
+                        </form>
+                        <div class="card-footer bg-transparent mt-4 d-none ps-0" id="dukcapil-api-footer">
+                            <div class="btn-list justify-content-start">
+                                <button type="button" class="btn btn-1" id="cancel-dukcapil-api">Batal</button>
+                                <button type="submit" form="dukcapil-api-settings-form" class="btn btn-primary btn-2">Simpan</button>
                             </div>
                         </div>
                     </div>
@@ -253,6 +320,30 @@
 @push('scripts')
 <script>
     document.addEventListener("DOMContentLoaded", function () {
+        // --- LOGIKA UTAMA: MENGAKTIFKAN TAB SETELAH REDIRECT ---
+        const activeTab = new URL(location.href).hash;
+        if (activeTab) {
+            const tabElement = document.querySelector(`a[data-bs-target="${activeTab}"]`);
+            if (tabElement) {
+                // Nonaktifkan tab yang aktif secara default
+                const defaultActiveTab = document.querySelector('#settings-tab a.active');
+                if (defaultActiveTab) {
+                    defaultActiveTab.classList.remove('active');
+                }
+                const defaultActivePane = document.querySelector('#settings-tabContent .tab-pane.show.active');
+                if (defaultActivePane) {
+                    defaultActivePane.classList.remove('show', 'active');
+                }
+
+                // Aktifkan tab dan pane yang sesuai dengan URL
+                tabElement.classList.add('active');
+                const paneElement = document.querySelector(activeTab);
+                if (paneElement) {
+                    paneElement.classList.add('show', 'active');
+                }
+            }
+        }
+        
         // Objek untuk memetakan unit_kerja_id ke nama deputi
         const unitData = {};
         @foreach($units as $unit)
@@ -327,35 +418,54 @@
             }
         });
 
-        // Logika untuk form API Settings
-        const toggleApi = document.getElementById("edit-toggle-api");
-        const footerApi = document.getElementById("api-footer");
-        const formApi = document.getElementById("api-settings-form");
-        const controlsApi = formApi.querySelectorAll("input.form-control, textarea.form-control, select.form-select");
-        const cancelApiBtn = document.getElementById("cancel-api");
-
-        function applyEditStateApi(editing) {
-            if (footerApi) {
-                footerApi.classList.toggle("d-none", !editing);
-            }
-            controlsApi.forEach((el) => {
-                el.disabled = !editing;
-            });
-        }
-        
-        if (toggleApi) {
-            applyEditStateApi(toggleApi.checked);
-            toggleApi.addEventListener("change", () => applyEditStateApi(toggleApi.checked));
+        // --- Perbaikan Logika API Settings untuk setiap tab ---
+        function setupApiForm(apiName) {
+            const toggle = document.getElementById(`edit-toggle-${apiName}-api`);
+            const footer = document.getElementById(`${apiName}-api-footer`);
+            const form = document.getElementById(`${apiName}-api-settings-form`);
+            const controls = form.querySelectorAll("input.form-control, textarea.form-control, select.form-select");
+            const cancelBtn = document.getElementById(`cancel-${apiName}-api`);
             
-            cancelApiBtn.addEventListener("click", (e) => {
-                e.preventDefault();
-                toggleApi.checked = false;
-                applyEditStateApi(false);
-            });
+            function applyEditState(editing) {
+                if (footer) {
+                    footer.classList.toggle("d-none", !editing);
+                }
+                controls.forEach((el) => {
+                    el.disabled = !editing;
+                });
+
+                if (apiName === 'lmw') {
+                    const refreshBtn = document.getElementById('refresh-lmw-api-key-btn');
+                    const keyInput = document.getElementById('lmw-api-key-input');
+                    if (refreshBtn) {
+                        refreshBtn.disabled = !editing;
+                    }
+                    if (keyInput) {
+                        keyInput.disabled = !editing;
+                    }
+                }
+            }
+
+            if (toggle) {
+                applyEditState(toggle.checked);
+                toggle.addEventListener("change", () => applyEditState(toggle.checked));
+                
+                if (cancelBtn) {
+                    cancelBtn.addEventListener("click", (e) => {
+                        e.preventDefault();
+                        toggle.checked = false;
+                        applyEditState(false);
+                    });
+                }
+            }
         }
+
+        setupApiForm('lmw');
+        setupApiForm('lapor');
+        setupApiForm('dukcapil');
 
         // JavaScript untuk merefresh API Key
-        const refreshBtn = document.getElementById('refresh-api-key-btn');
+        const refreshBtn = document.getElementById('refresh-lmw-api-key-btn');
         if (refreshBtn) {
             refreshBtn.addEventListener('click', function() {
                 Swal.fire({
@@ -377,7 +487,7 @@
                         .then(response => response.json())
                         .then(data => {
                             if (data.new_token) {
-                                document.getElementById('api-key-input').value = data.new_token;
+                                document.getElementById('lmw-api-key-input').value = data.new_token;
                                 Swal.fire('Berhasil!', 'Token API berhasil diperbarui.', 'success');
                             } else {
                                 Swal.fire('Gagal!', data.message || 'Terjadi kesalahan.', 'error');

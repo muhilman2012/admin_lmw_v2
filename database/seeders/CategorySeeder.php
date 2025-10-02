@@ -242,6 +242,7 @@ class CategorySeeder extends Seeder
                 'KITAS',
             ],
             'TNI' => [],
+            'Bantuan Masyarakat' => [],
             'Lainnya' => [],
         ];
 

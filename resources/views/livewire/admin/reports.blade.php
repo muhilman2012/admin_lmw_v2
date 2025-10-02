@@ -14,7 +14,7 @@
             <div class="col-1">
                 <button class="btn btn-outline-secondary position-relative" data-bs-toggle="modal" data-bs-target="#modal-filter-laporan" >
                     <i class="ti ti-filter me-1"></i> Filter
-                    {{-- <span id="filter-active-count" class="badge bg-blue-lt bg-primary ms-2 d-none">0</span> --}}
+                    <span id="filter-active-count" class="badge bg-blue-lt bg-primary ms-2 d-none">0</span>
                 </button>
             </div>
         </div>
@@ -23,9 +23,27 @@
     <div id="advanced-table-laporan">
         <div class="table-responsive" style="min-height: 50vh; max-height: 58vh; overflow-y: auto">
             <table class="table table-selectable card-table table-vcenter text-nowrap datatable">
-                <thead class="sticky-top bg-white">
+                <colgroup>
+                    <col style="width: 2%" />
+                    <col style="width: 4%" />
+                    <col style="width: 8%" />
+                    <col style="width: 16%" />
+                    <col style="width: 20%" />
+                    <col style="width: 12%" />
+                    <col style="width: 8%" />
+                    <col style="width: 9%" />
+                    <col style="width: 5%" />
+                    <col style="width: 12%" />
+                    <col style="width: 4%" />
+                    <col style="width: 2%" />
+                </colgroup>
+
+                <thead class="sticky-top bg-white" style="z-index:10;">
                     <tr>
                         <th class="w-1">
+                            <input class="form-check-input m-0 align-middle" type="checkbox" aria-label="Pilih semua laporan" />
+                        </th>
+                        <th>
                             <button class="table-sort d-flex justify-content-between" wire:click="sortBy('id')">#</button>
                         </th>
                         <th>
@@ -39,8 +57,8 @@
                             </button>
                         </th>
                         <th>
-                            <button class="table-sort d-flex justify-content-between" wire:click="sortBy('title')">
-                                Judul
+                            <button class="table-sort d-flex justify-content-between" wire:click="sortBy('subject')">
+                                Judul Pengaduan
                             </button>
                         </th>
                         <th>
@@ -78,41 +96,85 @@
                 </thead>
                 <tbody class="table-tbody">
                     @forelse ($reports as $index => $report)
-                        <tr>
-                            <td>{{ $reports->firstItem() + $index }}</td>
-                            <td><a href="{{ route('reports.show', $report) }}" class="text-blue">{{ $report->ticket_number }}</a></td>
-                            <td style="max-width: 100px; white-space: normal;">{{ \Illuminate\Support\Str::words($report->reporter?->name ?? '-', 2) }}</td>
-                            <td style="max-width: 150px; white-space: normal; word-break: break-word;">
-                                <div style="
-                                    display: -webkit-box;
-                                    -webkit-line-clamp: 2;
-                                    -webkit-box-orient: vertical;
-                                    overflow: hidden;
-                                ">
-                                    {{ $report->subject }}
-                                </div>
-                            </td>
-                            <td style="max-width: 100px; white-space: normal; word-break: break-word;">{{ $report->category?->name ?? '-' }}</td>
-                            <td style="max-width: 100px; white-space: normal; word-break: break-word;">{{ $report->unitKerja?->name ?? $report->deputy?->name ?? '-' }}</td>
-                            <td class="{{ $report->disposition ? '' : 'text-danger' }}" style="max-width: 120px; white-space: normal; word-break: break-word;">{{ $report->disposition ?? 'Belum terdisposisi' }}</td>
-                            <td style="max-width: 80px; white-space: normal; word-break: break-word;"><span class="badge bg-primary-lt">{{ $report->source }}</span></td>
-                            <td style="max-width: 120px; white-space: normal; word-break: break-word;">
-                                <div style="
-                                    display: -webkit-box;
-                                    -webkit-line-clamp: 2;
-                                    -webkit-box-orient: vertical;
-                                    overflow: hidden;
-                                ">
-                                    {{ $report->status }}
-                                </div>
-                            </td>
-                            <td style="max-width: 80px; white-space: normal;">{{ $report->created_at->format('d/m/Y') }}</td>
+                        <tr wire:key="{{ $report->id }}">
                             <td>
+                                <input class="form-check-input m-0 align-middle" type="checkbox" aria-label="Select aduan" />
+                            </td>
+                            <td class="fs-5">{{ $reports->firstItem() + $index }}</td>
+                            <td class="fs-5">
+                                <button 
+                                    type="button"
+                                    wire:click="dispatchReportPreview('{{ $report->uuid }}')"
+                                    class="text-blue fw-bold btn btn-link p-0 m-0 border-0 text-start"
+                                    title="Pratinjau Laporan"
+                                >
+                                    {{ $report->ticket_number }}
+                                </button>
+                            </td>
+                            
+                            {{-- Nama Lengkap --}}
+                            <td style="max-width: 100px;">
+                                <div class="multiline-clamp-2">
+                                    <span class="fs-5">{{ \Illuminate\Support\Str::words($report->reporter?->name ?? '-', 4, '...') }}</span>
+                                </div>
+                            </td>
+                            
+                            {{-- Judul Pengaduan (Sudah ada clamping) --}}
+                            <td style="max-width: 150px;">
+                                <div class="multiline-clamp-2">
+                                    <span class="fs-5">{{ $report->subject }}</span>
+                                </div>
+                            </td>
+                            
+                            {{-- Kategori --}}
+                            <td style="max-width: 100px;">
+                                <div class="multiline-clamp-2">
+                                    <span class="fs-5">{{ $report->category?->name ?? '-' }}</span>
+                                </div>
+                            </td>
+                            
+                            {{-- Distribusi (Unit/Deputi) --}}
+                            <td style="max-width: 100px;">
+                                <div class="multiline-clamp-2">
+                                    <span class="fs-5">{{ $report->unitKerja?->name ?? $report->deputy?->name ?? '-' }}</span>
+                                </div>
+                            </td>
+                            
+                            {{-- Disposisi --}}
+                            <td class="{{ $report->disposition ? '' : 'text-danger' }}" style="max-width: 120px;">
+                                <div class="multiline-clamp-2">
+                                    <span class="fs-5">{{ $report->disposition ?? 'Belum terdisposisi' }}</span>
+                                </div>
+                            </td>
+                            
+                            {{-- Sumber --}}
+                            <td style="max-width: 80px;">
+                                <div class="multiline-clamp-2">
+                                    <span class="badge bg-primary-lt fs-5 text-wrap w-100">{{ $report->source }}</span>
+                                </div>
+                            </td>
+                            
+                            {{-- Status --}}
+                            <td style="max-width: 120px;">
+                                <div class="multiline-clamp-2">
+                                    <span class="fs-5">{{ $report->status }}</span>
+                                </div>
+                            </td>
+                            
+                            {{-- Dikirim --}}
+                            <td style="max-width: 80px;">
+                                <div class="multiline-clamp-2">
+                                    <span class="fs-5">{{ $report->created_at->format('d/m/Y') }}</span>
+                                </div>
+                            </td>
+                            
+                            {{-- Aksi --}}
+                            <td class="text-end">
                                 <div class="btn-list flex-nowrap">
                                     <a class="btn btn-icon btn-outline-secondary btn-view" href="{{ route('reports.show', $report->uuid) }}" title="Lihat">
                                         <i class="ti ti-eye"></i>
                                     </a>
-                                    <a class="btn btn-icon btn-outline-secondary btn-edit" href="#" title="Edit">
+                                    <a class="btn btn-icon btn-outline-secondary btn-edit" href="{{ route('reports.edit', $report->uuid) }}" title="Edit">
                                         <i class="ti ti-pencil"></i>
                                     </a>
                                     <button class="btn btn-icon btn-outline-danger btn-delete" wire:click="deleteReportConfirm({{ $report->id }})" title="Hapus">
@@ -121,9 +183,9 @@
                                 </div>
                             </td>
                         </tr>
-                    @empty  
+                    @empty
                         <tr>
-                            <td colspan="11" class="text-center text-muted p-4">
+                            <td colspan="12" class="text-center text-muted p-4">
                                 <div class="d-flex flex-column align-items-center gap-1">
                                     <div style="font-size: 2rem; line-height: 1">😕</div>
                                     <div><strong>Tidak ada data</strong></div>
@@ -136,6 +198,19 @@
             </table>
         </div>
 
+        <style>
+            /* Gaya untuk membatasi teks hingga 2 baris */
+            .multiline-clamp-2 {
+                display: -webkit-box !important;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: normal; /* Pastikan teks pindah baris */
+                max-width: 100%;
+            }
+        </style>
+    
         <div class="card-footer d-flex align-items-center">
             <div class="dropdown">
                 <a class="btn dropdown-toggle" data-bs-toggle="dropdown">
@@ -165,13 +240,13 @@
             <div class="modal-content">
                 <div class="modal-header sticky-top bg-body z-3 border-bottom">
                     <h5 class="modal-title">Filter Data Pengaduan</h5>
-                    <button class="btn-close" data-bs-dismiss="modal" wire:click="updatingFilters"></button>
+                    <button class="btn-close" data-bs-dismiss="modal" wire:click="resetPaginasi"></button>
                 </div>
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label">Kategori</label>
-                            <select class="form-select" wire:model.live="filterKategori">
+                            <select class="form-select" wire:model.live="filterKategori" id="filter-kategori">
                                 <option value="">Semua Kategori</option>
                                 @foreach ($categories as $category)
                                     <option>{{ $category }}</option>
@@ -180,7 +255,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Status</label>
-                            <select class="form-select" wire:model.live="filterStatus">
+                            <select class="form-select" wire:model.live="filterStatus" id="filter-status">
                                 <option value="">Semua Status</option>
                                 @foreach ($statuses as $status)
                                     <option>{{ $status }}</option>
@@ -188,25 +263,46 @@
                             </select>
                         </div>
                         <div class="col-md-6">
+                            <label class="form-label">Klasifikasi</label>
+                            <select class="form-select" wire:model.live="filterKlasifikasi" id="filter-klasifikasi">
+                                <option value="">Semua Klasifikasi</option>
+                                <option value="Pengaduan berkadar pengawasan">Pengaduan berkadar pengawasan</option>
+                                <option value="Pengaduan tidak berkadar pengawasan">Pengaduan tidak berkadar pengawasan</option>
+                                <option value="Aspirasi">Aspirasi</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
                             <label class="form-label">Distribusi</label>
-                            <select class="form-select" wire:model.live="filterDistribusi">
+                            <select class="form-select" wire:model.live="filterDistribusi" id="filter-distribusi">
                                 <option value="">Semua Distribusi</option>
-                                @foreach ($distributions as $distribution)
-                                    <option>{{ $distribution }}</option>
+                                <optgroup label="Deputi">
+                                    @foreach ($deputies as $deputy)
+                                        <option value="deputy_{{ $deputy->id }}">{{ $deputy->name }}</option>
+                                    @endforeach
+                                </optgroup>
+                                <optgroup label="Unit Kerja">
+                                    @foreach ($unitKerjas as $unit)
+                                        <option value="unit_{{ $unit->id }}">{{ $unit->name }}</option>
+                                    @endforeach
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Status Analisis</label>
+                            <select class="form-select" wire:model.live="filterStatusAnalisis" id="filter-status-analisis">
+                                <option value="">Semua Status Analisis</option>
+                                @foreach ($analysisStatuses as $statusAnalisis)
+                                    <option>{{ $statusAnalisis }}</option>
                                 @endforeach
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Disposisi</label>
-                            <select class="form-select" wire:model.live="filterDisposisi">
-                                <option value="">Semua</option>
-                                <option>Belum terdisposisi</option>
-                                <option>Sudah terdisposisi</option>
-                            </select>
+                            <label class="form-label">Tanggal Pengaduan</label>
+                            <input type="text" class="form-control" id="tanggal-range-filter" wire:model.live="filterDateRange" placeholder="dd/mm/yyyy - dd/mm/yyyy" />
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Sumber</label>
-                            <select class="form-select" wire:model.live="filterSumber">
+                            <select class="form-select" wire:model.live="filterSumber" id="filter-sumber">
                                 <option value="">Semua Sumber</option>
                                 @foreach ($sources as $source)
                                     <option>{{ $source }}</option>
@@ -215,7 +311,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Urutkan</label>
-                            <select class="form-select" wire:model="sortDirection">
+                            <select class="form-select" wire:model.live="sortDirection" id="filter-urutkan">
                                 <option value="desc">Terbaru</option>
                                 <option value="asc">Terlama</option>
                             </select>
@@ -225,6 +321,59 @@
                 <div class="modal-footer sticky-bottom bg-body z-3 border-top">
                     <button class="btn btn-link text-danger" wire:click="resetFilters" data-bs-dismiss="modal">Reset</button>
                     <button class="btn btn-primary" data-bs-dismiss="modal">Terapkan</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div 
+        class="modal fade" 
+        id="modal-report-preview" 
+        tabindex="-1" 
+        aria-hidden="true" 
+        wire:ignore.self
+    >
+        {{-- PERUBAHAN: Ubah modal-md menjadi modal-lg agar lebih lebar --}}
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Pratinjau Laporan #{{ $previewReportData['ticket_number'] ?? '' }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item"><strong>Pengadu:</strong> {{ $previewReportData['reporter_name'] ?? '-' }}</div>
+                        <div class="list-group-item"><strong>Judul:</strong> {{ $previewReportData['subject'] ?? '-' }}</div>
+                        
+                        <div class="list-group-item"><strong>Status:</strong> {{ $previewReportData['status'] ?? '-' }}</div>
+                        <div class="list-group-item"><strong>Status Disposisi:</strong> {{ $previewReportData['disposition'] ?? '-' }}</div>
+                        
+                        <div class="list-group-item">
+                            <strong>Unit:</strong> 
+                            {{ $previewReportData['unit_tujuan'] ?? '-' }}
+                        </div>
+                        <div class="list-group-item">
+                            <strong>Deputi:</strong> 
+                            {{ $previewReportData['deputi_tujuan'] ?? '-' }}
+                        </div>
+                        
+                        <div class="list-group-item"><strong>Kategori:</strong> {{ $previewReportData['category'] ?? '-' }}</div>
+                        <div class="list-group-item"><strong>Sumber:</strong> {{ $previewReportData['source'] ?? '-' }}</div>
+                        <div class="list-group-item"><strong>Dibuat:</strong> {{ $previewReportData['created_at'] ?? '-' }}</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    {{-- Gunakan logika yang aman dari error route --}}
+                    @php
+                        $detailUuid = $previewReportData['uuid'] ?? false;
+                    @endphp
+                    <a 
+                        href="{{ $detailUuid ? route('reports.show', ['uuid' => $detailUuid]) : '#' }}" 
+                        class="btn btn-primary"
+                        {{ $detailUuid ? '' : 'disabled' }}
+                    >
+                        Lihat Detail Lengkap
+                    </a>
                 </div>
             </div>
         </div>
@@ -254,40 +403,207 @@
     @push('scripts')
         <script>
             document.addEventListener('livewire:initialized', () => {
-                Livewire.on('swal:confirm', (event) => {
-                    const { title, text, confirmButtonText, onConfirmed, onConfirmedParams } = event[0];
-                    Swal.fire({
-                        title: title,
-                        text: text,
-                        icon: 'warning',
-                        showCancelButton: true,
-                        confirmButtonColor: '#d33',
-                        cancelButtonColor: '#3085d6',
-                        confirmButtonText: confirmButtonText,
-                        cancelButtonText: 'Batal'
-                    }).then((result) => {
-                        if (result.isConfirmed) {
-                            Livewire.dispatch(onConfirmed, { reportId: onConfirmedParams[0] });
+                // Deklarasi variabel global untuk instance library dan komponen
+                let litepickerInstance = null;
+                let reportsComponent = null; // Instance komponen Livewire
+                
+                // Elemen DOM
+                const dateRangeInput = document.getElementById('tanggal-range-filter');
+                const filterModal = document.getElementById('modal-filter-laporan');
+                const previewModalElement = document.getElementById('modal-report-preview');
+                
+                // --- 1. Fungsi Utilitas (Shared Helpers) ---
+
+                const updateFilterBadge = () => {
+                    if (!reportsComponent) return;
+                    let count = 0;
+                    const filters = [
+                        'filterKategori', 'filterStatus', 'filterKlasifikasi',
+                        'filterDistribusi', 'filterStatusAnalisis', 'filterDateRange',
+                        'filterSumber', 'search'
+                    ];
+
+                    filters.forEach(filter => {
+                        const value = reportsComponent.$wire.get(filter);
+                        if (value && value !== 'desc' && value !== '') {
+                            count++;
                         }
                     });
+
+                    const badge = document.getElementById('filter-active-count');
+                    if (badge) {
+                        if (count > 0) {
+                            badge.classList.remove('d-none');
+                            badge.textContent = count;
+                        } else {
+                            badge.classList.add('d-none');
+                            badge.textContent = '0';
+                        }
+                    }
+                };
+
+                const initializeLitepicker = () => {
+                    if (litepickerInstance) { litepickerInstance.destroy(); }
+                    
+                    if (window.Litepicker && dateRangeInput && reportsComponent) {
+                        litepickerInstance = new Litepicker({
+                            element: dateRangeInput,
+                            singleMode: false,
+                            format: 'DD/MM/YYYY',
+                            autoApply: true,
+                            lang: 'id',
+                        });
+                        
+                        litepickerInstance.on('selected', (start, end) => {
+                            const dateRange = `${start.format('DD/MM/YYYY')} - ${end.format('DD/MM/YYYY')}`;
+                            reportsComponent.$wire.set('filterDateRange', dateRange);
+                            updateFilterBadge();
+                        });
+                        litepickerInstance.on('clear', () => {
+                            reportsComponent.$wire.set('filterDateRange', '');
+                            updateFilterBadge();
+                        });
+                    }
+                };
+
+                const initializeTomSelect = (selector, livewireProperty, config = {}) => {
+                    const selectElement = document.getElementById(selector);
+                    
+                    if (window.TomSelect && selectElement && reportsComponent) {
+                        if (selectElement.tomselect) { selectElement.tomselect.destroy(); }
+
+                        const defaultConfig = {
+                            plugins: { dropdown_input: {} },
+                            create: false,
+                            allowEmptyOption: true,
+                            sortField: { field: "text", direction: "asc" },
+                            onItemAdd: (value) => {
+                                reportsComponent.$wire.set(livewireProperty, value);
+                                updateFilterBadge();
+                            },
+                            onItemRemove: () => {
+                                reportsComponent.$wire.set(livewireProperty, '');
+                                updateFilterBadge();
+                            },
+                        };
+                        
+                        const finalConfig = { ...defaultConfig, ...config };
+                        const tomSelectInstance = new TomSelect(`#${selector}`, finalConfig);
+                        
+                        const livewireValue = reportsComponent.$wire.get(livewireProperty);
+                        if (livewireValue) {
+                            tomSelectInstance.setValue(livewireValue);
+                        }
+                    }
+                };
+                
+                // --- 2. Logika Modal Preview (Pure JS Show/Hide) ---
+                
+                // Fungsi untuk menyembunyikan modal secara Pure JS (dipanggil saat tombol close diklik)
+                const hidePreviewModalPureJS = () => {
+                    if (previewModalElement) {
+                        previewModalElement.classList.remove('show');
+                        previewModalElement.setAttribute('aria-hidden', 'true');
+                        document.body.classList.remove('modal-open');
+                        
+                        setTimeout(() => {
+                            previewModalElement.style.display = 'none';
+                            const backdrop = document.querySelector('.modal-backdrop');
+                            if (backdrop) {
+                                backdrop.remove();
+                            }
+                            
+                            // Panggil Livewire untuk mereset data (sama seperti hidden.bs.modal)
+                            if (reportsComponent) {
+                                reportsComponent.$wire.call('resetPreviewData');
+                            }
+                        }, 150); 
+                    }
+                };
+                
+                // Fungsi untuk menampilkan modal secara Pure JS (dipanggil dari Livewire Dispatch)
+                const showPreviewModalPureJS = () => {
+                    if (!previewModalElement) return;
+
+                    // Tambahkan backdrop
+                    let backdrop = document.querySelector('.modal-backdrop');
+                    if (!backdrop) {
+                        backdrop = document.createElement('div');
+                        // Menggunakan class Bootstrap CSS murni
+                        backdrop.classList.add('modal-backdrop', 'fade', 'show'); 
+                        document.body.appendChild(backdrop);
+                        
+                        // Tambahkan listener untuk menutup modal saat klik backdrop
+                        backdrop.onclick = hidePreviewModalPureJS;
+                    }
+
+                    // Tampilkan modal
+                    previewModalElement.style.display = 'block';
+                    previewModalElement.removeAttribute('aria-hidden');
+                    document.body.classList.add('modal-open');
+                    
+                    // Tambahkan class 'show' (dengan jeda untuk transisi CSS)
+                    setTimeout(() => {
+                        previewModalElement.classList.add('show');
+                    }, 1);
+                };
+                
+                // --- 3. Livewire Hooks dan Event Listeners ---
+                
+                // Simpan instance komponen saat terinisialisasi
+                Livewire.hook('element.init', ({ component }) => {
+                    if (component.name === 'admin.reports') {
+                        reportsComponent = component;
+                        updateFilterBadge();
+                    }
+                });
+                
+                // LISTENER BARU: Dipicu dari Controller setelah data diisi
+                // Ganti event show-bootstrap-modal dengan nama event Anda
+                Livewire.on('show-bootstrap-modal', () => {
+                    showPreviewModalPureJS();
                 });
 
-                Livewire.on('session:success', (event) => {
-                    const message = event[0].message;
-                    Swal.fire({
-                        toast: true,
-                        position: 'top-end',
-                        icon: 'success',
-                        title: message,
-                        showConfirmButton: false,
-                        timer: 3000,
-                        timerProgressBar: true,
-                        didOpen: (toast) => {
-                            toast.addEventListener('mouseenter', Swal.stopTimer);
-                            toast.addEventListener('mouseleave', Swal.resumeTimer);
-                        }
+                // Event listener saat modal filter dibuka (untuk inisialisasi TomSelect & Litepicker)
+                if (filterModal) {
+                    filterModal.addEventListener('shown.bs.modal', () => {
+                        initializeLitepicker();
+                        initializeTomSelect('filter-kategori', 'filterKategori', { allowEmptyOption: false });
+                        initializeTomSelect('filter-status', 'filterStatus');
+                        initializeTomSelect('filter-klasifikasi', 'filterKlasifikasi');
+                        initializeTomSelect('filter-distribusi', 'filterDistribusi');
+                        initializeTomSelect('filter-status-analisis', 'filterStatusAnalisis');
+                        initializeTomSelect('filter-sumber', 'filterSumber');
+                        initializeTomSelect('filter-urutkan', 'sortDirection');
+                        updateFilterBadge();
                     });
+                }
+                
+                // Listener update filter (dipicu setelah reset atau perubahan)
+                Livewire.on('filtersUpdated', () => {
+                    updateFilterBadge();
                 });
+                
+                // DAFTARKAN LISTENER CLOSE MANUAL (Pure JS)
+                // Kita harus mendaftarkan listener untuk tombol close (data-bs-dismiss="modal")
+                if (previewModalElement) {
+                    const closeButton = previewModalElement.querySelector('[data-bs-dismiss="modal"]');
+                    if (closeButton) {
+                        closeButton.addEventListener('click', hidePreviewModalPureJS);
+                    }
+                }
+                
+                // Hapus kode Bootstrap Modal yang tidak digunakan (previewModalInstance dan logikanya)
+                // Hapus blok kode di bawah ini:
+                /*
+                // Inisialisasi Bootstrap Modal
+                if (typeof bootstrap !== 'undefined' && previewModalElement) {
+                    previewModalInstance = new bootstrap.Modal(previewModalElement);
+                }
+                // ...
+                // Hapus semua event listener yang menggunakan 'hidden.bs.modal'
+                */
+                
             });
         </script>
     @endpush

@@ -21,7 +21,7 @@ class UnitKerja extends Model
 
     public function deputy(): BelongsTo
     {
-        return $this->belongsTo(Deputy::class);
+        return $this->belongsTo(Deputy::class, 'deputy_id');
     }
 
     public function users(): HasMany

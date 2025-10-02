@@ -62,17 +62,17 @@ return [
         
         // Konfigurasi untuk bucket 'complaint-documents'
         'complaints' => [
-        'driver' => 's3',
-        'key' => env('AWS_ACCESS_KEY_ID'),
-        'secret' => env('AWS_SECRET_ACCESS_KEY'),
-        'region' => env('AWS_DEFAULT_REGION'),
-        'bucket' => env('AWS_COMPLAINT_BUCKET'),
-        'endpoint' => env('AWS_ENDPOINT'),
-        'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
-        'url' => null,
-        'temporary_url' => env('AWS_URL_TEMPORARY', env('AWS_TEMPORARY_URL', 'http://localhost:9000')),
-        'throw' => false,
-    ],
+            'driver' => 's3',
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'region' => env('AWS_DEFAULT_REGION'),
+            'bucket' => env('AWS_COMPLAINT_BUCKET'),
+            'endpoint' => env('AWS_ENDPOINT'),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            'url' => null,
+            'temporary_url' => env('AWS_URL_TEMPORARY', env('AWS_TEMPORARY_URL', 'http://localhost:9000')),
+            'throw' => false,
+        ],
 
     ],
 

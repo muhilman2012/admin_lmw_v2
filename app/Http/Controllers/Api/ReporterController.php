@@ -94,70 +94,63 @@ class ReporterController extends Controller
             $isFromCheckin = $apiSource === 'checkin';
             
             $reporter = Reporter::where('nik', $validatedData['nik'])->first();
-        
-            if ($reporter) {
-                // Pengadu sudah ada, perbarui datanya
-                $reporter->fill($validatedData)->save();
-                
-                // Tambahkan logika checkin_status HANYA jika request dari mesin check-in
-                if ($isFromCheckin) {
-                    $reporter->checkin_status = 'pending_report_creation';
-                    $reporter->save();
+            
+            $action = '';
+            $description = '';
+            $statusMessage = '';
+            
+            // Atur status checkin_status berdasarkan sumber API
+            $checkinStatus = $isFromCheckin ? 'pending_report_creation' : 'not_checked_in';
 
-                    ActivityLog::create([
-                        'user_id' => Auth::id(),
-                        'action' => 'check_in_reporter',
-                        'description' => "Pengadu dengan NIK {$reporter->nik} check-in kembali melalui mesin.",
-                        'loggable_id' => $reporter->id,
-                        'loggable_type' => Reporter::class,
-                    ]);
+            if ($reporter) {
+                $reporter->fill($validatedData);
+                $reporter->checkin_status = $checkinStatus;
+                $reporter->save();
+                
+                if ($isFromCheckin) {
+                    $action = 'check_in_reporter';
+                    $description = "Pengadu dengan NIK {$reporter->nik} check-in kembali melalui mesin.";
+                    $statusMessage = 'Data Pengadu sudah terdaftar dan dimasukkan ke antrean.';
                 } else {
-                    // Log aktivitas untuk update data dari bot
-                    ActivityLog::create([
-                        'user_id' => Auth::id(),
-                        'action' => 'update_reporter_data',
-                        'description' => "Data pengadu dengan NIK {$reporter->nik} diperbarui melalui {$apiSource}.",
-                        'loggable_id' => $reporter->id,
-                        'loggable_type' => Reporter::class,
-                    ]);
+                    $action = 'update_reporter_data';
+                    $description = "Data pengadu dengan NIK {$reporter->nik} diperbarui melalui {$apiSource}.";
+                    $statusMessage = 'Data Pengadu sudah terdaftar dan diperbarui.';
                 }
 
                 return response()->json([
                     'status' => 'success',
-                    'message' => 'Data Pengadu sudah terdaftar dan diperbarui.',
+                    'message' => $statusMessage,
                     'reporter_id' => $reporter->id
                 ], 200);
+
+            } else {
+                $tanggalLahirRaw = substr($validatedData['nik'], 6, 2);
+                $genderDigit = intval($tanggalLahirRaw);
+                $validatedData['gender'] = ($genderDigit > 40) ? 'P' : 'L';
+                
+                $validatedData['checkin_status'] = $checkinStatus;
+
+                $newReporter = Reporter::create($validatedData);
+
+                $action = $isFromCheckin ? 'create_reporter_checkin' : 'create_reporter_whatsapp';
+                $description = "Pengadu baru dengan NIK {$newReporter->nik} berhasil dibuat dari {$apiSource}.";
+                $statusMessage = 'Data Pengadu berhasil disimpan dan dimasukkan ke antrean.';
+
+                ActivityLog::create([
+                    'user_id' => Auth::id(),
+                    'action' => $action,
+                    'description' => $description,
+                    'loggable_id' => $newReporter->id,
+                    'loggable_type' => Reporter::class,
+                ]);
+
+                return response()->json([
+                    'status' => 'success',
+                    'code' => '200',
+                    'message' => $statusMessage,
+                    'reporter_id' => $newReporter->id
+                ], 200);
             }
-
-            // ... (logika untuk pengadu baru, logika ini juga harus dibedakan) ...
-            $tanggalLahirRaw = substr($validatedData['nik'], 6, 2);
-            $genderDigit = intval($tanggalLahirRaw);
-            $validatedData['gender'] = ($genderDigit > 40) ? 'P' : 'L';
-            
-            // Set status checkin berdasarkan sumber API
-            $checkinStatus = $isFromCheckin ? 'pending_report_creation' : 'not_checked_in';
-            $validatedData['checkin_status'] = $checkinStatus;
-
-            $newReporter = Reporter::create($validatedData);
-
-            // Tambahkan log aktivitas untuk CREATE
-            $action = $isFromCheckin ? 'create_reporter_checkin' : 'create_reporter_whatsapp';
-            $description = "Pengadu baru dengan NIK {$newReporter->nik} berhasil dibuat dari {$apiSource}.";
-
-            ActivityLog::create([
-                'user_id' => Auth::id(),
-                'action' => $action,
-                'description' => $description,
-                'loggable_id' => $newReporter->id,
-                'loggable_type' => Reporter::class,
-            ]);
-
-            return response()->json([
-                'status' => 'success',
-                'code'  => '200',
-                'message' => 'Data Pengadu berhasil disimpan dan dimasukkan ke antrean.',
-                'reporter_id' => $newReporter->id
-            ], 200);
             
         } catch (ValidationException $e) {
             return response()->json([

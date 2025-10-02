@@ -6,7 +6,8 @@
 
     <link rel="icon" href="{{ asset('tabler/img/logo/LaporMasWapres.png') }}" type="image/png">
     <link rel="apple-touch-icon" href="{{ asset('tabler/img/logo/LaporMasWapres.png') }}">
-
+    
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <link href="{{ asset('tabler/libs/jsvectormap/dist/jsvectormap.css') }}" rel="stylesheet" />
     <link href="{{ asset('tabler/css/tabler.css') }}" rel="stylesheet" />
     <link href="{{ asset('tabler/css/addon-css.css') }}" rel="stylesheet" />

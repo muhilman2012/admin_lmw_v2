@@ -6,8 +6,13 @@ use App\Http\Controllers\Pages\UsersController;
 use App\Http\Controllers\Pages\ProfileController;
 use App\Http\Controllers\Pages\ReportersController;
 use App\Http\Controllers\Pages\ReportsController;
+use App\Http\Controllers\Pages\ForwardingController;
+use App\Http\Controllers\Pages\SearchController;
+use App\Http\Controllers\Pages\ReportExportController;
+use App\Http\Controllers\Pages\ReportImportController;
 use App\Http\Controllers\Pages\CategoriesController;
 use App\Http\Controllers\Pages\DeputiesController;
+use App\Http\Controllers\ReceiptPdfController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -61,10 +66,42 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     Route::prefix('reports')->name('reports.')->group(function () {
         Route::get('/', [ReportsController::class, 'index'])->name('index');
         Route::get('/{uuid}/detail', [ReportsController::class, 'show'])->name('show');
-        Route::get('/create/from-reporter/{reporter_id}', [ReportsController::class, 'create'])->name('create.from_reporter');
+        Route::get('/create/from-reporter/{reporter_uuid}', [ReportsController::class, 'create'])->name('create.from_reporter');
         Route::get('/create', [ReportsController::class, 'create'])->name('create');
         Route::post('/store', [ReportsController::class, 'store'])->name('store');
+        Route::get('reports/{uuid}/edit', [ReportsController::class, 'edit'])->name('edit');
+        Route::patch('reports/{uuid}', [ReportsController::class, 'update'])->name('update');
         Route::post('/attachments', [ReportsController::class, 'storeAttachment'])->name('attachments.store');
+        Route::post('/{uuid}/submit-analysis', [ReportsController::class, 'submitAnalysis'])->name('submit-analysis');
+        Route::patch('/{uuid}/update-response', [ReportsController::class, 'updateResponse'])->name('update-response');
+        Route::post('/{uuid}/approve', [ReportsController::class, 'approveAnalysis'])->name('approve');
+        Route::post('/{uuid}/forward', [ReportsController::class, 'forwardToLapor'])->name('forward');
+        Route::get('/{uuid}/download/user', [ReceiptPdfController::class, 'downloadReceiptUser'])->name('download.user');
+        Route::get('/{uuid}/download/government', [ReceiptPdfController::class, 'downloadReceiptGovernment'])->name('download.government');
+    });
+
+    Route::prefix('forwarding')->name('forwarding.')->group(function () {
+        Route::get('/', [ForwardingController::class, 'index'])->name('index');
+        Route::get('/{uuid}/detail/{complaintId}', [ForwardingController::class, 'showDetail'])->name('detail');
+        Route::put('/{complaintId}/reply', [ForwardingController::class, 'submitReply'])->name('reply');
+    });
+
+    Route::prefix('search')->name('search.')->group(function () {
+        Route::get('/', [SearchController::class, 'index'])->name('index');
+        Route::post('/run', [SearchController::class, 'runSearch'])->name('run');
+    });
+
+    Route::prefix('export')->name('export.')->group(function () {
+        Route::get('/', [ReportExportController::class, 'index'])->name('index');
+        Route::post('/excel', [ReportExportController::class, 'exportExcel'])->name('excel');
+        Route::post('/pdf', [ReportExportController::class, 'exportPdf'])->name('pdf');
+        Route::get('/status', [ReportExportController::class, 'checkStatus'])->name('status');
+        Route::get('/download', [ReportExportController::class, 'download'])->name('download');
+        Route::get('/template', [ReportExportController::class, 'downloadTemplate'])->name('template');
+    });
+
+    Route::prefix('import')->name('import.')->group(function () {
+        Route::post('/reports', [ReportImportController::class, 'importReports'])->name('reports');
     });
 
     // --- Pengelolaan Kategori ---
@@ -73,6 +110,7 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
         Route::post('/', [CategoriesController::class, 'store'])->name('store');
         Route::put('/{category}', [CategoriesController::class, 'update'])->name('update');
         Route::delete('/{category}', [CategoriesController::class, 'destroy'])->name('destroy');
+        Route::post('/assign-units', [CategoriesController::class, 'assignUnits'])->name('assign.units');
     });
 
     // --- Pengelolaan Struktur Organisasi ---

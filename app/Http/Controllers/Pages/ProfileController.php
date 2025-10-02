@@ -8,6 +8,7 @@ use App\Models\ApiSetting;
 use App\Models\UnitKerja;
 use App\Models\Deputy;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -23,11 +24,9 @@ class ProfileController extends Controller
             $query->orderBy('created_at', 'desc')->limit(10);
         }]);
 
-        $apiSettings = [
-            'base_url' => ApiSetting::where('key', 'base_url')->first()?->value,
-            'authorization' => ApiSetting::where('key', 'authorization')->first()?->value,
-            'token' => ApiSetting::where('key', 'token')->first()?->value,
-        ];
+        $apiSettings = ApiSetting::all()->groupBy('name')->map(function ($group) {
+            return $group->pluck('value', 'key')->all();
+        })->all();
         
         $units = UnitKerja::with('deputy')->get();
         $deputies = Deputy::all();
@@ -67,7 +66,7 @@ class ProfileController extends Controller
             $user->update($dataToUpdate);
         }
 
-        return redirect()->back()->with('success', 'Profil berhasil diperbarui!');
+        return redirect()->route('users.profile.index', ['#pane-account'])->with('success', 'Profil berhasil diperbarui!');
     }
 
     public function updatePassword(Request $request)
@@ -87,7 +86,7 @@ class ProfileController extends Controller
             'password' => Hash::make($request->input('new_password'))
         ]);
         
-        return redirect()->back()->with('success', 'Kata sandi berhasil diperbarui!');
+        return redirect()->route('users.profile.index', ['#pane-reset-password'])->with('success', 'Kata sandi berhasil diperbarui!');
     }
 
     public function regenerateApiToken(Request $request)
@@ -105,22 +104,24 @@ class ProfileController extends Controller
     public function updateApiSettings(Request $request)
     {
         $request->validate([
+            'api_name' => 'required|string|in:lmw_api,lapor_api,dukcapil_api',
             'base_url' => 'nullable|url|max:255',
-            'authorization' => 'nullable|string|max:255',
+            'authorization' => 'nullable|string',
             'token' => 'nullable|string',
         ]);
 
+        $apiName = $request->input('api_name');
         $settings = $request->only(['base_url', 'authorization', 'token']);
-
+        
         foreach ($settings as $key => $value) {
-            if ($value) {
+            if (!is_null($value)) {
                 ApiSetting::updateOrCreate(
-                    ['key' => $key],
+                    ['name' => $apiName, 'key' => $key],
                     ['value' => $value]
                 );
             }
         }
         
-        return redirect()->back()->with('success', 'Pengaturan API berhasil disimpan.');
+        return redirect()->route('users.profile.index', ['#pane-api-' . Str::of($apiName)->replace('_api', '')])->with('success', 'Pengaturan API ' . Str::upper($apiName) . ' berhasil disimpan.');
     }
 }

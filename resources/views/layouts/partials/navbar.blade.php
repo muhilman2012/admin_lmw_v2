@@ -64,8 +64,9 @@
                         <div class="mt-1 small text-secondary">{{ Auth::user()->role }}</div>
                     </div>
                 </a>
-                <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-                    <a href="{{ route('users.profile.index') }}" class="dropdown-item">Profile</a>
+                <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow z-3">
+                    <a href="{{ route('users.profile.index') }}" class="dropdown-item">Profil</a>
+                    <a href="{{ route('categories.index') }}" class="dropdown-item">Pengaturan</a>
                     <div class="dropdown-divider"></div>
                     <a class="dropdown-item" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
                         Logout
@@ -76,20 +77,15 @@
         
         <div class="collapse navbar-collapse" id="navbar-menu">
             <ul class="navbar-nav">
-                <li class="nav-item {{ Request::is('dashboard') ? 'active' : '' }}">
+                <li class="nav-item {{ Request::is('admin/dashboard') ? 'active' : '' }}">
                     <a class="nav-link" href="{{ route('dashboard') }}">
                         <span class="nav-link-icon d-md-none d-lg-inline-block">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-home">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                <path d="M5 12l-2 0l9 -9l9 9l-2 0" />
-                                <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
-                                <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
-                            </svg>
+                            <i class="ti ti-home"></i>
                         </span>
                         <span class="nav-link-title">Beranda</span>
                     </a>
                 </li>
-                <li class="nav-item {{ Request::is('users/profile') ? 'active' : '' }}">
+                <li class="nav-item {{ Request::is('admin/users/profile') ? 'active' : '' }}">
                     <a class="nav-link" href="{{ route('users.profile.index') }}">
                         <span class="nav-link-icon d-md-none d-lg-inline-block">
                             <i class="ti ti-user-circle"></i>
@@ -97,7 +93,7 @@
                         <span class="nav-link-title">Profil</span>
                     </a>
                 </li>
-                <li class="nav-item {{ Request::is('reporters*') ? 'active' : '' }}">
+                <li class="nav-item {{ Request::is('admin/reporters*') ? 'active' : '' }}">
                     <a class="nav-link" href="{{ route('reporters.index') }}">
                         <span class="nav-link-icon d-md-none d-lg-inline-block">
                             <i class="ti ti-list"></i>
@@ -105,7 +101,7 @@
                         <span class="nav-link-title">Daftar Pengadu</span>
                     </a>
                 </li>
-                <li class="nav-item {{ Request::is('reports*') ? 'active' : '' }}">
+                <li class="nav-item {{ Request::is('admin/reports*') ? 'active' : '' }}">
                     <a class="nav-link" href="{{ route('reports.index') }}">
                         <span class="nav-link-icon d-md-none d-lg-inline-block">
                             <i class="ti ti-file-text"></i>
@@ -113,24 +109,24 @@
                         <span class="nav-link-title">Kelola Pengaduan</span>
                     </a>
                 </li>
-                <li class="nav-item {{ Request::is('forwarding/reports*') ? 'active' : '' }}">
-                    <a class="nav-link" href="#">
+                <li class="nav-item {{ Request::is('admin/forwarding*') ? 'active' : '' }}">
+                    <a class="nav-link" href="{{ route('forwarding.index') }}">
                         <span class="nav-link-icon d-md-none d-lg-inline-block">
                             <i class="ti ti-share"></i>
                         </span>
                         <span class="nav-link-title">Laporan Diteruskan</span>
                     </a>
                 </li>
-                <li class="nav-item {{ Request::is('reports/search*') ? 'active' : '' }}">
-                    <a class="nav-link" href="#">
+                <li class="nav-item {{ Request::is('admin/search*') ? 'active' : '' }}">
+                    <a class="nav-link" href="{{ route('search.index') }}">
                         <span class="nav-link-icon d-md-none d-lg-inline-block">
                             <i class="ti ti-search"></i>
                         </span>
                         <span class="nav-link-title">Pencarian</span>
                     </a>
                 </li>
-                <li class="nav-item {{ Request::is('reports/export*') ? 'active' : '' }}">
-                    <a class="nav-link" href="#">
+                <li class="nav-item {{ Request::is('admin/export*') ? 'active' : '' }}">
+                    <a class="nav-link" href="{{ route('export.index') }}">
                         <span class="nav-link-icon d-md-none d-lg-inline-block">
                             <i class="ti ti-download"></i>
                         </span>
@@ -138,7 +134,7 @@
                     </a>
                 </li>
                 @can('view users')
-                    <li class="nav-item {{ Request::is('users/management*') ? 'active' : '' }}">
+                    <li class="nav-item {{ Request::is('admin/users/management*') ? 'active' : '' }}">
                         <a class="nav-link" href="{{ route('users.management.index') }}">
                             <span class="nav-link-icon d-md-none d-lg-inline-block">
                                 <i class="ti ti-users"></i>

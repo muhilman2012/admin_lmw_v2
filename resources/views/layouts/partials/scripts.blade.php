@@ -5,7 +5,7 @@
 <script src="{{ asset('tabler/js/toast-trial.js') }}" defer></script>
 <script src="{{ asset('tabler/libs/litepicker/dist/litepicker.js') }}" defer></script>
 <script src="{{ asset('tabler/libs/tom-select/dist/js/tom-select.complete.min.js') }}" defer></script>
-
+<script src="{{ asset('assets/js/loader-util.js') }}"></script>
 
 <script src="{{ asset('assets/js/sweetalert2.all.min.js') }}"></script>
 <script>
@@ -45,6 +45,21 @@
 
 <script>
     document.addEventListener('livewire:initialized', () => {
+        Livewire.on('session:success', (data) => {
+            const payload = data[0] || data; 
+            const message = payload.message || 'Aksi berhasil!'; 
+
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'success',
+                title: message,
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true,
+            });
+        });
+
         Livewire.on('modal:show', (event) => {
             const modalElement = document.getElementById(event.id);
             if (modalElement) {

@@ -37,7 +37,7 @@
                         <td>{{ $reporter->address }}</td>
                         <td>
                             <div class="btn-list flex-nowrap">
-                                <a href="#" class="btn btn-primary" >
+                                <a href="{{ route('reports.create', ['reporter_id' => $hashids->encode($reporter->id)]) }}" class="btn btn-primary">
                                     <i class="ti ti-pencil me-2"></i>Buat Laporan
                                 </a>
                             </div>

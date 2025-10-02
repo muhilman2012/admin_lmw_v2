@@ -10,6 +10,7 @@ class ApiSetting extends Model
     use HasFactory;
 
     protected $fillable = [
+        'name',
         'key',
         'value',
     ];

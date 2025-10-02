@@ -11,10 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('api_settings', function (Blueprint $table) {
+        Schema::create('document_templates', function (Blueprint $table) {
             $table->id();
-            $table->string('key')->unique();
-            $table->text('value');
+            $table->string('name')->unique();
             $table->timestamps();
         });
     }
@@ -24,6 +23,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('api_settings');
+        Schema::dropIfExists('document_templates');
     }
 };

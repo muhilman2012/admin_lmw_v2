@@ -3,6 +3,7 @@
 @include('layouts.partials.head')
 
 <body class="layout-fluid">
+    @include('layouts.partials.page-loader')
     <div class="page">
         <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
             @csrf

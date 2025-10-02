@@ -26,6 +26,8 @@ return new class extends Migration
             $table->text('response')->nullable();
             $table->string('classification')->nullable();
             $table->unsignedBigInteger('category_id');
+            $table->foreignId('unit_kerja_id')->nullable()->constrained('unit_kerjas');
+            $table->foreignId('deputy_id')->nullable()->constrained('deputies');
             $table->timestamps();
         });
     }
