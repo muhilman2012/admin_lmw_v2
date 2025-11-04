@@ -19,11 +19,12 @@
                     <p class="form-hint">Choose the color mode for your app.</p>
                     <div class="form-selectgroup">
                         <label class="form-selectgroup-item">
-                            <input type="radio" name="theme-mode" value="light" class="form-selectgroup-input" checked />
+                            {{-- NAME WAJIB 'data-bs-theme' untuk Bootstrap/Tabler --}}
+                            <input type="radio" name="data-bs-theme" value="light" class="form-selectgroup-input" checked />
                             <span class="form-selectgroup-label">Light</span>
                         </label>
                         <label class="form-selectgroup-item">
-                            <input type="radio" name="theme-mode" value="dark" class="form-selectgroup-input" />
+                            <input type="radio" name="data-bs-theme" value="dark" class="form-selectgroup-input" />
                             <span class="form-selectgroup-label">Dark</span>
                         </label>
                     </div>
@@ -34,23 +35,40 @@
                     <div class="row g-2">
                         <div class="col-auto">
                             <label class="form-colorinput">
-                                <input name="theme-primary" type="radio" value="blue" class="form-colorinput-input" checked />
+                                {{-- NAME WAJIB 'theme-color' --}}
+                                <input name="theme-color" type="radio" value="blue" class="form-colorinput-input" checked />
                                 <span class="form-colorinput-color bg-blue"></span>
                             </label>
                         </div>
+                        <div class="col-auto">
+                            <label class="form-colorinput">
+                                <input name="theme-color" type="radio" value="orange" class="form-colorinput-input" />
+                                <span class="form-colorinput-color bg-orange"></span>
+                            </label>
                         </div>
+                         <div class="col-auto">
+                            <label class="form-colorinput">
+                                <input name="theme-color" type="radio" value="green" class="form-colorinput-input" />
+                                <span class="form-colorinput-color bg-green"></span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
                 <div class="mb-4">
                     <label class="form-label">Font family</label>
                     <p class="form-hint">Choose the font family that fits your app.</p>
                     <div class="form-selectgroup">
                         <label class="form-selectgroup-item">
-                            <input type="radio" name="theme-font" value="sans-serif" class="form-selectgroup-input" checked />
+                            <input type="radio" name="theme-font" value="none" class="form-selectgroup-input" checked />
+                            <span class="form-selectgroup-label">Default</span>
+                        </label>
+                        <label class="form-selectgroup-item">
+                            <input type="radio" name="theme-font" value="sans-serif" class="form-selectgroup-input" />
                             <span class="form-selectgroup-label">Sans-serif</span>
                         </label>
-                        </div>
+                    </div>
                 </div>
-                <div class="mb-4">
+                 <div class="mb-4">
                     <label class="form-label">Theme base</label>
                     <p class="form-hint">Choose the gray shade for your app.</p>
                     <div class="form-selectgroup">
@@ -58,17 +76,25 @@
                             <input type="radio" name="theme-base" value="gray" class="form-selectgroup-input" checked />
                             <span class="form-selectgroup-label">Gray</span>
                         </label>
-                        </div>
+                        <label class="form-selectgroup-item">
+                            <input type="radio" name="theme-base" value="light" class="form-selectgroup-input" />
+                            <span class="form-selectgroup-label">Light</span>
+                        </label>
+                    </div>
                 </div>
                 <div class="mb-4">
                     <label class="form-label">Corner Radius</label>
                     <p class="form-hint">Choose the border radius factor for your app.</p>
                     <div class="form-selectgroup">
                         <label class="form-selectgroup-item">
+                            <input type="radio" name="theme-radius" value="0.6rem" class="form-selectgroup-input" checked />
+                            <span class="form-selectgroup-label">Default</span>
+                        </label>
+                        <label class="form-selectgroup-item">
                             <input type="radio" name="theme-radius" value="0" class="form-selectgroup-input" />
                             <span class="form-selectgroup-label">0</span>
                         </label>
-                        </div>
+                    </div>
                 </div>
             </div>
             <div class="mt-auto space-y">

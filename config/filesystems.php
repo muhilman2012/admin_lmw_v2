@@ -74,6 +74,14 @@ return [
             'throw' => false,
         ],
 
+        // DISK BARU UNTUK DOKUMEN V1
+        'v1_local' => [
+            'driver' => 'local',
+            'root' => storage_path('app/public/dokumen_v1'), 
+            'url' => env('APP_URL').'/storage/dokumen_v1',
+            'visibility' => 'public',
+        ],
+
     ],
 
     /*

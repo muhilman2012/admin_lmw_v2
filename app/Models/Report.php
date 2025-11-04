@@ -14,6 +14,8 @@ class Report extends Model
     use HasFactory;
 
     protected $casts = [
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
         'event_date' => 'date',
     ];
 
@@ -29,10 +31,13 @@ class Report extends Model
         'source',
         'status',
         'response',
+        'is_benefit_provided',
         'classification',
         'category_id',
         'unit_kerja_id',
         'deputy_id', 
+        'created_at',
+        'updated_at'
     ];
 
     public function reporter()
@@ -79,5 +84,29 @@ class Report extends Model
         
         // Jika tidak punya parent, atau kategori tidak terisi
         return null;
+    }
+
+    public function getAnalysisStatusAttribute()
+    {
+        // Cek assignment terbaru berdasarkan ID (asumsi ID yang lebih besar adalah yang terbaru)
+        $latestAssignment = $this->assignments()
+                                ->latest('id')
+                                ->first();
+
+        // Kembalikan status dari assignment tersebut, default ke 'pending' jika tidak ada assignment
+        return $latestAssignment->status ?? 'pending';
+    }
+
+    /**
+     * Accessor untuk mendapatkan ID pengguna yang ditugaskan (assigned_to_user_id)
+     * dari assignment terbaru.
+     */
+    public function getAssignedToUserIdAttribute()
+    {
+        $latestAssignment = $this->assignments()
+                                ->latest('id')
+                                ->first();
+
+        return $latestAssignment->assigned_to_id ?? null;
     }
 }

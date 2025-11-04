@@ -23,6 +23,11 @@
                         </ul>
                     </div>
                 @endif
+                @if (session('status'))
+                    <div class="alert alert-{{ session('status')['type'] }} mb-3">
+                        <p class="mb-0">{!! session('status')['message'] !!}</p> 
+                    </div>
+                @endif
                 <div class="mb-3">
                     <label class="form-label">Email</label>
                     <input type="email" name="email" class="form-control" placeholder="email@set.wapresri.go.id" value="{{ old('email') }}">
@@ -31,7 +36,7 @@
                     <label class="form-label">
                         Password
                         <span class="form-label-description">
-                            <a href="#">Lupa Password</a>
+                            <a href="{{ route('password.forgot') }}">Lupa Password</a>
                         </span>
                     </label>
                     <div class="input-group input-group-flat">

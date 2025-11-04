@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\CheckPasswordReset; 
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Pages\DashboardController;
 use App\Http\Controllers\Pages\UsersController;
@@ -10,8 +11,12 @@ use App\Http\Controllers\Pages\ForwardingController;
 use App\Http\Controllers\Pages\SearchController;
 use App\Http\Controllers\Pages\ReportExportController;
 use App\Http\Controllers\Pages\ReportImportController;
-use App\Http\Controllers\Pages\CategoriesController;
+use App\Http\Controllers\Pages\UserImportController;
+use App\Http\Controllers\Pages\SettingsController;
+use App\Http\Controllers\Pages\UnitKerjaController;
 use App\Http\Controllers\Pages\DeputiesController;
+use App\Http\Controllers\Pages\NotificationController;
+use App\Http\Controllers\Pages\KmsController;
 use App\Http\Controllers\ReceiptPdfController;
 use Illuminate\Support\Facades\Route;
 
@@ -27,14 +32,19 @@ use Illuminate\Support\Facades\Route;
 // Rute Autentikasi
 Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/', [LoginController::class, 'login']);
+Route::get('/forgot-password', [LoginController::class, 'showForgotPasswordForm'])->name('password.forgot');
+Route::post('/forgot-password', [LoginController::class, 'handleForgotPassword'])->name('password.reset.internal');
 
 // Rute yang hanya bisa diakses setelah login
-Route::middleware(['auth'])->prefix('admin')->group(function () {
+Route::middleware(['auth', CheckPasswordReset::class])->prefix('admin')->group(function () {
     // Rute Logout
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
     
     // Halaman Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // Notification
+    Route::get('/notifications/mark-all-read', [NotificationController::class, 'markAllRead'])->name('notifications.markAllRead');
 
     // --- Pengelolaan Pengguna dan Profil ---
     Route::prefix('users')->name('users.')->group(function () {
@@ -69,9 +79,11 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
         Route::get('/create/from-reporter/{reporter_uuid}', [ReportsController::class, 'create'])->name('create.from_reporter');
         Route::get('/create', [ReportsController::class, 'create'])->name('create');
         Route::post('/store', [ReportsController::class, 'store'])->name('store');
-        Route::get('reports/{uuid}/edit', [ReportsController::class, 'edit'])->name('edit');
-        Route::patch('reports/{uuid}', [ReportsController::class, 'update'])->name('update');
+        Route::get('/by-kk', [ReportsController::class, 'getReportsByKK'])->name('by.kk');
+        Route::get('{uuid}/edit', [ReportsController::class, 'edit'])->name('edit');
+        Route::patch('{uuid}', [ReportsController::class, 'update'])->name('update');
         Route::post('/attachments', [ReportsController::class, 'storeAttachment'])->name('attachments.store');
+        Route::post('/{uuid}/assign-quick', [ReportsController::class, 'assignQuick'])->name('assign-quick');
         Route::post('/{uuid}/submit-analysis', [ReportsController::class, 'submitAnalysis'])->name('submit-analysis');
         Route::patch('/{uuid}/update-response', [ReportsController::class, 'updateResponse'])->name('update-response');
         Route::post('/{uuid}/approve', [ReportsController::class, 'approveAnalysis'])->name('approve');
@@ -83,7 +95,8 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     Route::prefix('forwarding')->name('forwarding.')->group(function () {
         Route::get('/', [ForwardingController::class, 'index'])->name('index');
         Route::get('/{uuid}/detail/{complaintId}', [ForwardingController::class, 'showDetail'])->name('detail');
-        Route::put('/{complaintId}/reply', [ForwardingController::class, 'submitReply'])->name('reply');
+        Route::post('/{complaintId}/followup/add', [ForwardingController::class, 'sendFollowUp'])->name('followup.add');
+        Route::get('/masters/templates', [ForwardingController::class, 'getTemplates'])->name('templates'); 
     });
 
     Route::prefix('search')->name('search.')->group(function () {
@@ -97,20 +110,35 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
         Route::post('/pdf', [ReportExportController::class, 'exportPdf'])->name('pdf');
         Route::get('/status', [ReportExportController::class, 'checkStatus'])->name('status');
         Route::get('/download', [ReportExportController::class, 'download'])->name('download');
-        Route::get('/template', [ReportExportController::class, 'downloadTemplate'])->name('template');
+        Route::get('/template', [ReportImportController::class, 'downloadTemplate'])->name('template');
     });
 
     Route::prefix('import')->name('import.')->group(function () {
         Route::post('/reports', [ReportImportController::class, 'importReports'])->name('reports');
+        Route::post('/preview', [ReportImportController::class, 'previewReports'])->name('preview');
+        Route::post('/users', [UserImportController::class, 'store'])->name('users.store');
+        Route::get('/users/template', [UserImportController::class, 'downloadTemplate'])->name('users.template');
     });
 
-    // --- Pengelolaan Kategori ---
-    Route::prefix('categories')->name('categories.')->group(function () {
-        Route::get('/', [CategoriesController::class, 'index'])->name('index');
-        Route::post('/', [CategoriesController::class, 'store'])->name('store');
-        Route::put('/{category}', [CategoriesController::class, 'update'])->name('update');
-        Route::delete('/{category}', [CategoriesController::class, 'destroy'])->name('destroy');
-        Route::post('/assign-units', [CategoriesController::class, 'assignUnits'])->name('assign.units');
+    // --- Settings Aplikasi ---
+    Route::prefix('settings')->name('settings.')->group(function () {
+        Route::get('/', [SettingsController::class, 'index'])->name('index');
+        Route::post('/', [SettingsController::class, 'store'])->name('store');
+        Route::put('/{category}', [SettingsController::class, 'update'])->name('update');
+        Route::delete('/{category}', [SettingsController::class, 'destroy'])->name('destroy');
+        Route::patch('/{category}/toggle-active', [SettingsController::class, 'toggleCategoryActive'])->name('toggle-active');
+        Route::post('/assign-units', [SettingsController::class, 'assignUnits'])->name('assign.units');
+        Route::get('/assignments-by-deputy', [SettingsController::class, 'getAssignmentsByDeputy'])->name('assignments.by.deputy');
+        Route::put('/matrix/update', [SettingsController::class, 'updateMatrix'])->name('matrix.update');
+        Route::post('/run-maintenance', [SettingsController::class, 'runSystemMaintenance'])->name('run-maintenance');
+        Route::post('/retry-lapor', [SettingsController::class, 'retryLaporForwarding'])->name('retry.lapor');
+        Route::get('/gemini-status', [SettingsController::class, 'getGeminiStatus'])->name('gemini.status');
+
+        Route::prefix('unit-kerjas')->name('unitkerjas.')->group(function () {
+            Route::post('/', [UnitKerjaController::class, 'store'])->name('store');
+            Route::put('/{unitKerja}', [UnitKerjaController::class, 'update'])->name('update');
+            Route::delete('/{unitKerja}', [UnitKerjaController::class, 'destroy'])->name('destroy');
+        });
     });
 
     // --- Pengelolaan Struktur Organisasi ---
@@ -128,4 +156,21 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     Route::middleware('role:asdep_karo|deputy')->group(function () {
         Route::post('/reports/{report}/assign', [ReportsController::class, 'assign'])->name('reports.assign');
     });
+
+    Route::prefix('kms')->name('kms.')->group(function () {
+        Route::middleware('role:superadmin|admin')->group(function () {
+            Route::get('/create', [KmsController::class, 'create'])->name('create');
+            Route::post('/', [KmsController::class, 'store'])->name('store');
+            Route::get('/{article}/edit', [KmsController::class, 'edit'])->name('edit');
+            Route::put('/{article}', [KmsController::class, 'update'])->name('update');
+            Route::delete('/{article}', [KmsController::class, 'destroy'])->name('destroy');
+        });
+        
+        Route::get('/', [KmsController::class, 'index'])->name('index'); 
+        Route::get('/{article}', [KmsController::class, 'show'])->name('show');
+    });
 });
+
+Route::get('/changelog/v2', function () {
+    return view('changelogs.v2'); 
+})->name('changelog.v2');

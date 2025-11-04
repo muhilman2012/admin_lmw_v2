@@ -20,4 +20,16 @@ class Deputy extends Model
     {
         return $this->hasMany(UnitKerja::class);
     }
+
+    public function users(): HasMany
+    {
+        return $this->hasMany(User::class);
+    }
+
+    public function categoriesThroughUnits()
+    {
+        return Category::whereHas('unitKerjas', function ($query) {
+            $query->whereIn('unit_kerjas.deputy_id', [$this->id]);
+        })->get();
+    }
 }

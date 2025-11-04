@@ -1,8 +1,6 @@
 @extends('layouts.app')
 
 @section('title', 'Pencarian Laporan')
-@section('page_pretitle', 'Alat')
-@section('page_title', 'Pencarian Universal')
 
 @section('page_header')
     <div class="page-header d-print-none" aria-label="Page header">
@@ -27,19 +25,19 @@
                         name="q"
                         type="search"
                         class="form-control"
-                        placeholder="Cari judul, NIK, atau nomor tiket..."
+                        placeholder="Cari judul, NIK, Nama, atau nomor tiket..."
                         required
                     />
                 </div>
             </div>
-            <div class="col-6 col-md-2">
+            {{-- <div class="col-6 col-md-2">
                 <select id="status" name="status" class="form-select">
                     <option value="">Semua Status</option>
                     @foreach ($statuses as $status)
                         <option value="{{ $status }}">{{ $status }}</option>
                     @endforeach
                 </select>
-            </div>
+            </div> --}}
             <div class="col-6 col-md-2 d-flex gap-2 justify-content-end">
                 <button class="btn btn-primary" type="submit"><i class="ti ti-search me-1"></i>Cari</button>
                 <button class="btn btn-link" type="reset">Reset</button>

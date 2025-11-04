@@ -15,9 +15,9 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('phone_number')->nullable();
-            $table->string('email')->unique()->nullable();
+            $table->string('email')->nullable();
             $table->string('nik', 16)->unique();
-            $table->string('kk_number', 16)->unique()->nullable();
+            $table->string('kk_number', 16)->nullable();
             $table->string('gender')->nullable();
             $table->text('address')->nullable();
             $table->string('checkin_status')->default('not_checked_in');

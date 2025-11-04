@@ -5,10 +5,22 @@ namespace App\Livewire\Admin;
 use Livewire\Component;
 use Livewire\WithPagination;
 use App\Models\Report;
+use App\Models\Reporter;
+use App\Models\Assignment;
+use App\Models\ActivityLog;
 use App\Models\Category;
 use App\Models\UnitKerja;
 use App\Models\Deputy;
+use App\Models\User;
 use Carbon\Carbon;
+use App\Notifications\NewAssignmentNotification;
+use Illuminate\Database\QueryException;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
+use Livewire\Attributes\Url;
 
 class Reports extends Component
 {
@@ -28,6 +40,7 @@ class Reports extends Component
     public $filterSumber = '';
     public $filterDateRange = '';
 
+    public $unassignedCategoryId = null;
     public $categories;
     public $statuses;
     public $sources;
@@ -39,21 +52,48 @@ class Reports extends Component
         'Aspirasi',
     ];
     public $analysisStatuses = [
-        'Analisis',
-        'Disetujui',
-        'Perlu Perbaikan',
-        'Selesai',
-        'Ditolak'
+        'submitted', 'approved', 'revision_needed'
     ];
 
     public $previewReportData = [];
     public $isModalOpen = false;
+    public $categoryMapping = [];
+
+    public $dispatchReportId;
+    public $dispatchReportTicketNumber;
+    public $analystId;
+    public $dispositionNotes;
+    public $currentAssignmentId = null;
+
+    public $selectedReports = [];
+    public $selectAll = false;
+    public $newCategoryId = null;
+    public $newAnalystId = null;
+    public $newCategoryDestinationName = 'Belum Dipilih';
+    public $newCategoryDestinationDeputy = 'N/A';
+
+    public $confirmDeleteId;
+    public $confirmDeleteTicket;
+    public $confirmDeleteName;
+
+    public $confirmDeleteAssignmentId;
+    public $confirmDeleteAssignmentAnalyst;
+    public $confirmDeleteAssignmentTicket;
 
     protected $listeners = [
         'deleteReport',
+        'deleteAssignment',
         'updateDateRange' => 'handleDateRangeUpdate'
     ];
     protected $paginationTheme = 'bootstrap';
+    protected $queryString = [
+        'search' => ['except' => ''],
+        'filterKategori' => ['except' => ''],
+        'filterDisposisi' => ['except' => ''], 
+        'filterStatus' => ['except' => ''],
+        'filterKlasifikasi' => ['except' => ''],
+        'filterDistribusi' => ['except' => ''],
+    ];
 
     public function mount()
     {
@@ -62,20 +102,75 @@ class Reports extends Component
         $this->sources = Report::select('source')->distinct()->get()->pluck('source');
         $this->unitKerjas = UnitKerja::all();
         $this->deputies = Deputy::all();
+        $this->unassignedCategoryId = Category::where('name', 'Lainnya')->value('id');
+        $this->categoryMapping = Category::with('unitKerjas.deputy')
+            ->get()
+            ->pluck('unitKerjas.0.deputy.name', 'id')
+            ->toArray();
     }
 
-    public function render()
+    public function resetMassActionProperties()
     {
-        $query = Report::with(['reporter', 'category', 'unitKerja', 'deputy']);
+        $this->reset([
+            'confirmDeleteAssignmentId', 
+            'confirmDeleteAssignmentTicket', 
+            'confirmDeleteAssignmentAnalyst',
+            'newAnalystId',
+            'newCategoryId',
+            'currentAssignmentId',
+            'dispositionNotes'
+        ]);
 
-        // Logika Pencarian
+        $this->dispatch('close-mass-disposition-modal');
+        $this->dispatch('close-mass-category-modal');
+    }
+
+    private function applyUserScope(Builder $query, User $user): Builder
+    {
+        if ($user->hasRole('superadmin') || $user->hasRole('admin')) {
+            return $query;
+        }
+        if ($user->hasRole('analyst')) {
+            return $query->whereHas('assignments', function ($q) use ($user) {
+                $q->where('assigned_to_id', $user->id);
+            });
+        }
+        if ($user->hasRole('deputy') && $user->deputy_id) {
+            $unitIds = UnitKerja::where('deputy_id', $user->deputy_id)->pluck('id');
+            return $query->whereHas('category', function (Builder $q) use ($unitIds) {
+                $q->whereHas('unitKerjas', function ($qUnit) use ($unitIds) {
+                    $qUnit->whereIn('unit_kerjas.id', $unitIds);
+                });
+            });
+        }
+        if ($user->unit_kerja_id) {
+            return $query->whereHas('category', function (Builder $q) use ($user) {
+                $q->whereHas('unitKerjas', function ($qUnit) use ($user) {
+                    $qUnit->where('unit_kerjas.id', $user->unit_kerja_id);
+                });
+            });
+        }
+        return $query->where('id', 0);
+    }
+
+    public function getReportsProperty()
+    {
+        $user = Auth::user();
+
+        // APLIKASIKAN FILTER AKSES BERBASIS PERAN (RBAC Scope)
+        $query = Report::query()->with(['reporter', 'category.unitKerjas', 'unitKerja', 'deputy', 'assignments.assignedTo']);
+
+        $query = $this->applyUserScope($query, $user);
+
+        // LOGIKA PENCARIAN
         if ($this->search) {
-            $query->where(function ($q) {
-                $q->where('ticket_number', 'like', $this->search . '%')
-                  ->orWhere('subject', 'like', '%' . $this->search . '%')
-                  ->orWhereHas('reporter', function ($q) {
-                      $q->where('name', 'like', '%' . $this->search . '%')
-                        ->orWhere('nik', 'like', '%' . $this->search . '%');
+            $searchTerm = '%' . $this->search . '%';
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('ticket_number', 'like', str_replace('%', '', $searchTerm) . '%')
+                  ->orWhere('subject', 'like', $searchTerm)
+                  ->orWhereHas('reporter', function ($q) use ($searchTerm) {
+                      $q->where('name', 'like', $searchTerm)
+                        ->orWhere('nik', 'like', $searchTerm);
                   });
             });
         }
@@ -91,36 +186,58 @@ class Reports extends Component
             $query->where('status', $this->filterStatus);
         }
 
-        // Logika Filter Klasifikasi (Baru)
+        // Logika Filter Klasifikasi
         if ($this->filterKlasifikasi) {
             $query->where('classification', $this->filterKlasifikasi);
         }
 
-        // Logika Filter Distribusi (Diperbaiki)
+        // Logika Filter Distribusi
         if ($this->filterDistribusi) {
-            $parts = explode('_', $this->filterDistribusi);
-            $type = $parts[0] ?? null;
-            $id = $parts[1] ?? null;
+            if ($this->filterDistribusi === 'unassigned') {
+                
+                if ($this->unassignedCategoryId) {
+                    // Tampilkan laporan yang Kategori ID-nya adalah ID Kategori 'Lainnya'
+                    $query->where('category_id', $this->unassignedCategoryId);
+                } else {
+                    // Jika Kategori 'Lainnya' tidak ditemukan, jangan tampilkan apa-apa
+                    $query->where('id', 0); 
+                }
+                
+            } else {
+                // Logika lama (Deputi atau Unit Kerja)
+                list($type, $id) = array_pad(explode('_', $this->filterDistribusi), 2, null);
 
-            if ($type === 'deputy') {
-                $query->where('deputy_id', $id);
-            } elseif ($type === 'unit') {
-                $query->where('unit_kerja_id', $id);
+                if ($type === 'deputy' && $id) {
+                    $query->where('deputy_id', $id);
+                } elseif ($type === 'unit' && $id) {
+                    $query->where('unit_kerja_id', $id);
+                }
             }
         }
 
-        // Logika Filter Disposisi (Baru)
+        // Logika Filter Disposisi
         if ($this->filterDisposisi) {
             if ($this->filterDisposisi === 'Belum terdisposisi') {
-                $query->whereNull('disposition');
-            } else { // 'Sudah terdisposisi'
-                $query->whereNotNull('disposition');
+                $query->whereDoesntHave('assignments'); 
+            } else if ($this->filterDisposisi === 'Sudah terdisposisi') {
+                $query->whereHas('assignments');
+            } else { 
+                $analystName = $this->filterDisposisi;
+                
+                $query->whereHas('assignments', function (Builder $q) use ($analystName) {
+                    $q->whereHas('assignedTo', function (Builder $qUser) use ($analystName) {
+                        $qUser->where('name', $analystName);
+                    });
+                });
             }
         }
         
-        // Logika Filter Status Analisis (Baru)
+        // Logika Filter Status Analisis
         if ($this->filterStatusAnalisis) {
-            $query->where('analysis_status', $this->filterStatusAnalisis);
+            $status = $this->filterStatusAnalisis;
+            $query->whereHas('assignments', function ($q) use ($status) {
+                $q->where('status', $status)->latest()->limit(1);
+            });
         }
         
         // Logika Filter Sumber
@@ -136,10 +253,43 @@ class Reports extends Component
             $query->whereBetween('created_at', [$startDate, $endDate]);
         }
         
-        $reports = $query->orderBy($this->sortField, $this->sortDirection)
-                         ->paginate($this->perPage);
+        // 4. ORDER DAN PAGINASI
+        $sortField = $this->sortField;
+        $sortDirection = $this->sortDirection;
 
-        return view('livewire.admin.reports', ['reports' => $reports]);
+        // === PERBAIKAN SORTING KATEGORI ===
+        if ($sortField === 'category') {
+            $query->leftJoin('categories', 'reports.category_id', '=', 'categories.id')
+                ->orderBy('categories.name', $sortDirection)
+                ->select('reports.*');
+                
+        } elseif ($sortField === 'reporter_name') {
+            // JOIN ke tabel reporters
+            $query->leftJoin('reporters', 'reports.reporter_id', '=', 'reporters.id')
+                ->orderBy('reporters.name', $sortDirection) // Urutkan berdasarkan kolom 'name' di tabel reporters
+                ->select('reports.*');
+        } 
+        
+        else {
+            $query->orderBy($sortField, $sortDirection);
+        }
+        
+        return $query->paginate($this->perPage);
+    }
+
+    public function render()
+    {
+        $reports = $this->reports;
+
+        $groupedCategoriesSimple = $this->getGroupedCategoriesProperty(); 
+        $availableAnalysts = $this->getGroupedAnalystsProperty();
+
+        return view('livewire.admin.reports', [
+            'reports' => $reports,
+            'groupedCategories' => $this->groupedCategories,
+            'categoriesForMassSelect' => $groupedCategoriesSimple,
+            'availableAnalysts' => $availableAnalysts,
+        ]);
     }
 
     public function updatingSearch()
@@ -194,23 +344,34 @@ class Reports extends Component
         $this->resetPage();
     }
 
+    public function closeDeleteModal()
+    {
+        $this->reset(['confirmDeleteId', 'confirmDeleteTicket', 'confirmDeleteName', 'currentAssignmentId']);
+        $this->resetPage(); 
+    }
+
     public function deleteReportConfirm($reportId)
     {
-        $this->dispatch('swal:confirm', [
-            'title' => 'Apakah Anda yakin?',
-            'text' => 'Data laporan akan dihapus secara permanen!',
-            'confirmButtonText' => 'Ya, hapus!',
-            'onConfirmed' => 'deleteReport',
-            'onConfirmedParams' => [$reportId]
+        $report = Report::with('reporter')->findOrFail($reportId);
+
+        $this->confirmDeleteId = $reportId;
+        $this->confirmDeleteTicket = $report->ticket_number;
+        $this->confirmDeleteName = $report->reporter->name ?? 'N/A';
+
+        $this->dispatch('show-delete-confirm-modal', [
+            'ticket' => $this->confirmDeleteTicket,
+            'name' => $this->confirmDeleteName
         ]);
     }
 
-    public function deleteReport($reportId)
+    public function deleteReport()
     {
-        if ($report = Report::find($reportId)) {
+        if ($report = Report::find($this->confirmDeleteId)) {
             $report->delete();
-            $this->dispatch('session:success', ['message' => 'Laporan berhasil dihapus.']);
+            $this->dispatch('swal:toast', message: 'Laporan berhasil dihapus.', icon: 'success');
         }
+        $this->closeDeleteModal();
+        $this->dispatch('hide-delete-confirm-modal');
     }
 
     public function dispatchReportPreview($uuid)
@@ -248,5 +409,440 @@ class Reports extends Component
     public function resetPreviewData()
     {
         $this->previewReportData = [];
+    }
+
+    public function getGroupedCategoriesProperty()
+    {
+        // Menggunakan logika yang sama dengan ReportController@create (Parent/Child standard)
+        $categories = Category::with(['children' => function ($q) {
+                    $q->active();
+                }])
+                ->whereNull('parent_id')
+                ->active()
+                ->get();
+
+        $categoriesForSelect = Category::with('children')
+            ->whereNull('parent_id')
+            ->active()
+            ->get();
+            
+        return $categoriesForSelect;
+    }
+
+    public function updatedNewCategoryId($value)
+    {
+        // Reset properties jika tidak ada nilai
+        if (!$value) {
+            $this->newCategoryDestinationName = 'Belum Dipilih';
+            $this->newCategoryDestinationDeputy = 'N/A';
+            return;
+        }
+
+        $category = Category::with('unitKerjas.deputy', 'parent.unitKerjas.deputy')->find($value); // Eager Load Parent
+        
+        if (!$category) {
+            $this->newCategoryDestinationName = 'Kategori tidak valid';
+            $this->newCategoryDestinationDeputy = 'N/A';
+            return;
+        }
+
+        // 1. Coba ambil Unit Kerja dari Kategori yang Dipilih saat ini (Sub-Kategori)
+        $unit = $category->unitKerjas->first();
+
+        // 2. Jika Unit Kerja KOSONG, cari di PARENT Category
+        if (!$unit && $category->parent) {
+            $unit = $category->parent->unitKerjas->first();
+        }
+        
+        // 3. Ekstrak Nama tujuan
+        if ($unit) {
+            $unitName = $unit->name ?? 'TANPA UNIT KERJA';
+            $deputyName = $unit->deputy->name ?? 'TANPA DEPUTI';
+            
+            // Atur properti
+            $this->newCategoryDestinationName = $unitName;
+            $this->newCategoryDestinationDeputy = $deputyName;
+            
+        } else {
+            // Jika tidak ada Unit Kerja ditemukan di kategori itu sendiri atau Parent-nya
+            $this->newCategoryDestinationName = 'Belum Ditugaskan Unit Kerja';
+            $this->newCategoryDestinationDeputy = 'Belum Ditugaskan Deputi';
+        }
+    }
+
+    public function getGroupedAnalystsProperty()
+    {
+        $user = Auth::user();
+        
+        $query = User::role('analyst')->with(['unitKerja.deputy']); 
+
+        if (!($user->hasRole('superadmin') || $user->hasRole('admin'))) {
+            if ($user->hasRole('deputy') && $user->deputy_id) {
+                 $query->whereHas('unitKerja', function($q) use ($user) {
+                     $q->where('deputy_id', $user->deputy_id);
+                 });
+            } elseif ($user->unit_kerja_id) {
+                 $query->where('unit_kerja_id', $user->unit_kerja_id);
+            } else {
+                 $query->where('id', 0);
+            }
+        }
+
+        $allAnalysts = $query->orderBy('name')->get();
+
+        $grouped = [];
+        
+        foreach ($allAnalysts as $analyst) {
+            $deputyName = $analyst->unitKerja->deputy->name ?? 'TANPA DEPUTI';
+            $unitName = $analyst->unitKerja->name ?? 'TANPA UNIT KERJA';
+            
+            $grouped[$deputyName][$unitName][] = $analyst;
+        }
+
+        return $grouped;
+    }
+
+    public function openDispositionModal($reportId) 
+    {
+        $report = Report::select('id', 'ticket_number')->findOrFail($reportId);
+        
+        $this->dispatchReportId = $reportId;
+        $this->dispatchReportTicketNumber = $report->ticket_number;
+        
+        $this->currentAssignmentId = null; 
+        
+        $this->reset(['analystId', 'dispositionNotes']); 
+        $this->dispatch('show-disposition-modal');
+    }
+
+    public function openEditDispositionModal($assignmentId)
+    {
+        $assignment = Assignment::with(['report'])->findOrFail($assignmentId);
+        
+        $this->currentAssignmentId = $assignment->id;
+        $this->dispatchReportId = $assignment->report_id;
+        $this->dispatchReportTicketNumber = $assignment->report->ticket_number;
+        $this->analystId = $assignment->assigned_to_id;
+        $this->dispositionNotes = $assignment->notes;
+
+        $this->dispatch('show-disposition-modal'); 
+    }
+
+    public function resetDispositionData()
+    {
+        $this->reset([
+            'dispatchReportId', 
+            'dispatchReportTicketNumber',
+            'analystId', 
+            'dispositionNotes',
+            'currentAssignmentId'
+        ]);
+
+        // $this->dispatch('close-disposition-modal');
+    }
+
+    public function submitDisposition()
+    {
+        // Mengambil Laporan dan User yang menugaskan
+        $report = Report::findOrFail($this->dispatchReportId);
+        $assigner = Auth::user();
+        
+        $this->validate([
+            'analystId' => 'required|exists:users,id',
+            'dispositionNotes' => 'nullable|string|max:500',
+        ]);
+        
+        $analyst = \App\Models\User::findOrFail($this->analystId);
+        $logDescription = '';
+        $actionType = '';
+        
+        DB::beginTransaction();
+        try {
+            if ($this->currentAssignmentId) {
+                // UPDATE LOGIC
+                $assignment = Assignment::findOrFail($this->currentAssignmentId);
+                $assignment->update([
+                    'assigned_to_id' => $this->analystId,
+                    'notes' => $this->dispositionNotes,
+                ]);
+                
+                // --- PESAN TOAST YANG RINGKAS (UPDATE) ---
+                $message = "Tugas berhasil diperbarui. Analis: {$analyst->name}.";
+                
+                $actionType = 'ASSIGNMENT_UPDATED';
+                $logDescription = "Tugas laporan diperbarui. Ditugaskan kembali ke: {$analyst->name}. Catatan: {$this->dispositionNotes}";
+                
+            } else {
+                // CREATE LOGIC
+                Assignment::create([ 
+                    'report_id' => $this->dispatchReportId,
+                    'assigned_by_id' => Auth::id(),
+                    'assigned_to_id' => $this->analystId,
+                    'notes' => $this->dispositionNotes,
+                    'status' => 'pending', 
+                ]);
+                
+                // --- PESAN TOAST YANG RINGKAS (CREATE) ---
+                $message = "Laporan telah ditugaskan ke Analis {$analyst->name}.";
+                
+                $actionType = 'REPORT_DISPATCHED';
+                $logDescription = "Disposisi baru ke Analis: {$analyst->name}. Catatan: {$this->dispositionNotes}";
+            }
+
+            // --- 1. KIRIM NOTIFIKASI KE ANALIS (Pesan detail ada di file notifikasi) ---
+            $analyst->notify(new \App\Notifications\NewAssignmentNotification($report, $assigner));
+
+            // --- 2. TAMBAHKAN ACTIVITY LOG (Pesan detail untuk history) ---
+            \App\Models\ActivityLog::create([
+                'user_id' => Auth::id(),
+                'action' => $actionType,
+                'description' => $logDescription,
+                'loggable_id' => $report->id,
+                'loggable_type' => get_class($report),
+            ]);
+
+            DB::commit();
+            $this->reset(['dispatchReportId', 'analystId', 'dispositionNotes', 'currentAssignmentId']);
+            $this->dispatch('close-disposition-modal');
+            $this->dispatch('swal:toast', message: $message, icon: 'success');
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Gagal Disposisi Laporan: ' . $e->getMessage());
+            $this->dispatch('swal:toast', message: 'Gagal disposisi: ' . $e->getMessage(), icon: 'error');
+        }
+    }
+    
+    public function deleteAssignmentConfirm()
+    {
+        $assignmentId = $this->currentAssignmentId;
+        
+        if (!$assignmentId) {
+            $this->dispatch('swal:toast', message: 'ID Tugas hilang.', icon: 'error');
+            return;
+        }
+        
+        try {
+            $assignment = \App\Models\Assignment::with('assignedTo', 'report')->findOrFail($assignmentId);
+            
+            $this->confirmDeleteAssignmentId = $assignmentId;
+            $this->confirmDeleteAssignmentTicket = $assignment->report->ticket_number ?? 'N/A';
+            $this->confirmDeleteAssignmentAnalyst = $assignment->assignedTo->name ?? 'Analis';
+
+            $this->dispatch('close-disposition-modal');
+            
+            $this->dispatch('show-delete-assignment-modal');
+            
+        } catch (\Exception $e) {
+            $this->dispatch('swal:toast', message: 'Tugas tidak ditemukan.', icon: 'error');
+            \Illuminate\Support\Facades\Log::error('Assignment not found during confirm: ' . $e->getMessage());
+        }
+    }
+
+    public function deleteAssignment() 
+    {
+        $assignmentId = $this->confirmDeleteAssignmentId; 
+
+        if (!$assignmentId) {
+            $this->dispatch('swal:toast', message: 'Tugas tidak ditemukan atau ID hilang.', icon: 'error');
+            $this->closeDeleteModal();
+            return;
+        }
+
+        \Illuminate\Support\Facades\DB::beginTransaction();
+        try {
+            $assignment = \App\Models\Assignment::findOrFail($assignmentId);
+            $report = \App\Models\Report::findOrFail($assignment->report_id);
+            
+            $assignment->delete(); 
+            
+            // Atur ulang status Report hanya jika tidak ada tugas tersisa
+            if ($report->assignments()->count() === 0) {
+                $report->update(['status' => 'Proses verifikasi dan telaah']); 
+            }
+
+            \Illuminate\Support\Facades\DB::commit();
+            $this->dispatch('swal:toast', message: 'Disposisi berhasil dibatalkan.', icon: 'success');
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
+            \Illuminate\Support\Facades\Log::error('Delete Assignment Gagal: ' . $e->getMessage(), ['id' => $assignmentId]);
+            $this->dispatch('swal:toast', message: 'Gagal membatalkan disposisi karena kesalahan sistem.', icon: 'error');
+        }
+        
+        $this->reset(['confirmDeleteAssignmentId', 'confirmDeleteAssignmentTicket', 'confirmDeleteAssignmentAnalyst']);
+        $this->resetPage(); 
+        $this->dispatch('hide-delete-assignment-modal');
+    }
+
+    public function updatedSelectAll($value)
+    {
+        if ($value) {
+            $this->selectedReports = $this->reports->pluck('id')->map(fn($item) => (string)$item)->toArray();
+        } else {
+            $this->selectedReports = [];
+        }
+    }
+    
+    public function updatedSelectedReports()
+    {
+        if (count($this->selectedReports) < $this->reports->count()) {
+            $this->selectAll = false;
+        }
+    }
+
+    public function massOpenDispositionModal()
+    {
+        if (empty($this->selectedReports)) {
+            $this->dispatch('swal:toast', message: 'Pilih setidaknya satu laporan.', icon: 'warning');
+            return;
+        }
+        $this->reset(['newAnalystId', 'dispositionNotes']);
+        $this->dispatch('show-mass-disposition-modal');
+    }
+    
+    public function massSubmitDisposition()
+    {
+        if (empty($this->selectedReports)) {
+            $this->dispatch('swal:toast', message: 'Tidak ada laporan yang dipilih.', icon: 'warning');
+            return;
+        }
+        
+        $this->validate([
+            'newAnalystId' => 'required|exists:users,id',
+            'dispositionNotes' => 'nullable|string|max:500',
+        ], [
+            'newAnalystId.required' => 'Analis harus dipilih.'
+        ]);
+        
+        $assigner = Auth::user();
+        $analyst = \App\Models\User::findOrFail($this->newAnalystId);
+        $count = 0;
+        
+        DB::beginTransaction();
+        try {
+            foreach ($this->selectedReports as $reportId) {
+                $report = Report::find($reportId);
+                
+                if ($report) {
+                    // ... (Logika create Assignment)
+                    Assignment::create([ 
+                        'report_id' => $reportId,
+                        'assigned_by_id' => Auth::id(),
+                        'assigned_to_id' => $this->newAnalystId,
+                        'notes' => $this->dispositionNotes,
+                        'status' => 'pending', 
+                    ]);
+                    
+                    // --- 1. KIRIM NOTIFIKASI KE ANALIS ---
+                    $analyst->notify(new \App\Notifications\NewAssignmentNotification($report, $assigner));
+
+                    // --- 2. TAMBAHKAN ACTIVITY LOG ---
+                    \App\Models\ActivityLog::create([
+                        'user_id' => Auth::id(),
+                        'action' => 'REPORT_DISPATCHED_MASS',
+                        'description' => "Disposisi massal laporan #{$report->ticket_number} ke Analis: {$analyst->name}. Catatan: {$this->dispositionNotes}",
+                        'loggable_id' => $report->id,
+                        'loggable_type' => get_class($report),
+                    ]);
+                    
+                    $count++;
+                }
+            }
+            
+            DB::commit();
+            $this->reset(['selectedReports', 'selectAll', 'newAnalystId', 'dispositionNotes']);
+            
+            $message = "{$count} laporan berhasil ditugaskan ke Analis {$analyst->name}.";
+            $this->dispatch('swal:toast', message: $message, icon: 'success');
+            $this->dispatch('close-mass-disposition-modal');
+            $this->resetPage();
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Gagal Disposisi Massal Laporan: ' . $e->getMessage());
+            $this->dispatch('swal:toast', message: 'Gagal disposisi massal.' . $e->getMessage(), icon: 'error');
+        }
+    }
+
+    public function massUpdateCategory()
+    {
+        if (empty($this->selectedReports)) {
+            $this->dispatch('swal:toast', message: 'Pilih setidaknya satu laporan.', icon: 'warning');
+            return;
+        }
+        
+        $this->validate(['newCategoryId' => 'required|exists:categories,id'], [
+            'newCategoryId.required' => 'Kategori harus dipilih.'
+        ]);
+
+        $count = 0;
+        DB::beginTransaction();
+        try {
+            $newCategory = Category::with('unitKerjas.deputy', 'parent')->find($this->newCategoryId);
+            
+            // Tentukan Unit Kerja dan Deputi Tujuan BARU (Fall-back logic)
+            $unitKerjaIdTujuan = $newCategory->unitKerjas->first()->id ?? null;
+            $deputyIdTujuan = $newCategory->unitKerjas->first()->deputy->id ?? null;
+
+            // Fallback: Jika Sub-Kategori tidak memiliki Unit Kerjas langsung, cari di Parent
+            if (is_null($unitKerjaIdTujuan) && $newCategory->parent_id) {
+                $parentCategory = Category::with('unitKerjas.deputy')->find($newCategory->parent_id);
+                $unitKerjaIdTujuan = $parentCategory->unitKerjas->first()->id ?? null;
+                $deputyIdTujuan = $parentCategory->unitKerjas->first()->deputy->id ?? null;
+            }
+
+            // Ambil nama tujuan baru untuk log
+            $unitTujuanName = UnitKerja::find($unitKerjaIdTujuan)->name ?? 'T/A';
+            $deputiTujuanName = Deputy::find($deputyIdTujuan)->name ?? 'T/A';
+
+
+            foreach ($this->selectedReports as $reportId) {
+                $report = Report::find($reportId);
+                
+                if ($report) {
+                    $oldCategoryName = $report->category->name ?? 'T/A';
+                    
+                    // 1. Hapus penugasan analis lama
+                    $report->assignments()->delete();
+                    
+                    // 2. Simpan Category, Unit Kerja, dan Deputi yang baru
+                    $report->update([
+                        'category_id' => $this->newCategoryId,
+                        'unit_kerja_id' => $unitKerjaIdTujuan, 
+                        'deputy_id' => $deputyIdTujuan, 
+                    ]);
+                    
+                    // --- 3. TAMBAHKAN ACTIVITY LOG UNTUK SETIAP LAPORAN ---
+                    $logDescription = "Kategori Laporan diubah dari '{$oldCategoryName}' menjadi '{$newCategory->name}'.";
+                    $logDescription .= " Tugas Analis lama dibatalkan. Ditujukan ke Deputi: {$deputiTujuanName}, Unit: {$unitTujuanName}.";
+
+                    \App\Models\ActivityLog::create([
+                        'user_id' => Auth::id(),
+                        'action' => 'CATEGORY_UPDATE_MASS',
+                        'description' => $logDescription,
+                        'loggable_id' => $report->id,
+                        'loggable_type' => get_class($report),
+                    ]);
+                    // --- END ACTIVITY LOG ---
+                    
+                    $count++;
+                }
+            }
+            
+            DB::commit();
+            $this->reset(['selectedReports', 'selectAll', 'newCategoryId']);
+            $this->dispatch('close-mass-category-modal');
+            
+            $message = "{$count} laporan berhasil diperbarui. Kategori: {$newCategory->name}. Tugas lama dibatalkan.";
+            $this->dispatch('swal:toast', message: $message, icon: 'success');
+            
+            $this->resetPage();
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Gagal Update Kategori Massal Laporan: ' . $e->getMessage());
+            $this->dispatch('swal:toast', message: 'Gagal update kategori massal: Terjadi kesalahan sistem.', icon: 'error');
+        }
     }
 }

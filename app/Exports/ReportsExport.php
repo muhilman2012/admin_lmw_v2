@@ -3,7 +3,9 @@
 namespace App\Exports;
 
 use App\Models\Report;
+use App\Models\Category;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\Exportable;
@@ -34,7 +36,7 @@ class ReportsExport extends DefaultValueBinder implements
     {
         $q = Report::query();
 
-        // --- Terapkan ulang filter dari $this->filters ---
+        // 1. Filter Pencarian Universal (q)
         if (!empty($this->filters['q'])) {
             $search = $this->filters['q'];
             $q->where(function ($sub) use ($search) {
@@ -47,20 +49,45 @@ class ReportsExport extends DefaultValueBinder implements
             });
         }
 
-        if (!empty($this->filters['filterKategori'])) {
-            $q->whereHas('category', function ($c) {
-                $c->where('name', $this->filters['filterKategori']);
-            });
+        // 2. Filter Kategori (Logika Multi-Select yang sudah diuji)
+        $filterKategori = $this->filters['filterKategori'] ?? [];
+
+        if (is_array($filterKategori) && !empty($filterKategori)) {
+            
+            // Ambil ID Parent Category yang dipilih
+            $parentIds = Category::whereIn('name', $filterKategori)
+                ->where('is_active', true)
+                ->pluck('id');
+
+            $targetCategoryIds = collect($parentIds); // Mulai dengan ID Parent
+
+            // Ambil semua Child ID yang terhubung ke Parent yang dipilih
+            if ($parentIds->isNotEmpty()) {
+                $childIds = Category::whereIn('parent_id', $parentIds)
+                    ->where('is_active', true)
+                    ->pluck('id');
+                    
+                $targetCategoryIds = $targetCategoryIds->merge($childIds);
+            }
+            
+            $finalIds = $targetCategoryIds->unique()->all();
+
+            if (!empty($finalIds)) {
+                $q->whereIn('category_id', $finalIds);
+            }
         }
 
+        // 3. Filter Status
         if (!empty($this->filters['filterStatus'])) {
             $q->where('status', $this->filters['filterStatus']);
         }
 
+        // 4. Filter Klasifikasi
         if (!empty($this->filters['filterKlasifikasi'])) {
             $q->where('classification', $this->filters['filterKlasifikasi']);
         }
 
+        // 5. Filter Distribusi
         if (!empty($this->filters['filterDistribusi'])) {
             [$type, $id] = array_pad(explode('_', $this->filters['filterDistribusi']), 2, null);
             if ($type === 'deputy') {
@@ -70,10 +97,12 @@ class ReportsExport extends DefaultValueBinder implements
             }
         }
 
+        // 6. Filter Status Analisis
         if (!empty($this->filters['filterStatusAnalisis'])) {
             $q->where('analysis_status', $this->filters['filterStatusAnalisis']);
         }
 
+        // 7. Filter Tanggal
         if (!empty($this->filters['filterDateRange']) && str_contains($this->filters['filterDateRange'], ' - ')) {
             [$start, $end] = explode(' - ', $this->filters['filterDateRange']);
             $startDate = Carbon::createFromFormat('d/m/Y', $start)->startOfDay();
@@ -81,6 +110,7 @@ class ReportsExport extends DefaultValueBinder implements
             $q->whereBetween('created_at', [$startDate, $endDate]);
         }
 
+        // Default Sorting dan Eager Loading
         $q->with(['reporter', 'category', 'unitKerja', 'deputy'])
           ->orderBy('created_at', 'desc');
 

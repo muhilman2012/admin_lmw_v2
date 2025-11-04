@@ -18,19 +18,20 @@ class UnitKerjaSeeder extends Seeder
     {
         $unitsByDeputy = [
             'Deputi Bidang Dukungan Kebijakan Perekonomian, Pariwisata, dan Transformasi Digital' => [
-                'Asisten Deputi Industri, Perdagangan, Pariwisata, dan Ekonomi Kreatif',
                 'Asisten Deputi Ekonomi, Keuangan, dan Transformasi Digital',
+                'Asisten Deputi Industri, Perdagangan, Pariwisata, dan Ekonomi Kreatif',
                 'Asisten Deputi Infrastruktur, Sumber Daya Alam, dan Pembangunan Kewilayahan',
             ],
             'Deputi Bidang Dukungan Kebijakan Peningkatan Kesejahteraan dan Pembangunan Sumber Daya Manusia' => [
-                'Asisten Deputi Pemberdayaan Masyarakat dan Penanggulangan Bencana',
                 'Asisten Deputi Pengentasan Kemiskinan dan Pembangunan Desa',
+                'Asisten Deputi Kesehatan, Gizi, dan Pembangunan Keluarga',
+                'Asisten Deputi Pemberdayaan Masyarakat dan Penanggulangan Bencana',
                 'Asisten Deputi Pendidikan, Agama, Kebudayaan, Pemuda, dan Olahraga',
             ],
             'Deputi Bidang Dukungan Kebijakan Pemerintahan dan Pemerataan Pembangunan' => [
-                'Asisten Deputi Tata Kelola Pemerintahan',
-                'Asisten Deputi Politik, Keamanan, Hukum, dan Hak Asasi Manusia',
                 'Asisten Deputi Hubungan Luar Negeri dan Pertahanan',
+                'Asisten Deputi Politik, Keamanan, Hukum, dan Hak Asasi Manusia',
+                'Asisten Deputi Tata Kelola Pemerintahan',
             ],
             'Deputi Bidang Administrasi' => [
                 'Biro Perencanaan dan Keuangan',

@@ -24,9 +24,12 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'needs_password_reset',
+        'temporary_password',
         'role',
         'is_active',
         'unit_kerja_id',
+        'deputy_id',
         'jabatan',
         'nip',
         'phone',
@@ -53,13 +56,14 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed',
         ];
     }
 
-    /**
-     * Get the unit kerja associated with the user.
-     */
+    public function deputy(): BelongsTo
+    {
+        return $this->belongsTo(Deputy::class);
+    }
+
     public function unitKerja(): BelongsTo
     {
         return $this->belongsTo(UnitKerja::class);

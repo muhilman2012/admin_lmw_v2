@@ -50,7 +50,7 @@
                         <option value="" disabled selected>Pilih Sumber</option>
                         <option value="tatap muka" {{ old('source', $report->source) == 'tatap muka' ? 'selected' : '' }}>Tatap Muka</option>
                         <option value="whatsapp" {{ old('source', $report->source) == 'whatsapp' ? 'selected' : '' }}>WhatsApp</option>
-                        <option value="surat" {{ old('source', $report->source) == 'surat' ? 'selected' : '' }}>Surat</option>
+                        <option value="surat fisik" {{ old('source', $report->source) == 'surat fisik' ? 'selected' : '' }}>Surat</option>
                     </select>
                     <div class="invalid-feedback">Harap pilih Sumber Pengaduan</div>
                 </div>

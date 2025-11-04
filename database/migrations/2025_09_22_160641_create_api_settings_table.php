@@ -13,10 +13,12 @@ return new class extends Migration
     {
         Schema::create('api_settings', function (Blueprint $table) {
             $table->id();
-            $table->string('name')->nullable();
-            $table->string('key')->unique();
-            $table->text('value');
+            $table->string('name');
+            $table->string('key');
+            $table->text('value')->nullable();
             $table->timestamps();
+
+            $table->unique(['name', 'key']);
         });
     }
 

@@ -17,6 +17,11 @@ class Category extends Model
     protected $fillable = [
         'name',
         'parent_id',
+        'is_active',
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
     ];
 
     public function parent(): BelongsTo
@@ -42,5 +47,10 @@ class Category extends Model
     public function scopeMainCategories($query)
     {
         return $query->whereNull('parent_id');
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
     }
 }

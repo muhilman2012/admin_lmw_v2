@@ -6,6 +6,7 @@
 <script src="{{ asset('tabler/libs/litepicker/dist/litepicker.js') }}" defer></script>
 <script src="{{ asset('tabler/libs/tom-select/dist/js/tom-select.complete.min.js') }}" defer></script>
 <script src="{{ asset('assets/js/loader-util.js') }}"></script>
+<script src="{{ asset('tabler/libs/apexcharts/dist/apexcharts.min.js') }}" defer></script>
 
 <script src="{{ asset('assets/js/sweetalert2.all.min.js') }}"></script>
 <script>
@@ -86,7 +87,15 @@
         });
 
         Livewire.on('swal:confirm', (event) => {
-            const { title, text, confirmButtonText, onConfirmed, onConfirmedParams } = event;
+            const data = event.detail || {}; 
+            
+            const { title, text, confirmButtonText, onConfirmed, params } = data; 
+            
+            if (!title) {
+                console.warn('SweetAlert dispatch failed: Title is missing.');
+                return;
+            }
+
             Swal.fire({
                 title: title,
                 text: text,
@@ -98,7 +107,7 @@
                 cancelButtonText: 'Batal'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    Livewire.dispatch(onConfirmed, { userId: onConfirmedParams[0] });
+                    Livewire.dispatch(onConfirmed, params);
                 }
             });
         });
@@ -121,10 +130,67 @@
             });
         });
     });
-</script>
-<script>
-    document.getElementById('reset-changes').addEventListener('click', function() {
-        localStorage.clear();
-        location.reload();
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const settingsForm = document.getElementById('offcanvasSettings');
+        const root = document.documentElement;
+        
+        if (!settingsForm) return;
+
+        // Kunci yang digunakan Tabler (sesuaikan jika ada kustom)
+        const themeKeys = [
+            'data-bs-theme', 'theme-color', 'theme-font', 'theme-base', 'theme-radius'
+        ];
+        
+        // --- 1. LISTENER UTAMA (APPLY & SAVE) ---
+        // Tangkap perubahan radio/color input dalam offcanvas
+        settingsForm.addEventListener('change', (e) => {
+            const target = e.target;
+            if (target.name && target.type === 'radio') {
+                const key = target.name;
+                const value = target.value;
+                
+                // 1. Simpan ke Local Storage
+                localStorage.setItem(key, value);
+                
+                // 2. Terapkan (Memanggil Tabler's initTheme untuk membaca Local Storage dan menerapkan CSS Vars)
+                if (typeof tabler !== 'undefined' && typeof tabler.initTheme === 'function') {
+                    tabler.initTheme(); 
+                } 
+                // Catatan: Jika tabler.initTheme tidak ada, tema mungkin hanya berubah setelah refresh.
+            }
+        });
+
+        // --- 2. LISTENER RESET ---
+        document.getElementById('reset-changes').addEventListener('click', () => {
+            if (confirm('Yakin ingin mereset semua pengaturan tema ke default?')) {
+                
+                // Hapus semua custom setting dari Local Storage
+                themeKeys.forEach(key => {
+                    localStorage.removeItem(key);
+                });
+                
+                // Panggil initTheme() untuk memaksa Tabler JS menerapkan default settings
+                if (typeof tabler !== 'undefined' && typeof tabler.initTheme === 'function') {
+                    tabler.initTheme();
+                } else {
+                    window.location.reload(); 
+                }
+            }
+        });
+
+        // --- 3. SINKRONISASI RADIO BUTTONS SAAT OFFCANVAS DIBUKA ---
+        settingsForm.addEventListener('show.bs.offcanvas', () => {
+            themeKeys.forEach(key => {
+                const savedValue = localStorage.getItem(key);
+                if (savedValue) {
+                    // Set input radio agar checked sesuai savedValue
+                    const input = settingsForm.querySelector(`input[name="${key}"][value="${savedValue}"]`);
+                    if (input) {
+                        input.checked = true;
+                    }
+                }
+            });
+        });
     });
 </script>

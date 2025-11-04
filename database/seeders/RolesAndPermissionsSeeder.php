@@ -27,14 +27,18 @@ class RolesAndPermissionsSeeder extends Seeder
             'edit users',
             'delete users',
             'manage structure', // Untuk Deputi/Unit Kerja/Kategori
+            'edit roles permissions',
             
             // KATEGORI: FORWARDING & EKSPOR
             'view forwarded reports',
-            'forward reports to lapor', // Memicu proses API 3 langkah
+            'forward reports to lapor', // Kirim ke LAPOR!
             'export data',
             'import data', // Khusus untuk migrasi data lama
+            
+            // KATEGORI: API SETTINGS
+            'view api settings', 
+            'edit api settings',
             'regenerate api key', // Untuk token internal LMW
-            'manage external api settings', // Untuk setting API LAPOR/Dukcapil
 
             // KATEGORI: ASSIGNMENT & ANALISIS
             'assign reports', // Menugaskan ke analis
@@ -42,6 +46,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'fill analysis worksheet', // Mengisi hasil analisis (analyst_worksheet)
             'approve analysis', // Menyetujui/merevisi hasil analisis (Asdep/Deputi)
             'update report response', // Edit status & tanggapan pengaduan (Edit Tanggapan Pengaduan)
+
+            // KATEGORI: KMS
+            'create kms article',
         ];
 
         foreach ($permissions as $permission) {
@@ -52,6 +59,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // Peran 1: Superadmin (Akses Penuh)
         $superadmin = Role::firstOrCreate(['name' => 'superadmin']);
+        // Superadmin sudah mendapatkan semua izin, jadi tidak perlu penambahan
         $superadmin->givePermissionTo(Permission::all());
 
         // Peran 2: Admin (Entry Data & Manajemen User Dasar)
@@ -64,21 +72,24 @@ class RolesAndPermissionsSeeder extends Seeder
             'create users',
             'edit users',
             'view forwarded reports',
+            'view api settings',
+            'create kms article',
         ]);
-
+        
+        // ... (Peran lainnya tetap sama)
         // Peran 3: Analis (Fokus pada Tugas Sendiri)
         $analyst = Role::firstOrCreate(['name' => 'analyst']);
         $analyst->givePermissionTo([
             'view assigned reports',
             'fill analysis worksheet', 
-            'update report response', // Agar bisa edit status/tanggapan cepat
+            'update report response', 
             'forward reports to lapor',
         ]);
 
         // Peran 4: Asdep/Karo (Kontrol Unit & Persetujuan)
         $asdep_karo = Role::firstOrCreate(['name' => 'asdep_karo']);
         $asdep_karo->givePermissionTo([
-            'view all reports', // Atau ganti dengan 'view reports under unit' jika hanya bisa melihat unitnya
+            'view all reports',
             'assign reports',
             'approve analysis', 
             'update report response',

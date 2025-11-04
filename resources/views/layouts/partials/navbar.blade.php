@@ -4,7 +4,7 @@
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="navbar-brand navbar-brand-autodark d-none-navbar-horizontal pe-0 pe-md-3">
-            <a href="{{ url('/') }}" aria-label="LaporMasWapres">
+            <a href="{{ route('dashboard') }}" aria-label="LaporMasWapres">
                 <img src="{{ asset('tabler/img/logo/LaporMasWapres.png') }}" alt="Logo LaporMasWapres" class="navbar-brand-image" style="height: 32px;" />
             </a>
         </div>
@@ -25,32 +25,74 @@
                     </a>
                 </div>
                 <div class="nav-item dropdown d-none d-md-flex">
-                    <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" tabindex="-1" aria-label="Show notifications" data-bs-auto-close="outside" aria-expanded="false">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1">
-                            <path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6" />
-                            <path d="M9 17v1a3 3 0 0 0 6 0v-1" />
-                        </svg>
-                        <span class="badge bg-red"></span>
+                    <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" tabindex="-1" aria-label="Show notifications">
+                        <i class="ti ti-bell-ringing"></i>
+                        
+                        @php
+                            $unreadCount = auth()->user()->unreadNotifications->count();
+                        @endphp
+
+                        @if ($unreadCount > 0)
+                            <span class="badge bg-red badge-unread badge-blink">{{ $unreadCount > 9 ? '9+' : $unreadCount }}</span>
+                        @endif
                     </a>
                     <div class="dropdown-menu dropdown-menu-arrow dropdown-menu-end dropdown-menu-card">
                         <div class="card">
                             <div class="card-header d-flex">
+                                {{-- Menghapus hitungan dari judul di sini, fokus pada badge di luar --}}
                                 <h3 class="card-title">Notifications</h3>
                                 <div class="btn-close ms-auto" data-bs-dismiss="dropdown"></div>
                             </div>
-                            <div class="list-group list-group-flush list-group-hoverable">
-                                {{-- Daftar notifikasi... --}}
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col">
-                                        <a href="#" class="btn btn-2 w-100"> Archive all </a>
+                            
+                            <div class="list-group list-group-flush list-group-hoverable" id="notification-dropdown-list">
+                                @forelse (auth()->user()->unreadNotifications->take(5) as $notification)
+                                    @php
+                                        $data = $notification->data;
+                                        $icon = $data['icon'] ?? 'ti ti-bell-ringing';
+                                        $color = $data['color'] ?? 'primary';
+                                        $url = $data['url'] . '?read=' . $notification->id; // Tambahkan query untuk mark as read
+                                    @endphp
+                                    <div class="list-group-item">
+                                        <a href="{{ $url }}" class="d-flex text-decoration-none">
+                                            <div>
+                                                <span class="avatar avatar-sm rounded bg-{{ $color }}-lt me-3">
+                                                    <i class="{{ $icon }}"></i>
+                                                </span>
+                                            </div>
+                                            <div class="d-flex flex-column flex-grow-1">
+                                                <div class="font-weight-medium">{{ $data['title'] ?? 'Notifikasi Baru' }}</div>
+                                                <div class="text-secondary" style="font-size: 0.85rem;">
+                                                    {!! Str::limit($data['message'] ?? 'Lihat detail laporan.', 50) !!}
+                                                </div>
+                                                <div class="text-secondary mt-1" style="font-size: 0.75rem;">
+                                                    {{ $notification->created_at->diffForHumans() }}
+                                                </div>
+                                            </div>
+                                        </a>
                                     </div>
-                                    <div class="col">
-                                        <a href="#" class="btn btn-2 w-100"> Mark all as read </a>
+                                @empty
+                                    <div class="p-3 text-center text-secondary">Tidak ada notifikasi baru.</div>
+                                @endforelse
+                            </div>
+
+                            @if (auth()->user()->unreadNotifications->isNotEmpty())
+                                <div class="card-body border-top">
+                                    <div class="d-grid gap-2">
+                                        <a href="{{ route('notifications.markAllRead') }}" class="btn btn-2 btn-secondary w-100"> 
+                                            Tandai semua sudah dibaca 
+                                        </a>
+                                        <a href="{{ route('users.profile.index', ['#pane-notifications']) }}" class="btn btn-2 btn-primary w-100"> 
+                                            Lihat Semua Notifikasi 
+                                        </a>
                                     </div>
                                 </div>
-                            </div>
+                            @else
+                                <div class="card-body border-top">
+                                    <a href="{{ route('users.profile.index', ['#pane-notifications']) }}" class="btn btn-2 btn-primary w-100"> 
+                                        Lihat Semua Notifikasi 
+                                    </a>
+                                </div>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -60,13 +102,18 @@
                 <a href="#" class="nav-link d-flex lh-1 p-0 px-2" data-bs-toggle="dropdown" aria-label="Open user menu">
                     <x-user-avatar :user="Auth::user()" size="sm" />
                     <div class="d-none d-xl-block ps-2">
-                        <div>{{ Auth::user()->name }}</div>
+                        <div>
+                            {{ Str::limit(Auth::user()->name, 15) }}
+                        </div>
                         <div class="mt-1 small text-secondary">{{ Auth::user()->role }}</div>
                     </div>
                 </a>
                 <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow z-3">
                     <a href="{{ route('users.profile.index') }}" class="dropdown-item">Profil</a>
-                    <a href="{{ route('categories.index') }}" class="dropdown-item">Pengaturan</a>
+                    <a href="{{ route('kms.index') }}" target="_blank" class="dropdown-item">KMS</a>
+                    @can('manage structure')
+                        <a href="{{ route('settings.index') }}" class="dropdown-item">Pengaturan</a>
+                    @endcan
                     <div class="dropdown-divider"></div>
                     <a class="dropdown-item" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
                         Logout
@@ -125,6 +172,7 @@
                         <span class="nav-link-title">Pencarian</span>
                     </a>
                 </li>
+                @can('export data')
                 <li class="nav-item {{ Request::is('admin/export*') ? 'active' : '' }}">
                     <a class="nav-link" href="{{ route('export.index') }}">
                         <span class="nav-link-icon d-md-none d-lg-inline-block">
@@ -133,6 +181,7 @@
                         <span class="nav-link-title">Export</span>
                     </a>
                 </li>
+                @endcan
                 @can('view users')
                     <li class="nav-item {{ Request::is('admin/users/management*') ? 'active' : '' }}">
                         <a class="nav-link" href="{{ route('users.management.index') }}">

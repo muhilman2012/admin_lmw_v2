@@ -12,6 +12,8 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -71,22 +73,50 @@ class ProfileController extends Controller
 
     public function updatePassword(Request $request)
     {
+        \Illuminate\Support\Facades\Log::info('--- PROFILE UPDATE PASSWORD REACHED ---');
+
         $user = Auth::user();
 
-        $request->validate([
-            'current_password' => 'required',
-            'new_password' => 'required|min:8|confirmed',
-        ]);
-        
-        if (!Hash::check($request->input('current_password'), $user->password)) {
-            return redirect()->back()->with('error', 'Kata sandi lama tidak cocok.');
-        }
+        try{
+            $request->validate([
+                'current_password' => 'required',
+                'new_password' => 'required|min:8|confirmed',
+            ]);
+            
+            $currentPasswordInput = $request->input('current_password');
 
-        $user->update([
-            'password' => Hash::make($request->input('new_password'))
-        ]);
+            $isTempPassValid = false;
+            if ($user->needs_password_reset && $user->temporary_password) {
+                if ($currentPasswordInput === $user->temporary_password) {
+                    $isTempPassValid = true;
+                }
+            }
+
+            $isOldPassValid = Hash::check($currentPasswordInput, $user->password);
+            if (!$isTempPassValid && !$isOldPassValid) {
+                Log::warning("Password mismatch for user {$user->id}. Temp: {$user->needs_password_reset}. Input: {$currentPasswordInput}.");
+                return redirect()->back()->with('error', 'Kata sandi lama tidak cocok.')->withErrors(['current_password' => 'Kata sandi lama tidak valid.']);
+            }
+            
+            $user->update([
+                'password' => Hash::make($request->input('new_password')),
+                'needs_password_reset' => false, 
+                'temporary_password' => null, 
+            ]);
+            
+            return redirect()->to(route('users.profile.index') . '#pane-reset-password')
+                ->with('success', 'Kata sandi berhasil diperbarui!');
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Tangani kegagalan validasi (misalnya: new_password tidak sama dengan konfirmasi)
+            Log::warning("Validation failed for user {$user->id}: " . json_encode($e->errors()));
+            return redirect()->back()->withErrors($e->errors())->withInput();
         
-        return redirect()->route('users.profile.index', ['#pane-reset-password'])->with('success', 'Kata sandi berhasil diperbarui!');
+        } catch (\Exception $e) {
+            // Tangani kegagalan fatal (misalnya: Eloquent/DB error)
+            Log::critical("FATAL ERROR during password update for user {$user->id}: " . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal menyimpan kata sandi karena kesalahan sistem.')->withInput();
+        }
     }
 
     public function regenerateApiToken(Request $request)
@@ -103,25 +133,65 @@ class ProfileController extends Controller
 
     public function updateApiSettings(Request $request)
     {
-        $request->validate([
-            'api_name' => 'required|string|in:lmw_api,lapor_api,dukcapil_api',
-            'base_url' => 'nullable|url|max:255',
-            'authorization' => 'nullable|string',
-            'token' => 'nullable|string',
-        ]);
-
         $apiName = $request->input('api_name');
-        $settings = $request->only(['base_url', 'authorization', 'token']);
         
-        foreach ($settings as $key => $value) {
-            if (!is_null($value)) {
+        // 1. Validasi
+        $rules = [
+            'api_name' => 'required|string|in:lmw_api,lapor_api,dukcapil_api,gemini_api,v1_migration_api',
+        ];
+
+        $settingsToUpdate = [];
+        
+        switch ($apiName) {
+            case 'v1_migration_api':
+                // KASUS BARU: API MIGRASI V1
+                $rules['base_url'] = 'required|url|max:255'; 
+                $rules['authorization'] = 'required|string';
+                
+                $settingsToUpdate = $request->only(['base_url', 'authorization']);
+                break;
+            case 'lapor_api':
+            case 'dukcapil_api':
+            case 'lmw_api':
+                $rules['base_url'] = 'nullable|url|max:255';
+                $rules['authorization'] = 'nullable|string';
+                $rules['token'] = 'nullable|string';
+                $settingsToUpdate = $request->only(['base_url', 'authorization', 'token']);
+                break;
+            case 'gemini_api':
+                $rules['endpoint'] = 'nullable|url|max:255';
+                $rules['model'] = 'nullable|string|max:100';
+                $rules['api_key_primary'] = 'nullable|string';
+                $rules['api_key_fallback'] = 'nullable|string';
+                $settingsToUpdate = $request->only(['endpoint', 'model', 'api_key_primary', 'api_key_fallback']);
+                break;
+            default:
+                throw ValidationException::withMessages(['api_name' => 'Nama API tidak valid.']);
+        }
+
+        $request->validate($rules);
+
+        // 2. Simpan ke Database
+        foreach ($settingsToUpdate as $key => $value) {
+            if (!is_null($value) || $request->has($key)) {
+                
+                $dbKey = $key; 
+
+                // Khusus untuk LMW, pastikan kita hanya mengambil nilai
+                if ($apiName === 'lmw_api' && $key === 'api_token') {
+                     $dbKey = 'api_token';
+                }
+
+                // Gunakan kombinasi 'name' dan 'key' untuk mencari
                 ApiSetting::updateOrCreate(
-                    ['name' => $apiName, 'key' => $key],
-                    ['value' => $value]
+                    ['name' => $apiName, 'key' => $dbKey],
+                    ['value' => $value ?? ''] 
                 );
             }
         }
         
-        return redirect()->route('users.profile.index', ['#pane-api-' . Str::of($apiName)->replace('_api', '')])->with('success', 'Pengaturan API ' . Str::upper($apiName) . ' berhasil disimpan.');
+        // 3. Redirect
+        $redirectHash = '#pane-api-' . Str::of($apiName)->replace('_api', '');
+        return redirect()->to(route('users.profile.index') . $redirectHash)->with('success', 'Pengaturan API ' . Str::upper($apiName) . ' berhasil disimpan.');
     }
 }

@@ -25,13 +25,13 @@ class StatusTemplateSeeder extends Seeder
         ]);
 
         StatusTemplate::create([
-            'name' => '	Diteruskan kepada instansi yang berwenang untuk penanganan lebih lanjut',
+            'name' => 'Diteruskan kepada instansi yang berwenang untuk penanganan lebih lanjut',
             'status_code' => 'reports_forwarded',
             'response_template' => 'Laporan/pengaduan Saudara telah diteruskan ke instansi yang berwenang {{instansi}} melalui surat nomor {{nomor_surat}} untuk penanganan lebih lanjut sesuai dengan ketentuan perundang-undangan',
         ]);
 
         StatusTemplate::create([
-            'name' => '	Penanganan Selesai',
+            'name' => 'Penanganan Selesai',
             'status_code' => 'reports_completed',
             'response_template' => 'Laporan/pengaduan Saudara telah selesai ditindaklanjuti, dengan laporan tindaklanjut/tanggapan dari {{instansi_berwenang}} melalui surat nomor {{nomor_surat}}, yang intinya {{isi_surat}}. Terima kasih atas kerja sama yang baik.',
         ]);

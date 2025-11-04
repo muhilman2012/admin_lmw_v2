@@ -29,17 +29,17 @@
             <div class="row g-4 mb-4">
                 <div class="col-12 col-md-6">
                     <label class="form-label">Nama Lengkap<span class="text-danger">*</span></label>
-                    <input type="text" name="name" placeholder="Masukkan Nama Lengkap" class="form-control" value="{{ $reporter->name ?? '' }}" required />
+                    <input type="text" name="name" placeholder="Masukkan Nama Lengkap" class="form-control" value="{{ $reporter->name ?? '' }}" required autocomplete="off"/>
                     <div class="invalid-feedback">Nama Lengkap wajib diisi.</div>
                 </div>
                 <div class="col-12 col-md-3">
                     <label class="form-label">NIK<span class="text-danger">*</span></label>
-                    <input type="text" name="nik" placeholder="Masukkan Nomor NIK" class="form-control" value="{{ $reporter->nik ?? '' }}" required />
+                    <input type="text" name="nik" placeholder="Masukkan Nomor NIK" class="form-control" value="{{ $reporter->nik ?? '' }}" required autocomplete="off" />
                     <div class="invalid-feedback">NIK harus 16 digit.</div>
                 </div>
                 <div class="col-12 col-md-3">
                     <label class="form-label">Nomor Kartu Keluarga <span class="text-secondary"> (opsional)</span></label>
-                    <input type="text" name="kk_number" placeholder="Masukkan Nomor Kartu Keluarga" class="form-control" value="{{ $reporter->kk_number ?? '' }}"/>
+                    <input type="text" name="kk_number" placeholder="Masukkan Nomor Kartu Keluarga" class="form-control" value="{{ $reporter->kk_number ?? '' }}" autocomplete="off"/>
                     <div class="invalid-feedback">Nomor KK harus 16 digit.</div>
                 </div>
             </div>
@@ -49,20 +49,20 @@
                     <label class="form-label">Sumber Pengaduan<span class="text-danger">*</span></label>
                     <select class="form-select" name="source" required>
                         <option value="" disabled selected>Pilih Sumber</option>
-                        <option value="tatap muka">Tatap Muka</option>
-                        <option value="whatsapp">WhatsApp</option>
-                        <option value="surat">Surat</option>
+                        <option value="tatap muka" @selected(old('source', $defaultSource ?? null) === 'tatap muka')>Tatap Muka</option>
+                        <option value="whatsapp" @selected(old('source') === 'whatsapp')>WhatsApp</option>
+                        <option value="surat fisik" @selected(old('source') === 'surat fisik')>Surat</option>
                     </select>
                     <div class="invalid-feedback">Harap pilih Sumber Pengaduan</div>
                 </div>
                 <div>
                     <label class="form-label">Email Pengadu</label>
-                    <input type="email" name="email" placeholder="Masukkan Email" class="form-control" value="{{ $reporter->email ?? '' }}" />
+                    <input type="email" name="email" placeholder="Masukkan Email" class="form-control" value="{{ $reporter->email ?? '' }}" autocomplete="off" />
                     <div class="invalid-feedback">Perbaiki Email Pengadu.</div>
                 </div>
                 <div>
                     <label class="form-label">Nomor HP Pengadu<span class="text-danger">*</span></label>
-                    <input type="tel" name="phone_number" placeholder="Masukkan Nomor HP" class="form-control" value="{{ $reporter->phone_number ?? '' }}" required/>
+                    <input type="tel" name="phone_number" placeholder="Masukkan Nomor HP" class="form-control" value="{{ $reporter->phone_number ?? '' }}" required autocomplete="off"/>
                     <div class="invalid-feedback">Perbaiki Nomor HP Pengadu.</div>
                 </div>
                 <div>
@@ -75,7 +75,7 @@
             <div class="row row-cols-1 row-cols-md-2 g-4 mb-4">
                 <div>
                     <label class="form-label">Judul Laporan<span class="text-danger">*</span></label>
-                    <input type="text" name="subject" placeholder="Masukkan Judul Laporan" class="form-control" required />
+                    <input type="text" name="subject" placeholder="Masukkan Judul Laporan" class="form-control" required autocomplete="off" />
                     <div class="invalid-feedback">Harap isi Judul Laporan.</div>
                 </div>
                 <div>
@@ -86,7 +86,7 @@
                 <div>
                     <label class="form-label">Tanggal Kejadian</label>
                     <div class="input-icon">
-                        <input class="form-control" name="event_date" placeholder="DD/MM/YYYY" id="datepicker-tgl-kejadian" />
+                        <input class="form-control" name="event_date" placeholder="DD/MM/YYYY" id="datepicker-tgl-kejadian" autocomplete="off"/>
                         <span class="input-icon-addon"><i class="icon ti ti-calendar"></i></span>
                     </div>
                     <div class="invalid-feedback">Harap isi Tanggal Kejadian.</div>

@@ -4,17 +4,20 @@
             <div class="col-lg-auto ms-lg-auto">
                 <ul class="list-inline list-inline-dots mb-0">
                     <li class="list-inline-item">
-                        <a href="https://docs.tabler.io" target="_blank" class="link-secondary" rel="noopener">Knowledge Management System</a>
+                        <a href="{{ route('kms.index') }}" target="_blank" class="link-secondary" rel="noopener">Sistem Manajemen Pengetahuan (KMS)</a>
+                    </li>
+                    <li class="list-inline-item">
+                        Made with <svg xmlns="http://www.w3.org/2000/svg" class="icon text-danger" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.566" /></svg> by Hilman
                     </li>
                 </ul>
             </div>
             <div class="col-12 col-lg-auto mt-3 mt-lg-0">
                 <ul class="list-inline list-inline-dots mb-0">
                     <li class="list-inline-item">
-                        Copyright &copy; 2025 <a href="{{ url('/') }}" class="link-secondary">LaporMasWapres! </a>. All rights reserved.
+                        Copyright &copy; {{ date('Y') }} <a href="https://lapormaswapres.id/" target="blank" class="link-secondary">LaporMasWapres! </a>. All rights reserved.
                     </li>
                     <li class="list-inline-item">
-                        <a href="{{ url('/changelog') }}" class="link-secondary" rel="noopener"> v2.0.0 </a>
+                        <a href="{{ route('changelog.v2') }}" class="link-secondary" rel="noopener"> v2.0.0 </a>
                     </li>
                 </ul>
             </div>

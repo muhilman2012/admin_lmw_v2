@@ -17,6 +17,9 @@ use App\Models\DocumentTemplate;
 use App\Models\Institution;
 use App\Models\LaporanForwarding;
 use App\Services\LaporForwardingService;
+use App\Notifications\NewAssignmentNotification;
+use App\Notifications\AnalysisSubmittedNotification;
+use App\Notifications\AnalysisReviewedNotification;
 use Hashids\Hashids;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -40,24 +43,30 @@ class ReportsController extends Controller
             },
             // PENTING: Memuat hanya assignment yang ditugaskan kepada user saat ini
             'assignments' => function($query) {
-            $query->with(['assignedBy', 'assignedTo']) // EAGER LOAD USER RELATIONS
-                  ->where('assigned_to_id', Auth::id());
+                $query->with(['assignedBy', 'assignedTo']) // EAGER LOAD USER RELATIONS
+                    ->orderBy('created_at', 'desc'); // Urutkan untuk kemudahan mencari yang terbaru
             }
         ])->where('uuid', $uuid)->firstOrFail();
+
+        if (request()->has('read')) {
+            app(\App\Http\Controllers\Pages\NotificationController::class)->markSpecificAsReadById(request('read'));
+        }
         
         // 2. Ambil assignment yang relevan (hanya ada satu)
         $currentAssignment = $report->assignments->first();
         
         // 3. Ambil data statis untuk dropdown/modal
         $institutions = Institution::orderBy('name')->get();
-        // Anda mungkin membutuhkan ini untuk modal quick action:
+        // untuk modal quick action:
         $statusTemplates = StatusTemplate::all();
         $documentTemplates = DocumentTemplate::all();
+        $user = Auth::user();
+        $availableAnalysts = $this->getGroupedAnalysts($user);
         
         // 4. Pisahkan logs untuk kemudahan pemanggilan (jika Anda tidak menggunakan $report->activityLogs langsung di view)
         $reportLogs = $report->activityLogs; 
 
-        return view('pages.reports.show', compact('report', 'reportLogs', 'institutions', 'currentAssignment', 'statusTemplates', 'documentTemplates'));
+        return view('pages.reports.show', compact('report', 'reportLogs', 'institutions', 'currentAssignment', 'statusTemplates', 'documentTemplates', 'availableAnalysts'));
     }
 
     public function index()
@@ -77,11 +86,21 @@ class ReportsController extends Controller
             }
         }
 
+        $defaultSource = null;
+        if ($request->has('source_default')) {
+            $defaultSource = $request->source_default; 
+        }
+
         $statusTemplates = StatusTemplate::all();
         $documentTemplates = DocumentTemplate::all();
-        $categories = Category::with('children')->whereNull('parent_id')->get();
+        $categories = Category::with(['children' => function ($q) {
+                $q->active(); // Filter sub-kategori agar hanya yang aktif yang dimuat
+            }])
+            ->whereNull('parent_id')
+            ->active() // Filter kategori utama
+            ->get();
         
-        return view('pages.reports.create', compact('reporter', 'categories', 'statusTemplates', 'documentTemplates'));
+        return view('pages.reports.create', compact('reporter', 'categories', 'statusTemplates', 'documentTemplates'))->with('defaultSource', $defaultSource);
     }
 
     public function store(Request $request)
@@ -142,19 +161,33 @@ class ReportsController extends Controller
 
                 Log::info('Data pengadu berhasil disimpan.', ['reporter_id' => $reporter->id]);
 
-                // --- LOGIKA PENENTUAN DISTRIBUSI BARU ---
+                // --- LOGIKA PENENTUAN DISTRIBUSI ---
                 $unitKerjaId = null;
                 $deputyId = null;
+                $categoryId = $validated['category_id'];
 
-                // 1. Cari Unit Kerja berdasarkan Category ID
-                $category = Category::with('unitKerjas.deputy')->find($validated['category_id']);
+                // 1. Dapatkan kategori yang dipilih dan identifikasi Parent ID
+                $selectedCategory = Category::find($categoryId);
+                
+                $targetCategoryId = $categoryId;
+                if ($selectedCategory && $selectedCategory->parent_id) {
+                    // Jika ini adalah sub-kategori, gunakan ID Parent-nya untuk distribusi
+                    $targetCategoryId = $selectedCategory->parent_id;
+                    Log::info('Menggunakan ID kategori Parent untuk distribusi.', ['original_id' => $categoryId, 'parent_id' => $targetCategoryId]);
+                }
 
-                if ($category && $category->unitKerjas->count() > 0) {
+                // 2. Cari Unit Kerja berdasarkan Target Category ID (Parent atau Child)
+                // Lakukan pencarian unit kerja hanya berdasarkan ID target
+                $categoryForDistribution = Category::with('unitKerjas.deputy')->find($targetCategoryId);
+
+                if ($categoryForDistribution && $categoryForDistribution->unitKerjas->count() > 0) {
                     // Ambil Unit Kerja pertama sebagai Unit Distribusi utama
-                    $distributionUnit = $category->unitKerjas->first(); 
+                    $distributionUnit = $categoryForDistribution->unitKerjas->first(); 
                     
                     $unitKerjaId = $distributionUnit->id;
                     $deputyId = $distributionUnit->deputy->id ?? null;
+                } else {
+                    Log::warning('Unit Kerja tidak ditemukan untuk kategori distribusi.', ['target_category_id' => $targetCategoryId]);
                 }
 
                 $defaultStatus = 'Proses verifikasi dan telaah';
@@ -324,13 +357,15 @@ class ReportsController extends Controller
     {
         // Validasi input dari modal
         $request->validate([
-            'status' => 'required|string',
-            'classification' => 'required|string',
+            'status' => 'required|string|max:255',
+            'classification' => 'required|string|max:255',
             'response' => 'required|string',
         ]);
 
         // Cari laporan
         $report = Report::where('uuid', $uuid)->firstOrFail();
+
+        $isBenefitProvided = $request->has('is_benefit_provided'); // true atau false
 
         // Mulai transaksi
         DB::beginTransaction();
@@ -340,13 +375,14 @@ class ReportsController extends Controller
                 'status' => $request->status,
                 'classification' => $request->classification,
                 'response' => $request->response,
+                'is_benefit_provided' => $isBenefitProvided, 
             ]);
 
             // Buat log aktivitas
             ActivityLog::create([
                 'user_id' => auth()->id(),
                 'action' => 'update_response',
-                'description' => 'Berhasil mengedit tanggapan laporan',
+                'description' => 'Berhasil mengedit tanggapan laporan' . ($isBenefitProvided ? ' dan menandai pengadu telah menerima manfaat.' : '.'),
                 'loggable_id' => $report->id,
                 'loggable_type' => Report::class,
             ]);
@@ -356,7 +392,7 @@ class ReportsController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Gagal memperbarui tanggapan laporan: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Terjadi kesalahan saat menyimpan perubahan.');
+            return redirect()->back()->with('error', 'Terjadi kesalahan saat menyimpan perubahan. Silakan coba lagi.');
         }
     }
 
@@ -376,13 +412,16 @@ class ReportsController extends Controller
         // 2. Cari Laporan dan Assignment yang ditugaskan kepada user saat ini
         $report = Report::where('uuid', $uuid)->firstOrFail();
         $assignment = Assignment::where('report_id', $report->id)
-                                 ->where('assigned_to_id', Auth::id())
-                                 ->first();
+                                ->where('assigned_to_id', Auth::id())
+                                ->first();
         
         // Keamanan: Pastikan tugas ditemukan
         if (!$assignment) {
             return redirect()->back()->with('error', 'Anda tidak memiliki tugas aktif untuk laporan ini.');
         }
+        
+        // Dapatkan Assignee (Orang yang menugaskan) untuk dikirimi notifikasi
+        $assigner = $assignment->assignedBy; // Asumsi relasi assignedBy() ada di model Assignment
         
         // 3. Mulai Transaksi dan Update Database
         DB::beginTransaction();
@@ -393,24 +432,30 @@ class ReportsController extends Controller
             ]);
 
             // B. Update hasil analisis di tabel assignments
+            // Menggunakan data_get() untuk akses aman ke 'notes'
             $assignment->update([
                 'analyst_worksheet' => $validated['analyst_worksheet'],
-                'notes' => $validated['notes'],
-                'status' => 'Menunggu Persetujuan', // Status tugas berubah menjadi siap untuk disetujui
+                'notes' => data_get($validated, 'notes', null),
+                'status' => 'submitted', // Ubah ke status code 'submitted' yang lebih konsisten
             ]);
-
+            
             // C. Catat aktivitas
             ActivityLog::create([
                 'user_id' => Auth::id(),
-                'action' => 'submit_analysis',
+                'action' => 'analysis_submitted', // Gunakan action code yang konsisten
                 'description' => 'Hasil analisis laporan telah dikirim untuk persetujuan.',
                 'loggable_id' => $report->id,
                 'loggable_type' => Report::class,
             ]);
+            
+            // D. KIRIM NOTIFIKASI KE ASSIGNER (Pengirim Tugas)
+            if ($assigner) {
+                $assigner->notify(new \App\Notifications\AnalysisSubmittedNotification($report));
+            }
 
             DB::commit();
             return redirect()->route('reports.show', $report->uuid)
-                             ->with('success', 'Analisis berhasil dikirim untuk persetujuan.');
+                            ->with('success', 'Analisis berhasil dikirim untuk persetujuan.');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -433,9 +478,9 @@ class ReportsController extends Controller
         // Cari tugas (assignment) yang terkait dengan laporan
         // Asumsi: Hanya ada satu tugas aktif per laporan yang sedang dianalisis
         $assignment = Assignment::where('report_id', $report->id)
-                                ->where('assigned_to_id', auth()->id()) // Pastikan hanya bisa disetujui oleh user yang ditugaskan
-                                ->whereIn('status', ['Analisis', 'Menunggu Persetujuan']) // Asumsi: Status tugas yang relevan
-                                ->firstOrFail();
+                            ->whereIn('status', ['submitted', 'Menunggu Persetujuan']) // Asumsi: status submitted yang dikirim Analis
+                            ->latest() // Ambil assignment yang terbaru
+                            ->firstOrFail();
 
         // Mulai transaksi
         DB::beginTransaction();
@@ -444,34 +489,33 @@ class ReportsController extends Controller
             $action = $request->action;
             $note = $request->notes;
 
+            $analyst = $assignment->assignedTo; 
+            $notificationAction = '';
+            $description = '';
+
             if ($action === 'approve') {
-                // Perbarui status tugas menjadi 'Disetujui'
                 $assignment->update([
-                    'status' => 'Disetujui',
+                    'status' => 'approved',
                     'notes' => $note,
                 ]);
-
-                // Opsional: Perbarui status analisis di tabel laporan utama jika diperlukan
-                $report->update([
-                    'analysis_status' => 'Disetujui',
-                    'status' => 'Selesai' // Atau status akhir lainnya
-                ]);
-
+                $notificationAction = 'approved';
                 $description = 'Analisis laporan disetujui';
+
             } else { // action === 'revise'
-                // Perbarui status tugas menjadi 'Perlu Perbaikan'
                 $assignment->update([
                     'status' => 'Perlu Perbaikan',
                     'notes' => $note,
                 ]);
-
-                // Opsional: Perbarui status analisis di tabel laporan utama
-                $report->update(['analysis_status' => 'Perlu Perbaikan']);
-
+                $notificationAction = 'revision_needed';
                 $description = 'Analisis laporan memerlukan perbaikan';
             }
+
+            // 2. KIRIM NOTIFIKASI KEPADA ANALIS
+            if ($analyst) {
+                $analyst->notify(new AnalysisReviewedNotification($report, $user, $notificationAction));
+            }
             
-            // Buat log aktivitas
+            // 3. Buat log aktivitas
             ActivityLog::create([
                 'user_id' => $user->id,
                 'action' => $action . '_analysis',
@@ -543,6 +587,7 @@ class ReportsController extends Controller
                     // Buat entri forwarding yang sukses
                     LaporanForwarding::create([
                         'laporan_id' => $report->id,
+                        'user_id' => Auth::id(),
                         'institution_id' => $request->institution_id,
                         'reason' => $request->additional_notes,
                         'status' => 'terkirim',
@@ -559,6 +604,7 @@ class ReportsController extends Controller
                     // Buat entri forwarding yang gagal (untuk retry)
                     LaporanForwarding::create([
                         'laporan_id' => $report->id,
+                        'user_id' => Auth::id(),
                         'institution_id' => $request->institution_id,
                         'reason' => $request->additional_notes,
                         'status' => 'gagal_forward',
@@ -593,5 +639,133 @@ class ReportsController extends Controller
         } while ($existingReport);
         
         return (string) $ticketNumber;
+    }
+
+    public function getReportsByKk(Request $request)
+    {
+        $kkNumber = $request->input('kk_number');
+        
+        // Cek Nomor KK yang tidak valid atau kosong
+        if (empty($kkNumber) || $kkNumber === '-') {
+            return response()->json([
+                'html' => '<div class="alert alert-warning">Nomor KK tidak valid atau kosong.</div>'
+            ], 200);
+        }
+
+        try {
+            // 1. Dapatkan semua NIK terkait KK ini
+            $relatedNiks = Reporter::where('kk_number', $kkNumber)->pluck('nik')->unique();
+            
+            // Jika tidak ada NIK yang terkait dengan KK tersebut, kembalikan array kosong
+            if ($relatedNiks->isEmpty()) {
+                 $reports = collect();
+            } else {
+                // 2. Ambil laporan berdasarkan NIK yang terkait
+                $reports = Report::whereHas('reporter', function ($query) use ($relatedNiks) {
+                    $query->whereIn('nik', $relatedNiks);
+                })
+                ->with('reporter') // Pastikan relasi reporter dimuat
+                ->orderByDesc('created_at')
+                ->get();
+            }
+
+            return response()->json([
+                'html' => view('pages.reports.partials.kk_history_modal_content', compact('reports', 'kkNumber'))->render()
+            ]);
+
+        } catch (\Exception $e) {
+            // Log error secara detail di sisi server
+            Log::error('AJAX Riwayat KK Gagal (HTTP 500): ' . $e->getMessage(), [
+                'kk_number' => $kkNumber,
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
+            
+            // Kembalikan respons error yang akan ditangkap oleh JS fetch()
+            return response()->json([
+                'html' => '<div class="alert alert-danger">Kesalahan Internal: Gagal memproses data riwayat. Lihat log server.</div>'
+            ], 500); 
+        }
+    }
+
+    /**
+     * Helper: Mendapatkan Analis yang berada di bawah cakupan Deputi/Unit Kerja user.
+     */
+    private function getGroupedAnalysts(User $user)
+    {
+        $query = User::role('analyst')->with(['unitKerja.deputy']); 
+
+        if ($user->hasRole('deputy') && $user->deputy_id) {
+            $query->whereHas('unitKerja', function($q) use ($user) {
+                $q->where('deputy_id', $user->deputy_id);
+            });
+        } elseif ($user->unit_kerja_id) {
+            $query->where('unit_kerja_id', $user->unit_kerja_id);
+        } elseif (!($user->hasRole('superadmin') || $user->hasRole('admin'))) {
+             // Jika bukan Admin/SA dan tidak punya scope Unit/Deputi, tidak tampilkan Analis
+             $query->where('id', 0); 
+        }
+
+        $allAnalysts = $query->orderBy('name')->get();
+
+        $grouped = [];
+        foreach ($allAnalysts as $analyst) {
+            $deputyName = $analyst->unitKerja->deputy->name ?? 'TANPA DEPUTI';
+            $unitName = $analyst->unitKerja->name ?? 'TANPA UNIT KERJA';
+            
+            $grouped[$deputyName][$unitName][] = $analyst;
+        }
+
+        return $grouped;
+    }
+
+    public function assignQuick(Request $request, $uuid)
+    {
+        $request->validate([
+            'analyst_id' => 'required|exists:users,id',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $report = Report::where('uuid', $uuid)->firstOrFail();
+        $analyst = User::findOrFail($request->analyst_id);
+        $assigner = Auth::user();
+
+        // Pastikan laporan belum memiliki tugas (race condition check)
+        if ($report->assignments()->exists()) {
+            return redirect()->back()->with('error', 'Laporan ini sudah memiliki petugas analis yang ditugaskan.');
+        }
+
+        DB::beginTransaction();
+        try {
+            // 1. Buat Assignment Baru
+            Assignment::create([ 
+                'report_id' => $report->id,
+                'assigned_by_id' => $assigner->id,
+                'assigned_to_id' => $analyst->id,
+                'notes' => $request->notes,
+                'status' => 'pending', 
+            ]);
+            
+            // 2. Kirim Notifikasi
+            $analyst->notify(new NewAssignmentNotification($report, $assigner));
+            
+            // 3. Tambahkan Activity Log
+            $description = "Disposisi ke Analis: {$analyst->name}. Catatan: " . ($request->notes ?? 'Tidak ada catatan.');
+            ActivityLog::create([
+                'user_id' => $assigner->id,
+                'action' => 'DISPOSITION_QUICK',
+                'description' => $description,
+                'loggable_id' => $report->id,
+                'loggable_type' => Report::class,
+            ]);
+
+            DB::commit();
+            return redirect()->back()->with('success', "Laporan #{$report->ticket_number} berhasil ditugaskan ke Analis {$analyst->name}.");
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Gagal Disposisi Cepat: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal memproses disposisi cepat.');
+        }
     }
 }

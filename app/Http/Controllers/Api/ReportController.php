@@ -11,6 +11,8 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use App\Models\Reporter;
 use App\Models\Report;
+use App\Models\Deputy;
+use App\Models\UnitKerja;
 use App\Models\Document;
 use App\Models\Category;
 use App\Models\ActivityLog;
@@ -56,9 +58,34 @@ class ReportController extends Controller
             
             $category = Category::where('name', $categoryName)->first();
             $categoryId = $category ? $category->id : Category::where('name', 'Lainnya')->first()->id;
-
             $ticketNumber = $this->generateUniqueTicketNumber();
             $uuid = Str::uuid();
+            
+            $unitKerjaId = null;
+            $deputyId = null;
+            // 1. Dapatkan kategori yang dipilih dan identifikasi Parent ID
+            $selectedCategory = Category::find($categoryId);
+            
+            $targetCategoryId = $categoryId;
+            if ($selectedCategory && $selectedCategory->parent_id) {
+                // Jika ini adalah sub-kategori, gunakan ID Parent-nya untuk distribusi
+                $targetCategoryId = $selectedCategory->parent_id;
+                Log::info('Menggunakan ID kategori Parent untuk distribusi.', ['original_id' => $categoryId, 'parent_id' => $targetCategoryId]);
+            }
+
+            // 2. Cari Unit Kerja berdasarkan Target Category ID (Parent atau Child)
+            // Lakukan pencarian unit kerja hanya berdasarkan ID target
+            $categoryForDistribution = Category::with('unitKerjas.deputy')->find($targetCategoryId);
+
+            if ($categoryForDistribution && $categoryForDistribution->unitKerjas->count() > 0) {
+                // Ambil Unit Kerja pertama sebagai Unit Distribusi utama
+                $distributionUnit = $categoryForDistribution->unitKerjas->first(); 
+                
+                $unitKerjaId = $distributionUnit->id;
+                $deputyId = $distributionUnit->deputy->id ?? null;
+            } else {
+                Log::warning('Unit Kerja tidak ditemukan untuk kategori distribusi.', ['target_category_id' => $targetCategoryId]);
+            }
 
             // 4. Buat entri baru di tabel 'reports'
             $report = Report::create([
@@ -73,6 +100,8 @@ class ReportController extends Controller
                 'status' => 'Proses verifikasi dan telaah',
                 'response' => 'Laporan pengaduan Saudara dalam proses verifikasi & penelaahan.',
                 'category_id' => $categoryId, // Menggunakan kategori dari Gemini
+                'unit_kerja_id' => $unitKerjaId,
+                'deputy_id' => $deputyId,
             ]);
             
             // Ubah status check-in pengadu setelah laporan selesai dibuat

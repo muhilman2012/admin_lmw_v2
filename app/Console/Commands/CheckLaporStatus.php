@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Models\LaporanForwarding;
+use App\Models\DisposisiLapor;
 use App\Services\LaporForwardingService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -18,43 +19,81 @@ class CheckLaporStatus extends Command
         $this->info('Starting LAPOR! status check...');
         
         // Konstanta untuk jadwal pengecekan ulang
-        $CHECK_FREQUENCY_HOURS = 6; // Cek ulang laporan sukses setiap 6 jam
-        $RETRY_FREQUENCY_MINUTES = 60; // Cek ulang laporan yang gagal koneksi setiap 60 menit
+        $CHECK_FREQUENCY_HOURS = 3;
+        $RETRY_FREQUENCY_MINUTES = 60;
 
         // 1. Ambil laporan untuk di proses
         $forwardings = LaporanForwarding::query()
-            // Hanya ambil laporan yang sudah terkirim ke LAPOR!
             ->where('status', 'terkirim') 
-            // Pastikan memiliki complaint_id
             ->whereNotNull('complaint_id')
-            // Ambil yang jadwal pengecekan ulang (next_check_at) sudah lewat
             ->where(function ($query) {
                 $query->where('next_check_at', '<=', Carbon::now())
                       ->orWhereNull('next_check_at');
             })
-            ->orderBy('next_check_at', 'asc') // Proses yang paling lama belum dicek dulu
-            ->limit(100) // Batasi batch processing per sekali jalankan (Ganti sesuai kebutuhan)
+            ->orderBy('next_check_at', 'asc')
+            ->limit(100)
             ->get();
 
         $count = $forwardings->count();
         $this->info("Found {$count} reports to check in this batch.");
 
         foreach ($forwardings as $forwarding) {
-            $result = $service->getLaporStatus($forwarding->complaint_id);
+            $result = $service->getLaporDetail($forwarding->complaint_id);
 
             if ($result['success']) {
-                $data = $result['data'];
+                $results = $result['results'];
+                $data = $results['data'] ?? [];
+                $dataLogs = $results['data_logs'] ?? []; // Ini adalah log yang berisi Disposisi dan Content
                 
-                // 2. Update status & jadwal cek ulang
+                // 1. Ambil Status Code, Status Name, dan Disposition Name dari ROOT DATA
+                $laporStatusCode = $data['status_code'] ?? $forwarding->lapor_status_code;
+                $laporStatusName = $data['status_name'] ?? $forwarding->lapor_status_name;
+                $dispositionName = $data['disposition_name'] ?? 'Belum Terdisposisi';
+                
+                // 2. Ambil CONTENT log terakhir
+                // Gunakan log yang memiliki content di dalamnya (biasanya di data_logs array, diurutkan terbaru)
+                // Karena data_logs Anda tampaknya terurut dari yang tertua/tidak jelas, kita ambil yang paling akhir (index tertinggi).
+                $latestLog = end($dataLogs); 
+                $content = null;
+
+                if ($latestLog) {
+                    $content = $service->renderLogContent($latestLog, 'content'); 
+                }
+
+
+                // 3. Update laporan forwarding (Status dan Content)
                 $forwarding->update([
-                    'lapor_status_code' => $data['status_code'],
-                    'lapor_status_name' => $data['status_name'],
-                    // Jika status sudah Selesai/Ditolak, mungkin tidak perlu dicek lagi.
-                    // Jika masih proses, jadwalkan cek 6 jam lagi.
+                    'lapor_status_code' => $laporStatusCode,
+                    'lapor_status_name' => $laporStatusName,
+                    'content' => $content, // <<< SIMPAN CONTENT TERAKHIR
                     'next_check_at' => Carbon::now()->addHours($CHECK_FREQUENCY_HOURS), 
                 ]);
 
-                $this->line("Updated status for Complaint ID: {$forwarding->complaint_id} to {$data['status_name']}");
+                // 4. Simpan/Update disposisi ke tabel disposisi_lapor
+                
+                // Cek apakah ada log disposisi yang valid (misalnya, log ke-2/3)
+                $disposisiLogData = $dataLogs[1] ?? null; 
+                $institutionTo = $disposisiLogData['institution_to'] ?? null;
+                
+                // Fallback: Jika log tidak ada, gunakan disposisi name dari root data (meski kurang akurat)
+                if (!$institutionTo && $dispositionName !== 'Belum Terdisposisi') {
+                    // Coba ambil ID dari data utama (disposition_id) jika log tidak ada
+                    $institutionTo = ['id' => $data['disposition_id'], 'name' => $dispositionName];
+                }
+
+
+                if ($institutionTo && ($institutionTo['id'] ?? null) && ($institutionTo['name'] ?? null)) {
+                    DisposisiLapor::firstOrCreate(
+                        ['laporan_forwarding_id' => $forwarding->id],
+                        [
+                            'institution_id' => $institutionTo['id'],
+                            'institution_name' => $institutionTo['name'],
+                        ]
+                    );
+                    $this->line("Disposisi saved for Complaint ID: {$forwarding->complaint_id} to {$institutionTo['name']}");
+                }
+
+                $this->line("Updated status and content for Complaint ID: {$forwarding->complaint_id} to {$laporStatusName}");
             } else {
                 // Jika gagal (error API/koneksi), jadwalkan cek ulang lebih cepat
                 Log::warning("Failed to check status for Complaint ID: {$forwarding->complaint_id}. Error: {$result['error']}");

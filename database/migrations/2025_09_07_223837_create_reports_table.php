@@ -24,6 +24,7 @@ return new class extends Migration
             $table->string('source');
             $table->string('status');
             $table->text('response')->nullable();
+            $table->boolean('is_benefit_provided')->default(false); 
             $table->string('classification')->nullable();
             $table->unsignedBigInteger('category_id');
             $table->foreignId('unit_kerja_id')->nullable()->constrained('unit_kerjas');

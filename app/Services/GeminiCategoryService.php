@@ -5,16 +5,41 @@ namespace App\Services;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use App\Models\Category;
+use App\Models\ApiSetting;
 use Exception;
 
 class GeminiCategoryService
 {
     private array $categories;
+    private array $apiConfig;
+    private string $baseEndpoint;
+    private string $modelName;
+    private array $apiKeys;
 
     public function __construct()
     {
-        // Ambil daftar kategori dari database saat service diinisialisasi
-        $this->categories = Category::pluck('name')->toArray();
+        // 1. Ambil daftar kategori HANYA yang aktif dari database
+        $this->categories = Category::where('is_active', true)->pluck('name')->toArray();
+        
+        // 2. Ambil konfigurasi API Gemini dari database
+        $this->apiConfig = ApiSetting::where('name', 'gemini_api')
+                            ->pluck('value', 'key')
+                            ->all();
+
+        // 3. Set properti berdasarkan konfigurasi database
+        $this->baseEndpoint = rtrim($this->apiConfig['endpoint'] ?? 'https://generativelanguage.googleapis.com/v1beta', '/');
+        $this->modelName = $this->apiConfig['model'] ?? 'gemini-2.5-flash';
+        
+        // Kumpulkan API Keys (Utama dan Cadangan)
+        $this->apiKeys = array_filter([
+            $this->apiConfig['api_key_primary'] ?? null,
+            $this->apiConfig['api_key_fallback'] ?? null,
+        ]);
+
+        if (empty($this->apiKeys)) {
+             // Ini akan dicatat, tapi kita biarkan service berjalan untuk mengembalikan 'Lainnya'
+             Log::warning('GEMINI_API_KEY tidak ditemukan di database.');
+        }
     }
 
     /**
@@ -25,59 +50,90 @@ class GeminiCategoryService
      */
     public function classifyReport(string $originalLaporanDetail): string
     {
-        try {
-            $apiKey = config('gemini.api_key');
-            if (empty($apiKey)) {
-                throw new Exception('GEMINI_API_KEY tidak ditemukan di file .env');
-            }
-
-            $endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' . $apiKey;
-            
-            $kategoriList = implode('; ', $this->categories);
-            $prompt = $this->buildPrompt($kategoriList, $originalLaporanDetail);
-
-            $response = Http::timeout(30)->post($endpoint, [
-                'contents' => [
-                    [
-                        'parts' => [
-                            ['text' => $prompt]
-                        ]
-                    ]
-                ]
-            ]);
-
-            $responseData = $response->json();
-            
-            // Log respons API Gemini untuk debugging
-            Log::info('Gemini API Response:', ['response' => $responseData, 'prompt' => $prompt]);
-
-            $geminiOutput = 'Lainnya';
-            if (isset($responseData['candidates'][0]['content']['parts'][0]['text'])) {
-                $geminiOutput = trim($responseData['candidates'][0]['content']['parts'][0]['text']);
-            }
-
-            // --- Logika Fuzzy Matching ---
-            $bestMatch = 'Lainnya';
-            $highestSimilarity = 0;
-            $threshold = 70; // Batasan kemiripan dalam persen (misal: 50%)
-
-            foreach ($this->categories as $categoryName) {
-                // Hitung seberapa mirip string dari Gemini dengan kategori di database
-                similar_text(strtolower($geminiOutput), strtolower($categoryName), $similarity);
-                
-                if ($similarity > $highestSimilarity && $similarity >= $threshold) {
-                    $highestSimilarity = $similarity;
-                    $bestMatch = $categoryName;
-                }
-            }
-            
-            return $bestMatch; // Kembalikan kategori terbaik yang ditemukan
-        } catch (Exception $e) {
-            Log::error('Gagal memanggil API Gemini: ' . $e->getMessage(), [
-                'exception' => $e,
-            ]);
+        // Jika tidak ada kunci API yang tersedia, langsung gagal
+        if (empty($this->apiKeys)) {
             return 'Lainnya';
         }
+
+        // Jika tidak ada kategori aktif yang dimuat (meskipun sudah difilter)
+        if (empty($this->categories)) {
+            Log::warning('Tidak ada kategori aktif yang ditemukan di database untuk klasifikasi Gemini.');
+            return 'Lainnya';
+        }
+
+        $kategoriList = implode('; ', $this->categories);
+        $maskedLaporanDetail = $this->maskPii($originalLaporanDetail);
+        $prompt = $this->buildPrompt($kategoriList, $originalLaporanDetail);
+        
+        $lastError = null;
+
+        // Iterasi melalui semua API key yang tersedia (Utama, lalu Cadangan)
+        foreach ($this->apiKeys as $apiKey) {
+            
+            $endpoint = "{$this->baseEndpoint}/models/{$this->modelName}:generateContent?key=" . $apiKey;
+
+            try {
+                // Gunakan mekanisme Retry (3 kali, 1 detik jeda) untuk mengatasi error 503
+                $response = Http::timeout(30)
+                    ->retry(3, 1000) 
+                    ->post($endpoint, [
+                        'contents' => [
+                            [
+                                'parts' => [
+                                    ['text' => $prompt]
+                                ]
+                            ]
+                        ]
+                    ]);
+
+                // Jika respons berhasil (status 2xx)
+                if ($response->successful()) {
+                    $responseData = $response->json();
+                    
+                    // Log respons API Gemini untuk debugging
+                    Log::info('Gemini API Response (Success):', ['model' => $this->modelName, 'response' => $responseData, 'prompt' => $prompt]);
+
+                    $geminiOutput = 'Lainnya';
+                    if (isset($responseData['candidates'][0]['content']['parts'][0]['text'])) {
+                        $geminiOutput = trim($responseData['candidates'][0]['content']['parts'][0]['text']);
+                    }
+
+                    // --- Logika Fuzzy Matching ---
+                    $bestMatch = 'Lainnya';
+                    $highestSimilarity = 0;
+                    $threshold = 70; 
+
+                    foreach ($this->categories as $categoryName) {
+                        similar_text(strtolower($geminiOutput), strtolower($categoryName), $similarity);
+                        
+                        if ($similarity > $highestSimilarity && $similarity >= $threshold) {
+                            $highestSimilarity = $similarity;
+                            $bestMatch = $categoryName;
+                        }
+                    }
+                    
+                    return $bestMatch; 
+                }
+                
+                // Jika respons gagal (bukan 2xx, misal 400, 403, 5xx non-retryable)
+                $lastError = $response->status();
+                Log::error('Gemini API request failed (Status ' . $lastError . '):', [
+                    'body' => $response->body(),
+                    'endpoint' => $endpoint
+                ]);
+
+            } catch (Exception $e) {
+                $lastError = 'Exception: ' . $e->getMessage();
+                Log::error('Gagal memanggil API Gemini:', [
+                    'exception' => $e,
+                    'endpoint' => $endpoint
+                ]);
+            }
+        }
+        
+        // Jika semua API Key gagal
+        Log::error('Semua API Key Gemini gagal setelah semua percobaan. Terakhir: ' . $lastError);
+        return 'Lainnya';
     }
 
     /**

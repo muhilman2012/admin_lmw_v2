@@ -25,17 +25,18 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // 1. Sinkronisasi Institusi LAPOR! (Rutin)
-        // Disarankan berjalan setiap hari untuk mengambil data K/L/D baru.
         $schedule->command(SyncInstitutions::class)
                  ->daily()
-                 ->runInBackground(); // Jalankan di background
+                 ->runInBackground();
                  
-        // 2. Cek Status Laporan yang Diteruskan (Polling Cerdas)
-        // Berjalan setiap jam untuk memproses batch laporan yang jadwal ceknya sudah tiba.
         $schedule->command(CheckLaporStatus::class)
                  ->everyHour()
                  ->runInBackground();
+                 ->withoutOverlapping()
+
+        $schedule->command('lapor:retry-forwarding')
+                 ->everyFiveMinutes()
+                 ->withoutOverlapping();
     }
 
     /**

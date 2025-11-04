@@ -29,23 +29,27 @@ class SyncInstitutions extends Command
      */
     public function handle()
     {
-        $this->info('Starting to sync institutions from API...');
+        $this->info('Starting to sync institutions from LAPOR! API...');
+        $apiName = 'lapor_api';
 
-        // 1. Ambil kredensial API dari database berdasarkan key
-        $baseUrl = ApiSetting::where('key', 'base_url')->value('value');
-        $auth = ApiSetting::where('key', 'authorization')->value('value');
-        $token = ApiSetting::where('key', 'token')->value('value');
+        // 1. Ambil kredensial API dari database berdasarkan name dan key
+        $settings = \App\Models\ApiSetting::where('name', $apiName)
+                                        ->pluck('value', 'key');
+
+        $baseUrl = $settings->get('base_url');
+        $auth = $settings->get('authorization');
+        $token = $settings->get('token');
 
         if (!$baseUrl || !$auth || !$token) {
-            $this->error('One or more API settings (base_url, authorization, token) not found in the database. Sync aborted.');
-            Log::error('API settings not complete.');
+            $this->error("One or more API settings for '{$apiName}' not found. Sync aborted.");
+            \Illuminate\Support\Facades\Log::error("API settings for '{$apiName}' not complete.");
             return 1; // Exit with error code
         }
 
         try {
             // 2. Buat permintaan HTTP dengan kredensial yang diambil dari database
             $response = Http::withHeaders([
-                'auth' => $auth,
+                'Authorization' => $auth,
                 'token' => $token,
                 'Content-Type' => 'application/json'
             ])->get("{$baseUrl}/masters/institutions/external?page_size=1000");
@@ -53,32 +57,37 @@ class SyncInstitutions extends Command
             // Cek jika permintaan gagal
             $response->throw();
 
+            // 3. Proses Response (Asumsi struktur response tetap sama)
             $institutions = $response->json()['results']['data'] ?? [];
 
             if (empty($institutions)) {
                 $this->warn('API returned no institutions. Local database will not be updated.');
-                Log::warning('API returned no institutions.');
-                return 0; // Exit successfully, but with a warning
+                return 0; 
             }
 
-            // 3. Update atau buat institusi di database lokal
+            // 4. Update atau buat institusi di database lokal
+            $updatedCount = 0;
             foreach ($institutions as $institution) {
-                Institution::updateOrCreate(
+                // Asumsi Model Institution tersedia
+                \App\Models\Institution::updateOrCreate(
                     ['id' => $institution['id']],
                     ['name' => $institution['name']]
                 );
+                $updatedCount++;
             }
 
-            $this->info('Sync completed successfully!');
+            $this->info("Sync completed successfully! Updated/Created {$updatedCount} institutions.");
             
         } catch (\Illuminate\Http\Client\RequestException $e) {
             $this->error('API request failed: ' . $e->getMessage());
-            Log::error('API request failed: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error('API request failed: ' . $e->getMessage());
             return 1; // Exit with error code
         } catch (\Exception $e) {
             $this->error('An unexpected error occurred: ' . $e->getMessage());
-            Log::error('An unexpected error occurred: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error('An unexpected error occurred: ' . $e->getMessage());
             return 1; // Exit with error code
         }
+
+        return 0;
     }
 }

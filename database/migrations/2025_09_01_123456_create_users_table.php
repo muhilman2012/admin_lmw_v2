@@ -17,8 +17,11 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->string('role');
             $table->string('password');
+            $table->boolean('needs_password_reset')->default(false);
+            $table->string('temporary_password')->nullable();
             $table->boolean('is_active')->default(true);
             $table->foreignId('unit_kerja_id')->nullable()->constrained('unit_kerjas')->onDelete('set null');
+            $table->foreignId('deputy_id')->nullable()->constrained('deputies')->onDelete('set null');
             $table->string('jabatan')->nullable();
             $table->string('nip')->nullable();
             $table->string('phone')->nullable();

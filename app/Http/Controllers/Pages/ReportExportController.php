@@ -18,6 +18,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Database\Eloquent\Builder;
 
 class MigrationTemplateExport implements FromArray, WithHeadings
 {
@@ -81,7 +82,7 @@ class ReportExportController extends Controller
     public function index()
     {
         // 1. Ambil data yang dibutuhkan untuk dropdown filter
-        $categories = Category::all()->pluck('name');
+        $categories = Category::mainCategories()->active()->get();
         $statuses = Report::select('status')->distinct()->get()->pluck('status');
         $sources = Report::select('source')->distinct()->get()->pluck('source');
         $unitKerjas = UnitKerja::all();
@@ -112,24 +113,49 @@ class ReportExportController extends Controller
      */
     protected function getFilteredQuery(Request $request)
     {
-        $query = Report::query();
+        // DD DIHAPUS
+
+        $query = Report::query()->with(['reporter', 'category', 'unitKerja', 'deputy', 'assignments']);
 
         // 1. Filter Pencarian Universal (q)
         if ($search = $request->input('q')) {
             $query->where(function ($q) use ($search) {
                 $q->where('ticket_number', 'like', "%{$search}%")
-                  ->orWhere('subject', 'like', "%{$search}%")
-                  ->orWhereHas('reporter', function ($q) use ($search) {
-                      $q->where('name', 'like', "%{$search}%")
-                        ->orWhere('nik', 'like', "%{$search}%");
-                  });
+                    ->orWhere('subject', 'like', "%{$search}%")
+                    ->orWhereHas('reporter', function ($q) use ($search) {
+                        $q->where('name', 'like', "%{$search}%")
+                          ->orWhere('nik', 'like', "%{$search}%");
+                    });
             });
         }
         
-        // 2. Filter Kategori
-        if ($kategori = $request->input('filterKategori')) {
-            $categoryId = Category::where('name', $kategori)->value('id');
-            $query->where('category_id', $categoryId);
+        // 2. Filter Kategori (Multi-Select, termasuk Sub-Kategori)
+        $filterKategori = $request->input('filterKategori', []);
+        
+        if (is_array($filterKategori) && !empty($filterKategori)) {
+            
+            // Ambil ID Parent Category yang dipilih
+            $parentIds = Category::whereIn('name', $filterKategori)
+                ->where('is_active', true)
+                ->pluck('id');
+
+            $targetCategoryIds = collect($parentIds); // Mulai dengan ID Parent
+
+            // Ambil semua Child ID yang terhubung ke Parent yang dipilih
+            if ($parentIds->isNotEmpty()) {
+                $childIds = Category::whereIn('parent_id', $parentIds)
+                    ->where('is_active', true)
+                    ->pluck('id');
+                    
+                $targetCategoryIds = $targetCategoryIds->merge($childIds);
+            }
+            
+            $finalIds = $targetCategoryIds->unique()->all();
+
+            if (!empty($finalIds)) {
+                // Menerapkan WHERE IN di query laporan utama
+                $query->whereIn('category_id', $finalIds);
+            }
         }
         
         // 3. Filter Status
@@ -179,20 +205,17 @@ class ReportExportController extends Controller
      */
     public function exportExcel(Request $request)
     {
-        // Ambil hanya key yang dipakai export
+        // 1. Ambil hanya key yang dipakai filter
         $filters = $request->only([
             'q', 'filterKategori', 'filterStatus', 'filterKlasifikasi',
             'filterDistribusi', 'filterStatusAnalisis', 'filterDateRange',
         ]);
-
+        
         $fileName = 'Laporan_Pengaduan_Export_' . now()->format('Ymd_His') . '_' . \Str::random(10) . '.xlsx';
 
-        // Opsi A: pakai Exportable::queue()
-        (new \App\Exports\ReportsExport($filters))
+        // 2. Kirim filters ke Export Class. Biarkan Export Class yang menjalankan Query.
+        (new ReportsExport($filters)) 
             ->queue('exports/' . $fileName, 'local');
-
-        // Opsi B: via Facade (juga aman)
-        // Excel::queue(new \App\Exports\ReportsExport($filters), 'exports/' . $fileName, 'local');
 
         return response()->json([
             'success'  => true,

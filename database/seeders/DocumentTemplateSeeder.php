@@ -19,7 +19,7 @@ class DocumentTemplateSeeder extends Seeder
             'Rincian Biaya Tagihan dari Sekolah',
             'Bukti kepemilikan tanah',
             'Sertifikat Tanah',
-            'Dokumen Lainnya'
+            'Lainnya'
         ];
         
         foreach ($documents as $doc) {

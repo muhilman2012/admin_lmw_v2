@@ -36,7 +36,6 @@ class Assignment extends Model
 
     /**
      * Relasi ke model Report.
-     * Sebuah tugas (assignment) adalah milik satu laporan (report).
      */
     public function report(): BelongsTo
     {
@@ -45,7 +44,6 @@ class Assignment extends Model
 
     /**
      * Relasi ke model User (yang menugaskan).
-     * Kolom 'assigned_by_id' merujuk ke user yang memberikan penugasan.
      */
     public function assignedBy(): BelongsTo
     {
@@ -54,10 +52,20 @@ class Assignment extends Model
 
     /**
      * Relasi ke model User (yang ditugaskan).
-     * Kolom 'assigned_to_id' merujuk ke user yang menerima penugasan.
      */
     public function assignedTo(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to_id');
+    }
+
+    protected static function booted()
+    {
+        // Event ini dipicu sebelum record assignment dihapus
+        static::deleting(function ($assignment) {
+            
+            \App\Models\ActivityLog::where('loggable_type', self::class)
+                                   ->where('loggable_id', $assignment->id)
+                                   ->delete();
+        });
     }
 }

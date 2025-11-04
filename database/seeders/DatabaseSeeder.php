@@ -23,8 +23,10 @@ class DatabaseSeeder extends Seeder
             CategorySeeder::class,
             StatusTemplateSeeder::class,
             DocumentTemplateSeeder::class,
-            TestingUsersSeeder::class,
+            // TestingUsersSeeder::class,
             CategoryUnitSeeder::class,
+            ProvinceMapIdSeeder::class,
+            KmsArticleSeeder::class,
         ]);
     }
 }

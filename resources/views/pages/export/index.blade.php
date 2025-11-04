@@ -27,10 +27,9 @@
                 {{-- Kategori --}}
                 <div class="col-md-4">
                     <label class="form-label">Kategori</label>
-                    <select class="form-select" name="filterKategori" id="filter-export-kategori">
-                        <option value="">Semua Kategori</option>
+                    <select class="form-select" name="filterKategori[]" id="filter-export-kategori" multiple> 
                         @foreach ($categories as $category)
-                            <option>{{ $category }}</option>
+                            <option value="{{ $category->name }}">{{ $category->name }}</option> 
                         @endforeach
                     </select>
                 </div>
@@ -50,10 +49,10 @@
                 <div class="col-md-4">
                     <label class="form-label">Klasifikasi</label>
                     <select class="form-select" name="filterKlasifikasi" id="filter-export-klasifikasi">
-                        <option value="">Semua Klasifikasi</option>
-                        @foreach ($classifications as $classification)
-                            <option value="{{ $classification }}">{{ $classification }}</option>
-                        @endforeach
+                         <option value="">Semua Klasifikasi</option>
+                         @foreach ($classifications as $classification)
+                             <option value="{{ $classification }}">{{ $classification }}</option>
+                         @endforeach
                     </select>
                 </div>
 
@@ -119,37 +118,42 @@
                 </button>
             </div>
         </form>
-        <div class="mt-5 pt-4 border-top">
-            <h3 class="card-title text-warning">Import Data (Migrasi LMW Lama)</h3>
-            <p class="card-subtitle">Unggah file Excel (XLSX) yang berisi data laporan lama untuk migrasi. Pastikan menggunakan template yang telah disediakan.</p>
-            
-            <form action="{{ route('import.reports') }}" method="POST" enctype="multipart/form-data" class="row g-3 mt-3">
-                @csrf
-                <div class="col-md-6">
-                    <label class="form-label">Pilih File Excel Migrasi (.xlsx)</label>
-                    <input type="file" name="file" class="form-control" required accept=".xlsx">
-                </div>
-                <div class="col-md-6 d-flex align-items-end">
-                    <button type="submit" class="btn btn-warning w-100">
-                        <i class="ti ti-upload me-1"></i> Mulai Migrasi Data
-                    </button>
-                </div>
-            </form>
-            
-            <div class="mt-3">
-                <a href="{{ route('export.template') }}" class="small text-secondary">
-                    <i class="ti ti-download me-1"></i> Unduh Template Excel Migrasi
-                </a>
-            </div>
-        </div>
     </div>
 </div>
 @endsection
 
 @push('scripts')
 <script>
+    // FUNGSI HELPER UNTUK INISIALISASI TOM SELECT
+    // Kita buat ini agar dapat dipanggil dua kali tanpa error
+    function initializeTomSelectSafe(selector, options = {}) {
+        const selectElement = document.getElementById(selector.replace('#', ''));
+        
+        if (window.TomSelect && selectElement) {
+            // Cek apakah Tom Select sudah diinisialisasi
+            if (selectElement.tomselect) {
+                // Hancurkan instansi lama
+                selectElement.tomselect.destroy();
+            }
+
+            const defaultOptions = {
+                plugins: { dropdown_input: {} },
+                create: false,
+                allowEmptyOption: true,
+                sortField: { field: "text", direction: "asc" },
+            };
+
+            const finalOptions = { ...defaultOptions, ...options };
+            
+            // Inisialisasi yang baru
+            new TomSelect(selector, finalOptions);
+        }
+    }
+
+
     document.addEventListener('DOMContentLoaded', function () {
-        // 1. Inisialisasi Litepicker untuk range tanggal
+        
+        // 1. Inisialisasi Litepicker untuk range tanggal (tetap sama)
         if (window.Litepicker) {
             new Litepicker({
                 element: document.getElementById('tanggal-range-export'),
@@ -161,23 +165,24 @@
         }
         
         // 2. Inisialisasi TomSelect untuk semua dropdown filter
+        initializeTomSelectSafe("#filter-export-kategori", {
+            plugins: ['remove_button', { dropdown_input: {} }], // Tambahkan input di dropdown
+            create: false,
+            allowEmptyOption: false, // TIDAK BOLEH ALLOW EMPTY OPTION PADA MULTI-SELECT
+        });
+        
+        // --- INISIALISASI FILTER LAINNYA (Single Select) ---
         const selectIds = [
-            'filter-export-kategori', 'filter-export-status', 'filter-export-klasifikasi', 
+            'filter-export-status', 'filter-export-klasifikasi', 
             'filter-export-distribusi', 'filter-export-status-analisis', 'filter-export-sumber'
         ];
         
         selectIds.forEach(id => {
-            const selectElement = document.getElementById(id);
-            if (window.TomSelect && selectElement) {
-                new TomSelect(`#${id}`, {
-                    plugins: { dropdown_input: {} },
-                    create: false,
-                    allowEmptyOption: true,
-                    sortField: { field: "text", direction: "asc" },
-                });
-            }
+            initializeTomSelectSafe(`#${id}`, {
+                plugins: { dropdown_input: {} },
+                allowEmptyOption: true,
+            });
         });
-
     });
 
     /**

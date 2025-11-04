@@ -1,4 +1,4 @@
-jQuery.fn.vectorMap("addMap", "indonesia-adm1_merc", {
+jsVectorMap.addMap("indonesia-adm1_merc", {
   insets: [
     {
       width: 900,

@@ -11,7 +11,13 @@ use Illuminate\Support\Facades\Log;
 class ForwardingController extends Controller
 {
     protected array $middleware = ['auth'];
+    protected LaporForwardingService $laporService;
 
+    public function __construct(LaporForwardingService $laporService)
+    {
+        $this->laporService = $laporService;
+    }
+    
     public function index()
     {
         return view('pages.reports.forwarding.index');
@@ -19,45 +25,115 @@ class ForwardingController extends Controller
 
     public function showDetail($uuid, $complaintId)
     {
-        $report = Report::with('reporter')->where('uuid', $uuid)->firstOrFail();
-        $service = new LaporForwardingService();
+        $report = Report::with('reporter', 'documents')->where('uuid', $uuid)->firstOrFail();
+        
+        $laporId = $report->lapor_complaint_id ?? $complaintId; 
 
-        // 1. Ambil data status dari API LAPOR!
-        $apiResponse = $service->getLaporStatus($complaintId);
+        $detailResponse = $this->laporService->getLaporDetail($laporId); 
+        $logResponse = $this->laporService->getFollowUpLogs($laporId);
 
-        if (!$apiResponse['success']) {
-            return redirect()->back()->with('error', 'Gagal mengambil status dari LAPOR!: ' . $apiResponse['error']);
+        if (!$detailResponse['success']) {
+            return redirect()->back()->with('error', 'Gagal mengambil detail status dari LAPOR!: ' . $detailResponse['error']);
+        }
+        if (!$logResponse['success']) {
+            return redirect()->back()->with('error', 'Gagal mengambil riwayat tindak lanjut dari LAPOR!: ' . $logResponse['error']);
         }
         
-        $laporData = $apiResponse['data'];
-
-        // 2. Ambil log kegiatan dari API
-        $logActivities = $responseData['data_logs'] ?? [];
+        $laporData = $detailResponse['results']['data'] ?? [];
+        $logActivities = $logResponse['logs'] ?? []; 
         
-        return view('pages.reports.forwarding.detail', compact('report', 'complaintId', 'laporData', 'logActivities'));
+        $renderedActivities = collect($logActivities)->map(function ($log) {
+            $sourceField = !empty($log['template_content']) ? 'template_content' : 'content';
+            
+            // Panggil method render dari service instance
+            $log['rendered_content'] = $this->laporService->renderLogContent($log, $sourceField);
+            
+            // Tambahkan data status yang terurai (jika ada di data field)
+            if (!empty($log['data']) && ($data = json_decode($log['data'], true))) {
+                // Asumsi status_old/new mungkin ada di root JSON data
+                $log['status_old'] = $data['status_old'] ?? null;
+                $log['status_new'] = $data['status_new'] ?? null;
+            }
+            
+            return $log;
+        })->all();
+        
+        return view('pages.reports.forwarding.detail', compact('report', 'complaintId', 'laporData', 'renderedActivities'));
     }
 
     /**
-     * Mengirimkan tanggapan balasan (reply) ke laporan melalui API LAPOR! (PUT request).
+     * Helper: Mengganti placeholder template dengan nama instansi yang sebenarnya.
+     * @param array $log Item log dari API followups
+     * @param string $contentField Field yang berisi template string (cth: 'template_content' atau 'content')
+     * @return string
      */
-    public function submitReply(Request $request, $complaintId)
+    public function renderLogContent(array $log, string $contentField): string
+    {
+        $template = $log[$contentField] ?? $log['content'] ?? 'Pembaruan status/disposisi.';
+        
+        // Ambil nama dari kolom yang sudah terurai oleh API
+        $institutionFromName = $log['institution_from_name'] ?? 'Sistem';
+        $institutionToName = $log['institution_to_name'] ?? 'Sistem';
+        
+        // 1. Ganti placeholders umum {{institution_from}} dan {{institution_to}}
+        $content = str_replace('{{institution_from}}', $institutionFromName, $template);
+        $content = str_replace('{{institution_to}}', $institutionToName, $content);
+
+        // 2. Jika template menggunakan link, ganti juga link placeholder-nya (jika tidak ada data link, biarkan kosong)
+        $content = str_replace('{{institution_from_link}}', '#', $content);
+        $content = str_replace('{{institution_to_link}}', '#', $content);
+        
+        // 3. (Opsional) Hapus tag HTML <a> jika link tidak diperlukan, atau biarkan.
+        // Kita biarkan karena template content biasanya sudah mengandung tag <b> dan <a> yang berguna.
+        
+        return $content;
+    }
+
+    /**
+     * Mengirim tindak lanjut/balasan ke LAPOR!
+     */
+    public function sendFollowUp(Request $request, $complaintId)
     {
         $request->validate([
-            'admin_content' => 'required|string|max:1000',
+            'content' => 'required|string|max:1000',
+            'template_code' => 'nullable|string',
+            // Tambahkan validasi lain sesuai kebutuhan API (rating, dll)
         ]);
-        
-        $service = new LaporForwardingService();
-        $replyContent = $request->input('admin_content');
-        
-        // Asumsi data admin berupa ID user di LMW atau kode tertentu
-        $adminId = auth()->id(); 
 
-        $apiResponse = $service->sendReply($complaintId, $replyContent, $adminId);
+        try {
+            $response = $this->laporService->sendFollowUpToLapor($complaintId, $request->all());
 
-        if ($apiResponse['success']) {
-            return redirect()->back()->with('success', 'Tanggapan berhasil dikirim ke LAPOR!.');
+            if ($response['success']) {
+                return redirect()->back()->with('success', 'Tindak lanjut/balasan berhasil dikirim ke LAPOR!.');
+            } else {
+                return redirect()->back()->with('error', 'Gagal mengirim balasan: ' . ($response['error'] ?? 'Kesalahan API.'));
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Exception saat kirim follow-up: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Kesalahan sistem saat mengirim balasan.');
+        }
+    }
+
+    /**
+     * Mengambil daftar template dari API LAPOR!.
+     */
+    public function getTemplates(LaporForwardingService $laporService)
+    {
+        $response = $laporService->getLaporTemplates();
+
+        if ($response['success']) {
+            return response()->json([
+                'status' => true,
+                'results' => [
+                    'data' => $response['templates'] // Menggunakan data yang dikembalikan service
+                ],
+                'message' => 'Success'
+            ]);
         } else {
-            return redirect()->back()->with('error', 'Gagal mengirim tanggapan: ' . $apiResponse['error']);
+            // Gagal koneksi API
+            Log::error("Failed to fetch templates: " . ($response['error'] ?? 'Unknown API error.'));
+            return response()->json(['status' => false, 'message' => $response['error'] ?? 'Gagal koneksi ke API Templates.'], 500);
         }
     }
 }
