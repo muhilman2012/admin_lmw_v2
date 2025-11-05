@@ -1,33 +1,64 @@
+version: '3.8'
+
 services:
-    laravel.test:
+    lmw-app:
         build:
-            context: './vendor/laravel/sail/runtimes/8.4'
+            context: ./
             dockerfile: Dockerfile
-            args:
-                WWWGROUP: '${WWWGROUP}'
-        image: 'sail-8.4/app'
-        extra_hosts:
-            - 'host.docker.internal:host-gateway'
-        ports:
-            - '8088:80'
-            - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
-        environment:
-            WWWUSER: '${WWWUSER}'
-            LARAVEL_SAIL: 1
-            XDEBUG_MODE: '${SAIL_XDEBUG_MODE:-off}'
-            XDEBUG_CONFIG: '${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}'
-            IGNITION_LOCAL_SITES_PATH: '${PWD}'
+        
+        image: lmw-app-image
+        container_name: lmw-web-app
+        
+        restart: always 
+        
+        working_dir: /var/www/
+        
         volumes:
-            - '.:/var/www/html'
+            - ./src:/var/www
+            - ./config/.env:/var/www/.env
+            - ./src/storage:/var/www/storage
+        
+        ports:
+            - "8003:8080" 
+
+        environment:
+            APP_ENV: 'local'
+            APP_DEBUG: 'true'
+        
         networks:
-            - sail
+            - lmw-network
         depends_on:
             - mysql
             - redis
             - mailpit
             - minio
+
+    lmw-scheduler:
+        build:
+            context: ./
+            dockerfile: Dockerfile
+        
+        image: lmw-scheduler-image
+        container_name: lmw-scheduler
+        restart: always 
+        working_dir: /var/www/
+        
+        volumes:
+            - ./src:/var/www
+            - ./config/.env:/var/www/.env
+        
+        command: php /var/www/artisan schedule:run
+        
+        networks:
+            - lmw-network
+        depends_on:
+            - mysql
+            - redis
+
     mysql:
         image: 'mysql/mysql-server:8.0'
+        container_name: lmw-db
+        restart: always
         ports:
             - '${FORWARD_DB_PORT:-3306}:3306'
         environment:
@@ -39,68 +70,65 @@ services:
             MYSQL_ALLOW_EMPTY_PASSWORD: 1
             MYSQL_EXTRA_OPTIONS: '${MYSQL_EXTRA_OPTIONS}'
         volumes:
-            - 'sail-mysql:/var/lib/mysql'
-            - './vendor/laravel/sail/database/mysql/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh'
+            - 'lmw-mysql-data:/var/lib/mysql'
         networks:
-            - sail
+            - lmw-network
         healthcheck:
-            test:
-                - CMD
-                - mysqladmin
-                - ping
-                - '-p${DB_PASSWORD}'
+            test: [ "CMD", "mysqladmin", "ping", "-p${DB_PASSWORD}" ]
             retries: 3
             timeout: 5s
+    
     redis:
         image: 'redis:alpine'
+        container_name: lmw-redis
+        restart: always
         ports:
             - '${FORWARD_REDIS_PORT:-6379}:6379'
         volumes:
-            - 'sail-redis:/data'
+            - 'lmw-redis-data:/data'
         networks:
-            - sail
+            - lmw-network
         healthcheck:
-            test:
-                - CMD
-                - redis-cli
-                - ping
+            test: [ "CMD", "redis-cli", "ping" ]
             retries: 3
             timeout: 5s
+
     mailpit:
         image: 'axllent/mailpit:latest'
+        container_name: lmw-mailpit
         ports:
             - '${FORWARD_MAILPIT_PORT:-1025}:1025'
             - '${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
         networks:
-            - sail
+            - lmw-network
+            
     minio:
         image: 'minio/minio:latest'
+        container_name: lmw-minio
         ports:
             - '${FORWARD_MINIO_PORT:-9000}:9000'
             - '${FORWARD_MINIO_CONSOLE_PORT:-8900}:8900'
         environment:
-            MINIO_ROOT_USER: sail
+            MINIO_ROOT_USER: lmw
             MINIO_ROOT_PASSWORD: password
         volumes:
-            - 'sail-minio:/data'
+            - 'lmw-minio-data:/data'
         networks:
-            - sail
+            - lmw-network
         command: 'minio server /data --console-address ":8900"'
         healthcheck:
-            test:
-                - CMD
-                - mc
-                - ready
-                - local
+            test: [ "CMD", "mc", "ready", "local" ]
             retries: 3
             timeout: 5s
+
 networks:
-    sail:
+    lmw-network:
         driver: bridge
+
 volumes:
-    sail-mysql:
+    lmw-mysql-data:
         driver: local
-    sail-redis:
+    lmw-redis-data:
         driver: local
-    sail-minio:
+    lmw-minio-data:
         driver: local
