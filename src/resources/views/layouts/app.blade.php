@@ -81,6 +81,7 @@
             
         </script>
         @endpush
+    @livewireScripts
     @stack('modals')
     </body>
 </html>

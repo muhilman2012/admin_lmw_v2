@@ -30,6 +30,7 @@ RUN apk add --no-cache \
   php84-pgsql \
   php84-pecl-imagick \
   php84-phar \
+  php84-redis \
   php84-session \
   php84-simplexml \
   php84-tokenizer \
@@ -60,8 +61,8 @@ RUN ln -s /usr/bin/php84 /usr/bin/php
 RUN composer install --optimize-autoloader --no-dev
 RUN php artisan storage:link
 
-RUN yarn install
-RUN yarn run build
+RUN npm install --legacy-peer-deps
+# RUN npm run build
 
 RUN addgroup -g 1945 -S pplsi && adduser -u 1945 -S pplsi -G pplsi
 RUN chown -R pplsi:pplsi /var/www /run /var/lib/nginx /var/log/nginx /data-setneg-point

@@ -1,4 +1,4 @@
-version: '3.8'
+# version: '3.8'
 
 services:
     lmw-app:
@@ -47,7 +47,7 @@ services:
             - ./src:/var/www
             - ./config/.env:/var/www/.env
         
-        command: php /var/www/artisan schedule:run
+        command: /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
         
         networks:
             - lmw-network
