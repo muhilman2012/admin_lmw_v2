@@ -66,7 +66,14 @@ class ReportsController extends Controller
         // 4. Pisahkan logs untuk kemudahan pemanggilan (jika Anda tidak menggunakan $report->activityLogs langsung di view)
         $reportLogs = $report->activityLogs; 
 
-        return view('pages.reports.show', compact('report', 'reportLogs', 'institutions', 'currentAssignment', 'statusTemplates', 'documentTemplates', 'availableAnalysts'));
+        // 5. Logika tanggal teruskan hanya bisa dilakukan jika melebihi tanggal 17 November 2025
+        $targetDate = Carbon::create(2025, 11, 17, 0, 0, 0, 'Asia/Jakarta');
+        $isRecentEnough = $report->created_at->greaterThanOrEqualTo($targetDate);
+        $isAnalysisApproved = ($currentAssignment && $currentAssignment->status === 'approved');
+        $isSuperAdmin = $user->hasRole('superadmin');
+        $canForward = $isSuperAdmin || ($isRecentEnough && $isAnalysisApproved);
+
+        return view('pages.reports.show', compact('report', 'reportLogs', 'institutions', 'currentAssignment', 'statusTemplates', 'documentTemplates', 'availableAnalysts', 'canForward'));
     }
 
     public function index()

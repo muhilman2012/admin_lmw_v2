@@ -400,6 +400,22 @@
 
                         <div class="card mb-4 border-info-subtle">
                             <div class="card-header bg-info-lt">
+                                <h5 class="card-title mb-0">Cek Status Lapor! (Manual)</h5>
+                            </div>
+                            <div class="card-body">
+                                <p>Menjalankan <code>php artisan lapor:check-status</code> untuk segera memeriksa dan memperbarui status semua laporan yang diteruskan melalui LAPOR!.</p>
+                                <p class="text-secondary small">Biasanya berjalan otomatis oleh scheduler server, tombol ini memaksa pengecekan saat itu juga.</p>
+                                <button type="button" 
+                                        class="btn btn-primary run-maintenance-command" 
+                                        data-command="lapor:check-status" 
+                                        data-title="Cek Status LAPOR!">
+                                    <i class="ti ti-checkup-list me-1"></i> Jalankan Cek Status
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="card mb-4 border-info-subtle">
+                            <div class="card-header bg-info-lt">
                                 <h5 class="card-title mb-0">Pengiriman Ulang Laporan Gagal</h5>
                             </div>
                             <div class="card-body">
@@ -458,7 +474,7 @@
                             <input type="hidden" name="active_tab_hash" value="#tab-maintenance">
                         </form>
                     </div>
-                    {{-- TAB BARU: MONITORING GEMINI API --}}
+                    {{-- TAB 6 : MONITORING GEMINI API --}}
                     <div class="tab-pane" id="tab-gemini-monitor" role="tabpanel">
                         <h4 class="mb-3">Status dan Health Check Gemini API</h4>
                         <p class="text-muted">Fitur ini menampilkan status koneksi dan hasil uji coba sederhana ke Gemini API. Status di-cache selama 5 menit.</p>
@@ -1179,7 +1195,7 @@
                     // Konfirmasi Akhir (Menggunakan nilai input baru)
                     Swal.fire({
                         title: `Konfirmasi Migrasi?`,
-                        html: `Memulai **php artisan ${command}** dari Halaman <strong>${page}</strong> dengan <strong>${limit}</strong> data per halaman.`,
+                        html: `Memulai <strong>php artisan ${command}</strong> dari Halaman <strong>${page}</strong> dengan <strong>${limit}</strong> data per halaman.`,
                         icon: 'warning',
                         showCancelButton: true,
                         confirmButtonColor: '#3085d6',

@@ -101,8 +101,8 @@
                                 <div class="me-auto">
                                     
                                     @php
-                                        $institutionFromName = $log['institution_from_name'] ?? 'Sistem';
-                                        $institutionToName = $log['institution_to_name'] ?? 'Sistem';
+                                        $institutionFromName = $log['institution_from_name'] ?? 'Lapor Mas Wapres';
+                                        $institutionToName = $log['institution_to_name'] ?? 'Lapor Mas Wapres';
                                         $attachments = $log['attachments'] ?? [];
                                     @endphp
 
@@ -173,8 +173,22 @@
                                     @endif
                                     
                                 </div>
-                                {{-- TANGGAL LOG --}}
-                                <div class="text-secondary small ms-3 text-nowrap" title="Waktu Log">{{ $log['created_at'] }}</div>
+                                <div class="text-secondary small ms-3 text-nowrap">
+                                    <span title="Waktu Log">{{ $log['created_at'] }}</span>
+                                    
+                                    @if (!empty($log['rendered_content']))
+                                        <button 
+                                            type="button" 
+                                            class="btn btn-sm btn-ghost-dark p-0 ms-2 copy-lapor-content" 
+                                            title="Gunakan sebagai Tanggapan"
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#modal-quick-action"
+                                            data-content="{{ strip_tags($log['rendered_content']) }}" 
+                                        >
+                                            <i class="ti ti-copy ti-sm"></i>
+                                        </button>
+                                    @endif
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -257,6 +271,98 @@
                 </div>
             </div>
         </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modal-quick-action" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <form id="quick-action-form" action="{{ route('reports.update-response', $report->uuid) }}" method="POST">
+            @csrf
+            @method('PATCH')
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Tanggapan Pengaduan</h5><span>(dapat dilihat pelapor)</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    {{-- Status Pengaduan --}}
+                    <div class="mb-3">
+                        <label class="form-label">Status Pengaduan</label>
+                        <select name="status" class="form-select" required>
+                            {{-- Gunakan $report->status untuk menampung status default saat ini --}}
+                            <option value="Proses verifikasi dan telaah" {{ $report->status == 'Proses verifikasi dan telaah' ? 'selected' : '' }}>Proses verifikasi dan telaah</option>
+                            <option value="Menunggu kelengkapan data dukung dari Pelapor" {{ $report->status == 'Menunggu kelengkapan data dukung dari Pelapor' ? 'selected' : '' }}>Menunggu kelengkapan data dukung dari Pelapor</option>
+                            <option value="Diteruskan kepada instansi yang berwenang untuk penanganan lebih lanjut" {{ $report->status == 'Diteruskan kepada instansi yang berwenang untuk penanganan lebih lanjut' ? 'selected' : '' }}>Diteruskan kepada instansi yang berwenang untuk penanganan lebih lanjut</option>
+                            <option value="Penanganan Selesai" {{ $report->status == 'Penanganan Selesai' ? 'selected' : '' }}>Penanganan Selesai</option>
+                        </select>
+                    </div>
+                    
+                    {{-- Klasifikasi Aduan --}}
+                    <div class="mb-3">
+                        <label class="form-label">Klasifikasi Aduan</label>
+                        <select name="classification" class="form-select" required>
+                            <option value="" disabled {{ is_null($report->classification) ? 'selected' : '' }}>-- Belum diklasifikasikan --</option>
+                            <option value="Pengaduan berkadar pengawasan" {{ $report->classification == 'Pengaduan berkadar pengawasan' ? 'selected' : '' }}>Pengaduan berkadar pengawasan</option>
+                            <option value="Pengaduan tidak berkadar pengawasan" {{ $report->classification == 'Pengaduan tidak berkadar pengawasan' ? 'selected' : '' }}>Pengaduan tidak berkadar pengawasan</option>
+                            <option value="Aspirasi" {{ $report->classification == 'Aspirasi' ? 'selected' : '' }}>Aspirasi</option>
+                        </select>
+                    </div>
+                    
+                    {{-- Ceklis Bantuan/Manfaat --}}
+                    <div class="mb-4">
+                        <label class="form-check form-switch">
+                            <input 
+                                type="checkbox" 
+                                class="form-check-input" 
+                                name="is_benefit_provided" 
+                                value="1"
+                                {{ $report->is_benefit_provided ? 'checked' : '' }}
+                            >
+                            <span class="form-check-label fw-bold text-success">
+                                Pengadu telah mendapatkan Bantuan/Manfaat
+                            </span>
+                        </label>
+                        <small class="form-hint">Centang ini jika tindak lanjut laporan telah memberikan manfaat atau solusi nyata kepada pelapor.</small>
+                    </div>
+
+                    {{-- Textarea Tanggapan (Response) --}}
+                    <div class="mb-3">
+                        <div class="row">
+                            {{-- KOLOM KIRI: TANGGAPAN LAMA (READ-ONLY) --}}
+                            <div class="col-md-6 mb-3 mb-md-0">
+                                <label class="form-label text-secondary">Tanggapan Terakhir (Lama)</label>
+                                <textarea 
+                                    class="form-control bg-light" 
+                                    rows="7" 
+                                    disabled 
+                                    title="Tanggapan yang saat ini tersimpan di sistem."
+                                >{{ $report->response ?? '— Belum ada tanggapan tersimpan —' }}</textarea> 
+                            </div>
+
+                            {{-- KOLOM KANAN: TANGGAPAN BARU (INPUT) --}}
+                            <div class="col-md-6">
+                                <label class="form-label required">Tanggapan Baru / Salinan LAPOR!</label>
+                                {{-- ID KRITIS UNTUK JAVASCRIPT --}}
+                                <textarea 
+                                    name="response" 
+                                    class="form-control" 
+                                    rows="7" 
+                                    id="quick-action-response-area" 
+                                    required
+                                >{{ $report->response ?? '' }}</textarea> 
+                                <small class="form-hint">
+                                    Konten dari log LAPOR! akan disalin ke kolom ini saat tombol <i class="ti ti-copy"></i> diklik.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-primary" onclick="showQuickActionConfirmation()">Simpan Perubahan</button> 
+                </div>
+            </div>
+        </form>
     </div>
 </div>
 @endsection
@@ -345,6 +451,54 @@
                 }
                 // Biarkan form POST berjalan
             });
+        }
+
+        const quickActionModal = document.getElementById('modal-quick-action');
+        const responseArea = document.getElementById('quick-action-response-area');
+        
+        // Pastikan modal dan textarea ditemukan
+        if (!quickActionModal || !responseArea) {
+            console.error("Modal atau Response Area tidak ditemukan.");
+            return;
+        }
+
+        // 1. Listener untuk menangkap event saat MODAL dibuka
+        quickActionModal.addEventListener('show.bs.modal', function (event) {
+            // Elemen yang memicu modal (yaitu tombol 'copy-lapor-content' atau tombol lain)
+            const button = event.relatedTarget; 
+            
+            // Cek apakah tombol yang diklik memiliki data-content (tombol 'copy-lapor-content' Anda)
+            if (button && button.classList.contains('copy-lapor-content')) {
+                const content = button.getAttribute('data-content');
+                
+                if (content) {
+                    // 2. Isi textarea dengan content LAPOR! yang sudah di-strip tag HTML
+                    responseArea.value = content.trim(); 
+                }
+            }
+        });
+
+        // 3. Fungsi konfirmasi (diambil dari button modal footer)
+        window.showQuickActionConfirmation = function() {
+            // Asumsi: Anda memiliki fungsi konfirmasi SweetAlert di tempat lain
+            // Jika tidak, Anda dapat langsung melakukan submit form:
+            document.getElementById('quick-action-form').submit();
+            
+            // Jika Anda ingin SweetAlert konfirmasi sebelum submit:
+            /*
+            Swal.fire({
+                title: 'Simpan Tanggapan?',
+                text: "Pastikan tanggapan ini yang akan dilihat oleh Pelapor.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Ya, Simpan!',
+                // ... dst
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    document.getElementById('quick-action-form').submit();
+                }
+            });
+            */
         }
     });
 </script>

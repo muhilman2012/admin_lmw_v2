@@ -17,13 +17,15 @@ class MigrateReportDocuments extends Command
      * Nama dan signature command.
      */
     protected $signature = 'migrate:documents 
-                            {--source-disk=v1_local : Nama disk storage tempat dokumen V1 disimpan}';
+                            {--source-disk=v1_local : Nama disk storage tempat dokumen V1 disimpan}
+                            {--force : Force the operation without confirmation}';
 
     protected $description = 'Memindai dokumen laporan V1, memindahkannya ke MinIO/S3 (complaints), dan memigrasinya ke tabel documents V2.';
 
     public function handle()
     {
         $startTime = microtime(true);
+        $force = $this->option('force');
 
         set_time_limit(0); // Hapus batas waktu eksekusi CLI
         ini_set('memory_limit', '1G'); // Beri memori yang cukup

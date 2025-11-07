@@ -401,8 +401,7 @@ class Reports extends Component
         ];
         
         // 2. Memicu event untuk JAVASCRIPT menampilkan modal
-        // Gunakan nama event yang unik, misalnya 'show-bootstrap-modal'
-        $this->dispatch('show-bootstrap-modal'); 
+        $this->dispatch('show-report-preview-modal');
     }
 
     // Tambahkan fungsi ini jika Anda ingin menutup modal dari Livewire

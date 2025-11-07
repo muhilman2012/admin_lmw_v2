@@ -277,21 +277,24 @@ class SettingsController extends Controller
 
         try {
             switch ($command) {
+                case 'lapor:check-status':
+                    Artisan::call('lapor:check-status', ['--force' => true]); 
+                    $output = Artisan::output();
+                    Session::flash('success', "Perintah cek status LAPOR! (Manual) berhasil dijalankan. Hasil: " . Str::limit($output, 100));
+                    break;
+
                 case 'lapor:retry-forwarding':
                     Artisan::call('lapor:retry-forwarding');
                     $output = Artisan::output();
                     Session::flash('success', "Perintah pengiriman ulang berhasil dipanggil. Cek log server untuk detail. Hasil: " . Str::limit($output, 100));
                     break;
 
-                case 'migrate:v1': 
-                    // Ambil input manual dari form
+                case 'migrate:v1':
                     $startPage = (int) $request->input('start_page', 1);
-                    $limit = (int) $request->input('limit', 500); // Ambil limit
-
-                    // Jalankan Artisan Command dengan kedua parameter
+                    $limit = (int) $request->input('limit', 500);
                     Artisan::call('migrate:v1', [
                         '--start-page' => $startPage,
-                        '--limit' => $limit, // Kirim limit baru
+                        '--limit' => $limit,
                     ]); 
                     $output = Artisan::output();
                     

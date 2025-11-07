@@ -47,7 +47,7 @@
 
                 {{-- 3. Tombol Teruskan --}}
                 @can('forward reports to lapor')
-                    @if ($isSuperAdmin || $isAnalysisApproved)
+                    @if ($canForward) 
                         <button class="btn btn-info" data-bs-toggle="modal" data-bs-target="#modal-teruskan-lapor">
                             <i class="ti ti-share me-2"></i>Teruskan
                         </button>
@@ -227,7 +227,7 @@
                 <div class="p-3 text-start">{{ $report->details ?? '-' }}</div>
                 </div>
                 <div class="card card-border mb-3">
-                <div class="card-header"><strong>Detail Aduan</strong></div>
+                <div class="card-header"><strong>Detail Tanggapan Aduan</strong></div>
                 <div class="list-group list-group-flush">
                     <div class="list-group-item">
                     <div class="d-flex justify-content-between align-items-start">

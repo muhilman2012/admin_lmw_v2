@@ -19,6 +19,8 @@ class UsersImport implements ToCollection, WithHeadingRow, WithStartRow
 {
     private $importedCount = 0;
 
+    private const TEMPORARY_PASSWORD = 'password';
+
     public function startRow(): int
     {
         return 2;
@@ -29,7 +31,6 @@ class UsersImport implements ToCollection, WithHeadingRow, WithStartRow
         DB::beginTransaction();
         try {
             foreach ($rows as $row) {
-                // ... (Logika import tetap sama) ...
                 $email = trim(strtolower($row['email']));
                 $name = trim($row['name']);
                 
@@ -41,8 +42,10 @@ class UsersImport implements ToCollection, WithHeadingRow, WithStartRow
                 $userData = [
                     'name' => $name,
                     'email' => $email,
-                    'role' => strtolower($row['role']), 
-                    'password' => $row['password_hash'], 
+                    'role' => strtolower($row['role']),
+                    'password' => Hash::make(self::TEMPORARY_PASSWORD),
+                    'temporary_password' => self::TEMPORARY_PASSWORD,
+                    'needs_password_reset' => true,
                     'is_active' => true,
                     'unit_kerja_id' => $unitKerja->id ?? null,
                     'deputy_id' => $deputy->id ?? null,
@@ -53,16 +56,15 @@ class UsersImport implements ToCollection, WithHeadingRow, WithStartRow
                 ];
 
                 try {
-                    // Cek jika role adalah 'deputy', pastikan unit_kerja_id di-null-kan jika ada
                     if (strtolower($row['role']) === 'deputy') {
                          $userData['unit_kerja_id'] = null;
                     } else {
-                         $userData['deputy_id'] = null; // Role non-deputy tidak punya deputy_id
+                         $userData['deputy_id'] = null;
                     }
                     
                     $user = User::updateOrCreate(['email' => $email], $userData);
                     
-                    // Assign Role (penting untuk Spatie)
+                    // Assign Role
                     if ($user->role) {
                          $user->syncRoles($user->role);
                     }
@@ -71,7 +73,7 @@ class UsersImport implements ToCollection, WithHeadingRow, WithStartRow
                     
                 } catch (QueryException $e) {
                     if ($e->getCode() === '23000' || str_contains($e->getMessage(), 'Duplicate entry')) {
-                        throw new \Exception("Duplikasi Email terdeteksi: Email '{$email}' sudah terdaftar.");
+                         throw new \Exception("Duplikasi Email terdeteksi: Email '{$email}' sudah terdaftar.");
                     }
                     throw $e;
                 }
@@ -83,7 +85,6 @@ class UsersImport implements ToCollection, WithHeadingRow, WithStartRow
         }
     }
     
-    // Method untuk mendapatkan jumlah yang berhasil diimport
     public function getImportedCount(): int
     {
         return $this->importedCount;

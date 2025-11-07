@@ -11,12 +11,14 @@ use Illuminate\Support\Facades\Log;
 
 class CheckLaporStatus extends Command
 {
-    protected $signature = 'lapor:check-status';
+    protected $signature = 'lapor:check-status {--force : Force check all reports regardless of next_check_at timestamp.}';
     protected $description = 'Checks and updates status for forwarded reports from LAPOR!';
 
     public function handle(LaporForwardingService $service)
     {
         $this->info('Starting LAPOR! status check...');
+
+        $isForced = $this->option('force');
         
         // Konstanta untuk jadwal pengecekan ulang
         $CHECK_FREQUENCY_HOURS = 3;
@@ -26,10 +28,14 @@ class CheckLaporStatus extends Command
         $forwardings = LaporanForwarding::query()
             ->where('status', 'terkirim') 
             ->whereNotNull('complaint_id')
-            ->where(function ($query) {
-                $query->where('next_check_at', '<=', Carbon::now())
-                      ->orWhereNull('next_check_at');
+            
+            ->where(function ($query) use ($isForced) {
+                if (!$isForced) {
+                    $query->where('next_check_at', '<=', Carbon::now())
+                        ->orWhereNull('next_check_at');
+                }
             })
+            
             ->orderBy('next_check_at', 'asc')
             ->limit(100)
             ->get();
@@ -51,8 +57,6 @@ class CheckLaporStatus extends Command
                 $dispositionName = $data['disposition_name'] ?? 'Belum Terdisposisi';
                 
                 // 2. Ambil CONTENT log terakhir
-                // Gunakan log yang memiliki content di dalamnya (biasanya di data_logs array, diurutkan terbaru)
-                // Karena data_logs Anda tampaknya terurut dari yang tertua/tidak jelas, kita ambil yang paling akhir (index tertinggi).
                 $latestLog = end($dataLogs); 
                 $content = null;
 

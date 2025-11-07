@@ -1074,6 +1074,10 @@
                             }
                         });
 
+                        Livewire.on('show-report-preview-modal', () => { 
+                            showModalPureJS(previewModalElement); 
+                        });
+
                         Livewire.on('close-disposition-modal', () => {
                             const modalElement = document.getElementById('modal-disposition');
                             
