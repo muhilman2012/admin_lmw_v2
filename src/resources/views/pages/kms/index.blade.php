@@ -117,9 +117,10 @@
         {{ $articles->links() }}
     </div>
             
-    {{-- KOLOM KANAN: POPULAR TAGS --}}
+    {{-- KOLOM KANAN --}}
     <div class="col-lg-3">
-        <div class="card">
+        {{-- TAGS POPULER --}}
+        <div class="card mb-4">
             <div class="card-header">
                 <h3 class="card-title">Tags Populer</h3>
             </div>
@@ -129,6 +130,33 @@
                 @empty
                     <p class="text-muted">Tidak ada tag populer saat ini.</p>
                 @endforelse
+            </div>
+        </div>
+
+        {{-- DAFTAR KATEGORI --}}
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Pilih Berdasarkan Kategori</h3>
+            </div>
+            <div class="list-group list-group-flush">
+                @forelse ($categories as $categoryItem)
+                <a 
+                    href="{{ route('kms.index', ['category' => $categoryItem->name]) }}" 
+                    class="list-group-item list-group-item-action d-flex justify-content-between align-items-center 
+                        @if (isset($category) && $category === $categoryItem->name) active @endif"
+                >
+                    {{ $categoryItem->name }}
+                    <span class="badge bg-white badge-pill">{{ $categoryItem->article_count }}</span> {{-- Asumsi ada properti article_count di objek kategori --}}
+                </a>
+                @empty
+                    <div class="list-group-item">Tidak ada kategori tersedia.</div>
+                @endforelse
+                {{-- Opsi untuk melihat semua/reset kategori jika filter aktif --}}
+                @if (isset($category))
+                <a href="{{ route('kms.index') }}" class="list-group-item list-group-item-action text-danger">
+                    Lihat Semua Artikel
+                </a>
+                @endif
             </div>
         </div>
     </div>

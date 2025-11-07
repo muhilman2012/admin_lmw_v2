@@ -58,14 +58,14 @@
                     <col style="width: 2%" />
                     <col style="width: 4%" />
                     <col style="width: 8%" />
-                    <col style="width: 16%" />
-                    <col style="width: 20%" />
+                    <col style="width: 14%" />
+                    <col style="width: 18%" />
                     <col style="width: 12%" />
                     <col style="width: 8%" />
                     <col style="width: 9%" />
                     <col style="width: 5%" />
-                    <col style="width: 12%" />
-                    <col style="width: 4%" />
+                    <col style="width: 10%" />
+                    <col style="width: 8%" />
                     <col style="width: 2%" />
                 </colgroup>
 
@@ -244,9 +244,21 @@
                             </td>
                             
                             {{-- Dikirim --}}
-                            <td style="max-width: 80px;">
+                            <td style="max-width: 8%;">
                                 <div class="multiline-clamp-2">
-                                    <span class="fs-5">{{ $report->created_at->format('d/m/Y') }}</span>
+                                    <span class="fs-5 d-block">{{ $report->created_at->format('d/m/Y') }}</span>
+                                    
+                                    @if ($report->badge_text)
+                                    <span 
+                                        class="badge {{ $report->badge_class }} mt-1" 
+                                        style="font-size: 0.6rem;"
+                                        title="{{ $report->badge_tooltip }}" 
+                                        data-bs-toggle="tooltip" {{-- Tambahkan ini jika menggunakan Tooltip Tabler/Bootstrap --}}
+                                    >
+                                        {{ $report->badge_text }}
+                                    </span>
+                                    @endif
+                                    
                                 </div>
                             </td>
                             

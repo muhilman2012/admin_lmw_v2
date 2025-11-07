@@ -251,12 +251,26 @@
                             <div class="mt-4">
                                 <label class="form-label">X-LMW-API-KEY</label>
                                 <div class="input-group">
-                                    <input id="lmw-api-key-input" type="text" name="api_token" class="form-control" 
-                                        value="{{ $apiSettings['lmw_api']['api_token'] ?? 'Token belum diatur' }}" disabled />
+                                    {{-- 1. UBAH TYPE MENJADI PASSWORD UNTUK MENYEMBUNYIKAN --}}
+                                    <input 
+                                        id="lmw-api-key-input" 
+                                        type="password" 
+                                        name="api_token" 
+                                        class="form-control"
+                                        value="{{ $apiSettings['lmw_api']['api_token'] ?? 'Token belum diatur' }}" 
+                                        disabled 
+                                    />
+                                    
+                                    {{-- 2. TOMBOL SALIN --}}
+                                    <button id="copy-lmw-api-key-btn" class="btn btn-outline-secondary" type="button" title="Salin API Key">
+                                        <i class="ti ti-copy me-1"></i> Salin
+                                    </button>
+                                    
                                     @can('regenerate api key')
-                                        <button id="refresh-lmw-api-key-btn" class="btn btn-primary" type="button">
-                                            <i class="ti ti-refresh me-1"></i> Refresh Token
-                                        </button>
+                                    {{-- 3. TOMBOL REFRESH (Tetap ada) --}}
+                                    <button id="refresh-lmw-api-key-btn" class="btn btn-primary" type="button" title="Ganti Token Baru">
+                                        <i class="ti ti-refresh me-1"></i> Refresh Token
+                                    </button>
                                     @endcan
                                 </div>
                                 <small class="form-hint">Salin token ini untuk digunakan dalam permintaan API internal.</small>
@@ -339,11 +353,11 @@
                             </div>
                             <div class="mt-3">
                                 <label class="form-label">Authorization</label>
-                                <input type="text" name="authorization" class="form-control" value="{{ $apiSettings['lapor_api']['authorization'] ?? '' }}" disabled />
+                                <input type="password" name="authorization" class="form-control" value="{{ $apiSettings['lapor_api']['authorization'] ?? '' }}" disabled />
                             </div>
                             <div class="mt-3">
                                 <label class="form-label">Token</label>
-                                <input type="text" name="token" class="form-control" value="{{ $apiSettings['lapor_api']['token'] ?? '' }}" disabled />
+                                <input type="password" name="token" class="form-control" value="{{ $apiSettings['lapor_api']['token'] ?? '' }}" disabled />
                             </div>
                         </form>
                         <div class="card-footer bg-transparent mt-4 d-none ps-0" id="lapor-api-footer">
@@ -380,11 +394,11 @@
                             </div>
                             <div class="mt-3">
                                 <label class="form-label">Authorization</label>
-                                <input type="text" name="authorization" class="form-control" value="{{ $apiSettings['dukcapil_api']['authorization'] ?? '' }}" disabled />
+                                <input type="password" name="authorization" class="form-control" value="{{ $apiSettings['dukcapil_api']['authorization'] ?? '' }}" disabled />
                             </div>
                             <div class="mt-3">
                                 <label class="form-label">Token</label>
-                                <input type="text" name="token" class="form-control" value="{{ $apiSettings['dukcapil_api']['token'] ?? '' }}" disabled />
+                                <input type="password" name="token" class="form-control" value="{{ $apiSettings['dukcapil_api']['token'] ?? '' }}" disabled />
                             </div>
                         </form>
                         <div class="card-footer bg-transparent mt-4 d-none ps-0" id="dukcapil-api-footer">
@@ -433,13 +447,13 @@
 
                             <div class="mt-3">
                                 <label class="form-label">API Key Utama (GEMINI_API_KEY)</label>
-                                <input type="text" name="api_key_primary" class="form-control" value="{{ $apiSettings['gemini_api']['api_key_primary'] ?? '' }}" disabled />
+                                <input type="password" name="api_key_primary" class="form-control" value="{{ $apiSettings['gemini_api']['api_key_primary'] ?? '' }}" disabled />
                                 <small class="form-hint">Kunci utama untuk klasifikasi.</small>
                             </div>
 
                             <div class="mt-3">
                                 <label class="form-label">API Key Cadangan (Fallback)</label>
-                                <input type="text" name="api_key_fallback" class="form-control" value="{{ $apiSettings['gemini_api']['api_key_fallback'] ?? '' }}" disabled />
+                                <input type="password" name="api_key_fallback" class="form-control" value="{{ $apiSettings['gemini_api']['api_key_fallback'] ?? '' }}" disabled />
                                 <small class="form-hint">Kunci cadangan yang digunakan saat kunci utama gagal (untuk mekanisme retry/fallback).</small>
                             </div>
 
@@ -719,6 +733,49 @@
                 });
             });
         }
+    });
+</script>
+<script>
+    document.getElementById('copy-lmw-api-key-btn').addEventListener('click', function() {
+        var inputElement = document.getElementById('lmw-api-key-input');
+        
+        var originalType = inputElement.type;
+        var originalDisabled = inputElement.disabled;
+        
+        inputElement.type = 'text';
+        inputElement.disabled = false;
+        
+        inputElement.select(); 
+        inputElement.setSelectionRange(0, 99999);
+        
+        try {
+            document.execCommand('copy');
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'success',
+                title: 'Token API berhasil disalin!',
+                showConfirmButton: false,
+                timer: 3000
+            });
+        } catch (err) {
+            console.error('Gagal menyalin token:', err);
+             Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'error',
+                title: 'Gagal menyalin token. Coba salin manual.',
+                showConfirmButton: false,
+                timer: 4000
+            });
+        }
+        
+    
+        setTimeout(() => {
+            inputElement.type = originalType; 
+            inputElement.disabled = originalDisabled;
+        }, 0);
+        
     });
 </script>
 @endpush

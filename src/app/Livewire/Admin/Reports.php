@@ -279,13 +279,14 @@ class Reports extends Component
 
     public function render()
     {
-        $reports = $this->reports;
+        $reportsPaginator = $this->getReportsProperty();
 
+        $reportsProcessedPaginator = $this->processReportsForBadge($reportsPaginator);
         $groupedCategoriesSimple = $this->getGroupedCategoriesProperty(); 
         $availableAnalysts = $this->getGroupedAnalystsProperty();
 
         return view('livewire.admin.reports', [
-            'reports' => $reports,
+            'reports' => $reportsProcessedPaginator,
             'groupedCategories' => $this->groupedCategories,
             'categoriesForMassSelect' => $groupedCategoriesSimple,
             'availableAnalysts' => $availableAnalysts,
@@ -843,5 +844,108 @@ class Reports extends Component
             Log::error('Gagal Update Kategori Massal Laporan: ' . $e->getMessage());
             $this->dispatch('swal:toast', message: 'Gagal update kategori massal: Terjadi kesalahan sistem.', icon: 'error');
         }
+    }
+
+    protected function processReportsForBadge($reportsPaginator)
+    {
+        $reportsCollection = $reportsPaginator->getCollection();
+
+        // Nilai Treshold dan Deadline
+        $thresholdDate = Carbon::create(2025, 11, 02); // Treshold baru: 6 Nov 2025
+        $verificationDeadlineDays = 3;
+        $now = Carbon::now();
+        // Normalisasi waktu saat ini ke awal hari untuk perbandingan hari yang adil
+        $nowStartOfDay = $now->copy()->startOfDay(); 
+
+        $processedCollection = $reportsCollection->map(function ($report) use ($thresholdDate, $verificationDeadlineDays, $now, $nowStartOfDay) {
+            
+            $report->badge_class = '';
+            $report->badge_text = '';
+            $report->badge_tooltip = '';
+
+            $createdAt = $report->created_at->copy()->startOfDay(); // Normalisasi CreatedAt
+            
+            // Kondisi Utama
+            if ($createdAt->greaterThanOrEqualTo($thresholdDate) && $report->status === 'Proses verifikasi dan telaah') {
+                
+                // --- 1. HITUNG DEADLINE (3 HARI KERJA) MENGGUNAKAN LOOP MANUAL ---
+                $deadline = $createdAt->copy();
+                $daysAdded = 0;
+                
+                while ($daysAdded < $verificationDeadlineDays) {
+                    $deadline->addDay();
+                    if (!$deadline->isWeekend()) { 
+                        $daysAdded++; 
+                    }
+                }
+                // Deadline telah dihitung
+                // ----------------------------------------------------------------------
+                
+                // Cek apakah waktu saat ini (start of day) belum melewati deadline
+                if ($nowStartOfDay->lessThanOrEqualTo($deadline)) {
+                    // KONDISI 1: BELUM TERLAMBAT
+                    
+                    // --- 2. HITUNG SISA HARI KERJA DARI SEKARANG HINGGA DEADLINE (LOOP MANUAL) ---
+                    $remainingDays = 0;
+                    $currentCheckDay = $nowStartOfDay->copy(); 
+                    
+                    // Mulai dari hari ini (startOfDay) dan cek sampai TEPAT sebelum $deadline.
+                    // Jika $nowStartOfDay sama dengan $deadline, berarti tersisa 1 hari kerja (yaitu hari ini).
+                    while ($currentCheckDay->lessThanOrEqualTo($deadline)) {
+                        if (!$currentCheckDay->isWeekend()) { 
+                            $remainingDays++;
+                        }
+                        $currentCheckDay->addDay();
+                    }
+                    
+                    // Karena loop ini menghitung HARI INI sebagai sisa 1, kita harus mengurangi 1 
+                    // jika kita ingin menghitung sisa hari kerja PENUH.
+                    // Tapi untuk tujuan 'dalam X hari', kita biarkan saja (misalnya sisa 3 hari kerja).
+                    
+                    // SET CLASS & TOOLTIP
+                    $report->badge_class = 'bg-info-lt';
+                    $report->badge_tooltip = "Butuh Verifikasi dalam $remainingDays hari kerja"; 
+
+                    if ($remainingDays <= 1) { 
+                        $report->badge_class = 'bg-warning-lt';
+                        $report->badge_text = 'AKHIR';
+                    } else {
+                        $report->badge_text = "SISA $remainingDays HR";
+                    }
+                    
+                } else {
+                    // KONDISI 2: TERLAMBAT
+                    
+                    // --- 3. HITUNG HARI TERLAMBAT (HARI KERJA YANG TELAH TERLEWAT) ---
+                    $overdueDays = 0;
+                    $currentCheckDay = $deadline->copy()->addDay(); // Mulai hitung keterlambatan dari hari setelah deadline
+                    
+                    // Loop hingga TEPAT hari ini
+                    while ($currentCheckDay->lessThanOrEqualTo($nowStartOfDay)) {
+                        if (!$currentCheckDay->isWeekend()) { 
+                            $overdueDays++;
+                        }
+                        $currentCheckDay->addDay();
+                    }
+
+                    if ($overdueDays <= 0) {
+                        // Ini kasus edge di hari weekend setelah deadline, kita anggap HARI AKHIR.
+                        $report->badge_class = 'bg-warning-lt';
+                        $report->badge_text = 'AKHIR';
+                        $report->badge_tooltip = "Batas Verifikasi Tepat Hari Ini";
+                    } else {
+                        // SET CLASS & TOOLTIP
+                        $report->badge_class = 'bg-danger-lt';
+                        $report->badge_text = "TELAT $overdueDays HR";
+                        $report->badge_tooltip = "Terlambat Verifikasi lebih dari $overdueDays hari kerja";
+                    }
+                }
+                
+            }
+            return $report;
+        });
+
+        $reportsPaginator->setCollection($processedCollection);
+        return $reportsPaginator;
     }
 }

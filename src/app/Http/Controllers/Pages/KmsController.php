@@ -27,9 +27,13 @@ class KmsController extends Controller
     {
         $search = $request->input('q');
         $tag = $request->input('tag');
+        $category = $request->input('category');
         $user = Auth::user();
         
         $query = KmsArticle::query();
+
+        // Daftar kategori yang tersedia
+        $baseCategories = ['Kebijakan', 'Prosedur', 'FAQ', 'Teknis'];
 
         if (!$user->hasAnyRole(['superadmin', 'admin'])) {
             $query->where('is_active', true);
@@ -42,12 +46,35 @@ class KmsController extends Controller
                   ->orWhere('tags', 'like', "%{$search}%");
             });
         }
+        
+        if ($category) {
+            $query->where('category', $category);
+        }
 
         if ($tag) {
             $query->where('tags', 'like', "%{$tag}%"); 
         }
 
-        $articles = $query->latest()->paginate(10);
+        $articles = $query->latest()->paginate(10)->withQueryString();
+        
+        $categoryCounts = KmsArticle::query()
+            ->select('category', DB::raw('COUNT(*) as article_count'))
+            // Hanya hitung artikel yang aktif jika user bukan admin
+            ->when(!$user->hasAnyRole(['superadmin', 'admin']), function ($q) {
+                return $q->where('is_active', true);
+            })
+            ->whereIn('category', $baseCategories)
+            ->groupBy('category')
+            ->pluck('article_count', 'category')
+            ->toArray();
+
+        // Susun ulang kategori dengan hitungan untuk dikirim ke view
+        $categories = collect($baseCategories)->map(function ($name) use ($categoryCounts) {
+            return (object) [
+                'name' => $name,
+                'article_count' => $categoryCounts[$name] ?? 0,
+            ];
+        });
         
         $popularTags = DB::table('kms_articles')
             ->select(DB::raw('TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(tags, ",", numbers.n), ",", -1)) AS tag'))
@@ -65,7 +92,7 @@ class KmsController extends Controller
             ->pluck('tag');
 
 
-        return view('pages.kms.index', compact('articles', 'search', 'tag', 'popularTags'));
+        return view('pages.kms.index', compact('articles', 'search', 'tag', 'popularTags', 'category', 'categories'));
     }
 
     /**
