@@ -347,6 +347,8 @@ class Reports extends Component
 
     public function closeDeleteModal()
     {
+        $this->dispatch('close-confirm-delete-modal'); 
+        
         $this->reset(['confirmDeleteId', 'confirmDeleteTicket', 'confirmDeleteName', 'currentAssignmentId']);
         $this->resetPage(); 
     }
@@ -367,12 +369,33 @@ class Reports extends Component
 
     public function deleteReport()
     {
-        if ($report = Report::find($this->confirmDeleteId)) {
-            $report->delete();
-            $this->dispatch('swal:toast', message: 'Laporan berhasil dihapus.', icon: 'success');
+        DB::beginTransaction();
+        
+        try {
+            if ($report = Report::find($this->confirmDeleteId)) {
+                $ticket = $report->ticket_number;
+                
+                $report->delete(); 
+                
+                DB::commit();
+
+                $this->dispatch('swal:toast', message: "Laporan #{$ticket} berhasil dihapus.", icon: 'success');
+
+                $this->closeDeleteModal();
+                
+            } else {
+                DB::rollBack();
+                $this->dispatch('swal:toast', message: 'Laporan tidak ditemukan.', icon: 'error');
+                $this->closeDeleteModal();
+            }
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Gagal menghapus laporan {$this->confirmDeleteId}: " . $e->getMessage());
+            $this->dispatch('swal:toast', message: 'Gagal menghapus laporan sistem.', icon: 'error');
+            
+            $this->closeDeleteModal();
         }
-        $this->closeDeleteModal();
-        $this->dispatch('hide-delete-confirm-modal');
     }
 
     public function dispatchReportPreview($uuid)

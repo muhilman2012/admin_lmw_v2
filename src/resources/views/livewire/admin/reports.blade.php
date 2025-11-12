@@ -827,6 +827,7 @@
                 const filterModal = document.getElementById('modal-filter-laporan');
                 const massCategoryModalElement = document.getElementById('modal-mass-category');
                 const massCategoryConfirmationModalElement = document.getElementById('modal-confirm-category-mass');
+                const confirmDeleteModalElement = document.getElementById('modal-confirm-delete');
 
                 // --- FUNGSI UTILITY INTI ---
                 const getReportsComponent = () => {
@@ -1088,6 +1089,14 @@
 
                         Livewire.on('show-report-preview-modal', () => { 
                             showModalPureJS(previewModalElement); 
+                        });
+
+                        Livewire.on('show-delete-confirm-modal', () => { 
+                            showModalPureJS(confirmDeleteModalElement); 
+                        });
+
+                        Livewire.on('close-confirm-delete-modal', () => {
+                            window.hideModalPureJS(confirmDeleteModalElement); 
                         });
 
                         Livewire.on('close-disposition-modal', () => {
