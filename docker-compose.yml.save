@@ -1,24 +1,23 @@
 # version: '3.8'
 
 services:
+    # 1. SERVICE WEB UTAMA (Menerima Host Port 80)
     lmw-web:
         build:
             context: ./
             dockerfile: Dockerfile
         image: lmw-web-image
         container_name: lmw-web-app
-        restart: always
+        restart: always 
         working_dir: /var/www/
-        
+        # Menggunakan image yang sama
         volumes:
             - ./src:/var/www
             - ./config/.env:/var/www/.env
             - ./src/storage:/var/www/storage
-            - /etc/ssl/wapresri/b.wapresri.go.id.key:/etc/nginx/ssl/server.key:ro
-            - /etc/ssl/wapresri/combined_server_chain.crt:/etc/nginx/ssl/combined_server_chain.crt:ro
         ports:
-            - "80:8080"
-            - "443:8443"
+            # 🔥 HOST PORT 80 -> CONTAINER PORT 8080
+            - "80:8080" 
         networks:
             - lmw-network
         depends_on:
@@ -28,20 +27,22 @@ services:
                 condition: service_healthy
             minio:
                 condition: service_started
-        
+        # Environment tetap normal
         environment:
+            # Pastikan APP_ENV sesuai
             APP_ENV: local
             APP_DEBUG: ${APP_DEBUG:-true}
 
-    lmw-api:
+    # 2. 🔥 SERVICE API KHUSUS (Menerima Host Port 8080)
+    lmw-api: 
         build:
             context: ./
             dockerfile: Dockerfile
-        image: lmw-api-image
+        image: lmw-api-image # Image baru
         container_name: lmw-api-app
-        restart: always
+        restart: always 
         working_dir: /var/www/
-        
+        # Menggunakan image yang sama
         volumes:
             - ./src:/var/www
             - ./config/.env:/var/www/.env
@@ -74,7 +75,6 @@ services:
         volumes:
             - ./src:/var/www
             - ./config/.env:/var/www/.env
-            - ./config/supervisord-scheduler.conf:/etc/supervisor/conf.d/supervisord.conf
         
         command: /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
         

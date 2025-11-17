@@ -22,8 +22,8 @@ class AppServiceProvider extends ServiceProvider
             return signMinioUrlSmart(env('AWS_UPLOADS_BUCKET'), $path, $minutes);
         });
 
-        if (config('app.env') === 'local') {
-            URL::forceScheme('http'); 
+        if (config('app.env') === 'testing') {
+            URL::forceScheme('https'); 
         }
     }
 }
