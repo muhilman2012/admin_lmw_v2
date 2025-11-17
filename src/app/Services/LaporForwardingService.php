@@ -7,6 +7,7 @@ use App\Models\Report;
 use App\Models\Document;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
 
 class LaporForwardingService
@@ -40,14 +41,27 @@ class LaporForwardingService
      */
     private function getAuthHeaders(): array
     {
-        return [
-            'Authorization' => $this->getApiSetting('authorization'),
-            'token' => $this->getApiSetting('token'),
+        $authKey = $this->getApiSetting('auth_key') ?? 'Authorization';
+        $authValue = $this->getApiSetting('auth_value');
+        $additionalToken = $this->getApiSetting('token');
+
+        $headers = [
+            'Accept' => 'application/json',
         ];
+
+        if (!empty($authValue)) {
+            $headers[$authKey] = $authValue;
+        }
+
+        if (!empty($additionalToken)) {
+            $headers['token'] = $additionalToken; 
+        }
+
+        return $headers;
     }
 
     /**
-     * Langkah 1: Mengunggah dokumen laporan ke API LAPOR!. (Multipart Form Data)
+     * Langkah 1: Mengunggah dokumen laporan ke API LAPOR!. (Multipart Form Data, Batch Upload)
      */
     public function uploadDocuments(Report $report): array
     {
@@ -57,12 +71,12 @@ class LaporForwardingService
 
         $authHeaders = $this->getAuthHeaders();
         $uploadUrl = $this->getApiSetting('base_url') . '/complaints/complaint/file';
+        
+        // 1. Inisialisasi HTTP client dengan headers otentikasi
+        $http = Http::withHeaders($authHeaders);
+        $filesToAttach = 0;
 
-        if (empty($authHeaders['Authorization']) || empty($authHeaders['token'])) {
-             Log::error('API LAPOR! credentials missing for uploadDocuments.');
-             return [];
-        }
-
+        // 2. Loop semua dokumen dan lampirkan ke client (BELUM DIKIRIM)
         foreach ($dokumens as $dokumen) {
             $filePath = $dokumen->file_path;
             $fileName = basename($filePath);
@@ -77,34 +91,61 @@ class LaporForwardingService
                 $mimeType = $storageDisk->mimeType($filePath);
 
                 if ($fileContents) {
-                    // Hanya mengirim headers otentikasi, Content-Type diatur oleh attach (multipart)
-                    $response = Http::withHeaders($authHeaders)->attach(
-                        'attachments[]',
+                    // Lampirkan dokumen ke object HTTP client menggunakan array notation yang sudah benar
+                    $http->attach(
+                        'attachments[]', 
                         $fileContents,
                         $fileName,
                         ['Content-Type' => $mimeType]
-                    )->post($uploadUrl);
-
-                    $responseData = $response->json();
-                    
-                    if ($response->successful()) {
-                        $dokumenId = $responseData['results']['docs'][0]['id'] ?? null; 
-                        if ($dokumenId) {
-                            $dokumenIds[] = $dokumenId;
-                        }
-                    } else {
-                        Log::error('Gagal mengunggah dokumen ke LAPOR!', [
-                            'file' => $filePath, 
-                            'status' => $response->status(),
-                            'response' => $response->body()
-                        ]);
-                    }
+                    );
+                    $filesToAttach++;
                 }
             } catch (\Exception $e) {
-                Log::error('Exception saat upload dokumen dari Minio ke LAPOR!: ' . $e->getMessage(), ['file' => $filePath]);
+                Log::error('Exception saat menyiapkan dokumen dari Minio ke LAPOR!: ' . $e->getMessage(), ['file' => $filePath]);
             }
         }
 
+        // 3. Kirim request HANYA SEKALI
+        if ($filesToAttach > 0) {
+            try {
+                $response = $http->post($uploadUrl);
+                $responseData = $response->json();
+                
+                if ($response->successful()) {
+                    $uploadedDocs = $responseData['results']['docs'] ?? [];
+                    
+                    if (!empty($uploadedDocs)) {
+                        foreach ($uploadedDocs as $doc) {
+                            
+                            $dokumenIdResult = $doc['id'] ?? null; 
+                            
+                            if ($dokumenIdResult) {
+                                $dokumenIds[] = $dokumenIdResult; 
+                            } else {
+                                Log::error('API LAPOR! sukses, tapi ID dokumen tidak ditemukan di array docs.', ['response' => $response->body()]);
+                            }
+                        }
+                        
+                        Log::info('LAPOR! DOC UPLOAD SUCCESS', [
+                            'count' => count($dokumenIds), 
+                            'ids' => $dokumenIds
+                        ]); 
+
+                    } else {
+                        Log::error('API LAPOR! sukses, tapi tidak ada ID dokumen ditemukan di array "docs".', ['response' => $response->body()]);
+                    }
+                } else {
+                    Log::error('Gagal mengunggah dokumen ke LAPOR!', [
+                        'status' => $response->status(),
+                        'response' => $response->body()
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error('Exception saat mengirim request batch dokumen ke LAPOR!: ' . $e->getMessage());
+            }
+        }
+
+        // Mengembalikan SEMUA ID yang berhasil di-upload
         return $dokumenIds;
     }
 
@@ -113,7 +154,8 @@ class LaporForwardingService
      */
     public function sendToLapor(Report $report, array $uploadedDocumentIds, bool $isAnonymous): array
     {
-        $attachments = implode(',', $uploadedDocumentIds);
+        $attachmentsJson = json_encode($uploadedDocumentIds);
+        $finalAttachmentsPayload = $attachmentsJson . ".";
         
         $content = $isAnonymous
              ? "Nomor Tiket pada Aplikasi LMW: {$report->ticket_number}\n Detail Laporan: {$report->details}\n Lokasi: {$report->location}"
@@ -136,18 +178,26 @@ class LaporForwardingService
             'date_of_incident' => $report->event_date,
             'copy_externals'=> null,
             'info_disposition' => null,
-            'info_attachments' => "[{$attachments}]",
+            'info_attachments' => null,
             'tags_raw' => '#lapormaswapres',
             'is_approval' => false,
             'is_anonymous' => $isAnonymous,
             'is_secret' => true,
             'is_priority' => true,
-            'attachments' => "[{$attachments}]",
+            'attachments' => $finalAttachmentsPayload,
         ];
 
         $authHeaders = array_merge($this->getAuthHeaders(), [
             'Content-Type' => 'application/json',
             'Accept' => 'application/json' // Tambahkan Accept
+        ]);
+
+        Log::critical('LAPOR! SUBMIT PAYLOAD CHECK', [
+            'Total_IDs' => count($uploadedDocumentIds),
+            'IDs' => $uploadedDocumentIds,
+            'Final_Attachments_Payload' => $finalAttachmentsPayload,
+            'Headers' => $authHeaders,
+            'PayloadExcerpt' => substr(json_encode($data), 0, 200) . '...',
         ]);
         
         try {
@@ -158,6 +208,17 @@ class LaporForwardingService
 
             if ($response->successful()) {
                 $complaintId = $responseData['complaint_id'] ?? null; 
+
+                Log::info('LAPOR! SUBMIT SUCCESS RESPONSE', [
+                    'Complaint_ID' => $complaintId,
+                    'Attachments_Received' => $responseData['attachments'] ?? 'Field attachments tidak ada di respons',
+                    'Response_Data' => $responseData
+                ]);
+
+                Log::debug('LAPOR! RAW REQUEST PAYLOAD', [
+                    'url' => $this->getApiSetting('base_url') . '/complaints/complaint-lmw',
+                    'payload' => $data,
+                ]);
                 
                 $complaintId = $complaintId ? (string)$complaintId : null;
 
@@ -302,9 +363,29 @@ class LaporForwardingService
                 // Mengambil array data logs
                 $logs = $responseData['results']['data'] ?? [];
                 
-                return ['success' => true, 'logs' => $logs];
+                // Normalisasi Waktu Langsung Setelah Diterima
+                $normalizedLogs = collect($logs)->map(function ($log) {
+                    if (isset($log['created_at'])) {
+                        $dateTimeString = $log['created_at'];
+                        $format = 'd-m-Y H:i:s';
+                        
+                        try {
+                            $carbonObject = Carbon::createFromFormat($format, $dateTimeString);
+                            
+                            $log['created_at'] = $carbonObject->format($format);
+                            
+                        } catch (\Exception $e) {
+                            Log::warning("LAPOR! Log Time Parse Failed: " . $e->getMessage());
+                        }
+                    }
+                    
+                    return $log;
+                })->all();
+                
+                // Kembalikan log yang sudah dinormalisasi
+                return ['success' => true, 'logs' => $normalizedLogs]; 
             } else {
-                 return ['success' => false, 'error' => "API error: HTTP status {$response->status()}."];
+                return ['success' => false, 'error' => "API error: HTTP status {$response->status()}."];
             }
 
         } catch (\Exception $e) {

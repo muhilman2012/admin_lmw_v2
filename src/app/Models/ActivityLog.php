@@ -15,6 +15,8 @@ class ActivityLog extends Model
         'description',
         'loggable_id',
         'loggable_type',
+        'created_at',
+        'updated_at',
     ];
 
     public function user()

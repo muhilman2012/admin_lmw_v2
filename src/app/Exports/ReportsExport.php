@@ -18,18 +18,47 @@ use Maatwebsite\Excel\DefaultValueBinder;
 use PhpOffice\PhpSpreadsheet\Cell\Cell;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Events\BeforeExport;
+use Maatwebsite\Excel\Events\AfterExport;
 
 class ReportsExport extends DefaultValueBinder implements
     FromQuery, WithHeadings, WithMapping, ShouldQueue,
-    WithCustomValueBinder, WithColumnFormatting
+    WithCustomValueBinder, WithColumnFormatting, WithEvents
 {
     use Exportable;
 
     protected array $filters;
+    protected float $startedAt;
 
     public function __construct(array $filters = [])
     {
         $this->filters = $filters;
+    }
+
+    public function registerEvents(): array
+    {
+        return [
+            BeforeExport::class => function (BeforeExport $event) {
+                $this->startedAt = microtime(true);
+
+                Log::info('ReportsExport: export dimulai', [
+                    'filters' => $this->filters,
+                    'time' => now()->toDateTimeString(),
+                ]);
+            },
+
+            AfterExport::class => function (AfterExport $event) {
+                $duration = microtime(true) - $this->startedAt;
+
+                Log::info('ReportsExport: export selesai', [
+                    'duration_seconds' => round($duration, 2),
+                    'duration_human'   => gmdate('H:i:s', (int) $duration),
+                    'filters'          => $this->filters,
+                    'time'             => now()->toDateTimeString(),
+                ]);
+            },
+        ];
     }
 
     public function query(): Builder

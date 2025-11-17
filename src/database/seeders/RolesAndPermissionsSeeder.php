@@ -80,6 +80,7 @@ class RolesAndPermissionsSeeder extends Seeder
         // Peran 3: Analis (Fokus pada Tugas Sendiri)
         $analyst = Role::firstOrCreate(['name' => 'analyst']);
         $analyst->givePermissionTo([
+            'create reports',
             'view assigned reports',
             'fill analysis worksheet', 
             'update report response', 
@@ -89,6 +90,7 @@ class RolesAndPermissionsSeeder extends Seeder
         // Peran 4: Asdep/Karo (Kontrol Unit & Persetujuan)
         $asdep_karo = Role::firstOrCreate(['name' => 'asdep_karo']);
         $asdep_karo->givePermissionTo([
+            'create reports',
             'view all reports',
             'assign reports',
             'approve analysis', 
@@ -100,6 +102,7 @@ class RolesAndPermissionsSeeder extends Seeder
         // Peran 5: Deputi (Pengawasan dan Akses Data Penuh)
         $deputy = Role::firstOrCreate(['name' => 'deputy']);
         $deputy->givePermissionTo([
+            'create reports',
             'view all reports',
             'approve analysis',
             'export data',

@@ -37,20 +37,21 @@ class SyncInstitutions extends Command
                                         ->pluck('value', 'key');
 
         $baseUrl = $settings->get('base_url');
-        $auth = $settings->get('authorization');
+        $authKey = $settings->get('auth_key', 'Authorization');
+        $authValue = $settings->get('auth_value');
         $token = $settings->get('token');
 
-        if (!$baseUrl || !$auth || !$token) {
-            $this->error("One or more API settings for '{$apiName}' not found. Sync aborted.");
+        if (!$baseUrl || !$authValue || !$token) {
+            $this->error("One or more required API settings for '{$apiName}' not found (Base URL, Auth Value, or Token). Sync aborted.");
             \Illuminate\Support\Facades\Log::error("API settings for '{$apiName}' not complete.");
-            return 1; // Exit with error code
+            return 1;
         }
 
         try {
             // 2. Buat permintaan HTTP dengan kredensial yang diambil dari database
             $response = Http::withHeaders([
-                'Authorization' => $auth,
-                'token' => $token,
+                $authKey => "Bearer {$authValue}",
+                'token' => $token, 
                 'Content-Type' => 'application/json'
             ])->get("{$baseUrl}/masters/institutions/external?page_size=1000");
             
@@ -65,10 +66,17 @@ class SyncInstitutions extends Command
                 return 0; 
             }
 
+            $this->info("Clearing old institution data before synchronization...");
+            try {
+                \App\Models\Institution::truncate(); 
+            } catch (\Exception $e) {
+                $this->error("Failed to truncate Institution table. Attempting to delete all rows.");
+                \App\Models\Institution::query()->delete();
+            }
+
             // 4. Update atau buat institusi di database lokal
             $updatedCount = 0;
             foreach ($institutions as $institution) {
-                // Asumsi Model Institution tersedia
                 \App\Models\Institution::updateOrCreate(
                     ['id' => $institution['id']],
                     ['name' => $institution['name']]

@@ -315,6 +315,31 @@ class SettingsController extends Controller
                     
                     break;
 
+                case 'migrate:logs':
+                    $startPage = (int) $request->input('start_page', 1);
+                    $limit = (int) $request->input('limit', 500);
+                    
+                    Artisan::call($command, [
+                        '--start-page' => $startPage,
+                        '--limit' => $limit,
+                    ]); 
+                    $output = Artisan::output();
+                    
+                    $regex = '/Halaman (\d+)\/(\d+) berhasil diproses\. Total records: (\d+)/s'; 
+                    preg_match($regex, $output, $matches);
+                    
+                    if (isset($matches[1])) {
+                        $processedPage = (int) $matches[1];
+                        $lastPage = (int) $matches[2];
+                        $totalRecords = (int) $matches[3];
+
+                        $message = "Migrasi {$command} Halaman {$processedPage}/{$lastPage} berhasil diproses ({$totalRecords} records).";
+                        Session::flash('success', $message);
+                    } else {
+                        Session::flash('success', "Migrasi {$command} tahap ini selesai. Cek log server.");
+                    }
+                    
+                    break;
                 case 'sync:institutions':
                     Artisan::call('sync:institutions');
                     $output = Artisan::output();

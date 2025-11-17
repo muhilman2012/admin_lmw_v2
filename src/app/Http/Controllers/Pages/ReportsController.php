@@ -557,10 +557,20 @@ class ReportsController extends Controller
 
         $service = new LaporForwardingService();
 
+        $uploadedDocumentIds = [];
+        $uploadedIdsString = '';
+        $complaintId = null;
+
         DB::beginTransaction();
         try {
             // A. Langkah 1: Upload Dokumen
             $uploadedDocumentIds = $service->uploadDocuments($report);
+            $uploadedIdsString = implode(',', $uploadedDocumentIds);
+
+            if (empty($uploadedIdsString) && $report->documents->count() > 0) {
+                // Jika ada dokumen yang seharusnya diunggah tapi ID-nya kosong
+                throw new \Exception("Gagal mengumpulkan ID dokumen dari LAPOR! setelah upload.");
+            }
 
             // B. Langkah 2: Kirim Laporan Utama ke LAPOR!
             $apiFirstResponse = $service->sendToLapor($report, $uploadedDocumentIds, $isAnonymous);
@@ -631,7 +641,7 @@ class ReportsController extends Controller
             }
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Terjadi kesalahan saat teruskan ke instansi: ' . $e->getMessage(), ['uuid' => $uuid]);
+            Log::error('Terjadi kesalahan saat teruskan ke instansi: ' . $e->getMessage(), ['uuid' => $uuid, 'uploaded_ids' => $uploadedIdsString]);
             return redirect()->back()->with('error', 'Terjadi kesalahan sistem saat memproses penerusan laporan.');
         }
     }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pages;
 
 use App\Http\Controllers\Controller;
 use App\Models\Report;
+use Carbon\Carbon;
 use App\Services\LaporForwardingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -43,6 +44,20 @@ class ForwardingController extends Controller
         $logActivities = $logResponse['logs'] ?? []; 
         
         $renderedActivities = collect($logActivities)->map(function ($log) {
+            if (isset($log['created_at'])) {
+                try {
+                    $dateTimeString = $log['created_at'];
+                    $format = 'd-m-Y H:i:s';
+                    
+                    $carbonObject = Carbon::createFromFormat($format, $dateTimeString);
+                    
+                    $log['created_at'] = $carbonObject->format($format); 
+                    
+                } catch (\Exception $e) {
+                    Log::warning("Failed to parse created_at for log: " . $log['created_at']);
+                }
+            }
+
             $sourceField = !empty($log['template_content']) ? 'template_content' : 'content';
             
             // Panggil method render dari service instance

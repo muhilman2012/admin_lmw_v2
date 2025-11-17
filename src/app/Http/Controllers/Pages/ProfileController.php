@@ -73,8 +73,6 @@ class ProfileController extends Controller
 
     public function updatePassword(Request $request)
     {
-        \Illuminate\Support\Facades\Log::info('--- PROFILE UPDATE PASSWORD REACHED ---');
-
         $user = Auth::user();
 
         try{
@@ -144,13 +142,17 @@ class ProfileController extends Controller
         
         switch ($apiName) {
             case 'v1_migration_api':
-                // KASUS BARU: API MIGRASI V1
                 $rules['base_url'] = 'required|url|max:255'; 
                 $rules['authorization'] = 'required|string';
-                
                 $settingsToUpdate = $request->only(['base_url', 'authorization']);
                 break;
             case 'lapor_api':
+                $rules['base_url'] = 'nullable|url|max:255';
+                $rules['auth_key'] = 'nullable|string|in:Authorization,auth';
+                $rules['auth_value'] = 'nullable|string';
+                $rules['token'] = 'nullable|string';
+                $settingsToUpdate = $request->only(['base_url', 'auth_key', 'auth_value', 'token']);
+                break;
             case 'dukcapil_api':
             case 'lmw_api':
                 $rules['base_url'] = 'nullable|url|max:255';
@@ -174,8 +176,8 @@ class ProfileController extends Controller
         // 2. Simpan ke Database
         foreach ($settingsToUpdate as $key => $value) {
             if (!is_null($value) || $request->has($key)) {
-                
-                $dbKey = $key; 
+
+                $dbKey = $key;
 
                 // Khusus untuk LMW, pastikan kita hanya mengambil nilai
                 if ($apiName === 'lmw_api' && $key === 'api_token') {

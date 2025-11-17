@@ -443,6 +443,20 @@
                                 </button>
                             </div>
                         </div>
+                        <div class="card mb-4 border-warning-subtle">
+                            <div class="card-header bg-warning-lt">
+                                <h5 class="card-title mb-0">Migrasi Log Aktivitas V1</h5>
+                            </div>
+                            <div class="card-body">
+                                <p>Menjalankan <code>php artisan migrate:logs</code> untuk memigrasi riwayat aktivitas pengguna dari sistem V1. Ini adalah <strong>Tahap 3</strong>  migrasi.</p>
+                                <p class="text-muted small">Memproses data dalam batch. Gunakan parameter 'page' untuk melanjutkan jika terjadi timeout.</p>
+                                <button type="button" 
+                                        class="btn btn-warning" 
+                                        onclick="promptMigrationSettings('migrate:logs', 'Migrasi Log Aktivitas')">
+                                    <i class="ti ti-history me-1"></i> Mulai Migrasi Logs
+                                </button>
+                            </div>
+                        </div>
                         <div class="card mb-4 border-danger-subtle">
                             <div class="card-header bg-danger-lt">
                                 <h5 class="card-title mb-0">Migrasi Dokumen Khusus</h5>

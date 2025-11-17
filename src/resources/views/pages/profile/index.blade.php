@@ -308,7 +308,7 @@
                                 <label class="form-label">Base URL API V1</label>
                                 <input id="v1-base-url-input" type="text" name="base_url" class="form-control" 
                                     value="{{ $apiSettings['v1_migration_api']['base_url'] ?? '' }}" disabled />
-                                <small class="form-hint">Contoh: https://api.sistemlama.com/api</small>
+                                <small class="form-hint">Contoh: http://apibot.lapormaswapres.id/api</small>
                             </div>
                             
                             <div class="mt-4">
@@ -352,11 +352,22 @@
                                 <input type="text" name="base_url" class="form-control" value="{{ $apiSettings['lapor_api']['base_url'] ?? '' }}" disabled />
                             </div>
                             <div class="mt-3">
-                                <label class="form-label">Authorization</label>
-                                <input type="password" name="authorization" class="form-control" value="{{ $apiSettings['lapor_api']['authorization'] ?? '' }}" disabled />
+                                <label class="form-label">Header Auth Key</label>
+                                @php
+                                    $currentAuthKey = $apiSettings['lapor_api']['auth_key'] ?? 'Authorization';
+                                @endphp
+                                <select name="auth_key" class="form-select" disabled>
+                                    <option value="Authorization" {{ $currentAuthKey == 'Authorization' ? 'selected' : '' }}>Development (Authorization)</option>
+                                    <option value="auth" {{ $currentAuthKey == 'auth' ? 'selected' : '' }}>Production (auth)</option>
+                                </select>
+                                <small class="form-hint">Pilih nama header untuk Bearer Token (Authorization/auth).</small>
                             </div>
                             <div class="mt-3">
-                                <label class="form-label">Token</label>
+                                <label class="form-label">Bearer Token</label>
+                                <input type="password" name="auth_value" class="form-control" value="{{ $apiSettings['lapor_api']['auth_value'] ?? '' }}" disabled />
+                            </div>
+                            <div class="mt-3">
+                                <label class="form-label">Token Tambahan (Key Lain)</label>
                                 <input type="password" name="token" class="form-control" value="{{ $apiSettings['lapor_api']['token'] ?? '' }}" disabled />
                             </div>
                         </form>

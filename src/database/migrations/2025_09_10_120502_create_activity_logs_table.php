@@ -14,9 +14,9 @@ return new class extends Migration
         Schema::create('activity_logs', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('set null');
-            $table->string('action'); // Contoh: 'create_report', 'update_status'
-            $table->text('description'); // Deskripsi detail aksi
-            $table->morphs('loggable'); // Relasi polimorfik ke model terkait
+            $table->string('action');
+            $table->text('description');
+            $table->morphs('loggable');
             $table->timestamps();
         });
     }

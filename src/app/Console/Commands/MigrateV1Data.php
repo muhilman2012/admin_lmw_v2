@@ -21,11 +21,15 @@ use Exception;
 class MigrateV1Data extends Command
 {
     protected $signature = 'migrate:v1 {--start-page=1 : Page number to start migration from} {--limit=500 : Records per page}';
-    protected $description = 'Migrate data from V1 API (Single step with manual control).';
+    protected $description = 'Migrate data (Reports & Assignments) from V1 API.';
 
     private $categoryCache = [];
     private $unitKerjaCache = [];
     private $worksheetCache = []; 
+    
+    // Cache diisi saat handle() dipanggil:
+    private $reportTicketCache = []; 
+    private $userEmailCache = []; 
 
     private $kategoriUnitMapping = [
         'Asisten Deputi Ekonomi, Keuangan, dan Transformasi Digital' => ['Ekonomi dan Keuangan', 'Pemulihan Ekonomi Nasional', 'Teknologi Informasi dan Komunikasi', 'Perpajakan'],
@@ -51,8 +55,10 @@ class MigrateV1Data extends Command
         $apiName = 'v1_migration_api';
 
         $settings = ApiSetting::where('name', $apiName)->pluck('value', 'key');
+        
         $baseUrl = $settings->get('base_url');
-        $Authorization = $settings->get('authorization');
+        $Authorization = $settings->get('authorization'); 
+        
         $limit = (int) $this->option('limit');
         $startPage = (int) $this->option('start-page');
 
@@ -61,14 +67,23 @@ class MigrateV1Data extends Command
             return 1;
         }
 
-        $credentials = ['base_url' => $baseUrl, 'authorization' => $Authorization, 'limit' => $limit];
+        $credentials = [
+            'base_url' => $baseUrl,
+            'authorization' => $Authorization,
+            'limit' => $limit
+        ];
         
         $this->loadRelationCaches();
 
         $nextPageReports = $this->migrateReportsAndReporters($credentials, $startPage);
         
-        if ($startPage == 1) { 
+        if ($startPage == 1) {
+            // 🔥 TAHAP PENTING: Load cache ID V2 setelah Reports selesai
+            $this->loadReportTicketCache(); 
+            $this->loadUserEmailCache(); 
+            
             $this->migrateAssignments($credentials);
+            // migrateLogs dihapus dari sini
         }
 
         if ($nextPageReports > $startPage) {
@@ -83,6 +98,20 @@ class MigrateV1Data extends Command
     // =========================================================
     //                      HELPER FUNCTIONS
     // =========================================================
+    
+    private function loadReportTicketCache()
+    {
+        $this->info("Memuat cache ID Laporan V2 berdasarkan Nomor Tiket...");
+        $this->reportTicketCache = Report::pluck('id', 'ticket_number')->toArray(); 
+        $this->info("Cache Nomor Tiket selesai dimuat. Total: " . count($this->reportTicketCache));
+    }
+    
+    private function loadUserEmailCache()
+    {
+        $this->info("Memuat cache ID User V2...");
+        $this->userEmailCache = User::pluck('id', 'email')->toArray(); 
+        $this->info("Cache ID User V2 selesai dimuat. Total: " . count($this->userEmailCache));
+    }
 
     private function loadRelationCaches()
     {
@@ -107,9 +136,15 @@ class MigrateV1Data extends Command
         $limit = $credentials['limit'];
         $url = $credentials['base_url'] . "/migration/{$endpoint}?page={$page}&limit={$limit}";
 
-        $tokenValue = str_ireplace('Bearer ', '', $credentials['authorization']);
+        $authHeader = $credentials['authorization'];
+        $tokenValue = str_ireplace('Bearer ', '', $authHeader);
 
-        $response = Http::withToken($tokenValue)
+        $headers = [
+            'Content-Type' => 'application/json',
+            'Authorization' => $authHeader,
+        ];
+        
+        $response = Http::withHeaders($headers)
             ->timeout(120) 
             ->get($url);
 
@@ -125,7 +160,7 @@ class MigrateV1Data extends Command
 
 
     // =========================================================
-    // TAHAP 1: MIGRASI REPORTS & REPORTERS (Single Step)
+    // TAHAP 1: MIGRASI REPORTS & REPORTERS
     // =========================================================
     private function migrateReportsAndReporters(array $credentials, int $startPage): int
     {
@@ -139,8 +174,6 @@ class MigrateV1Data extends Command
         if (empty($reports_v1)) {
             return 0; // Sinyal: Selesai
         }
-
-        $categoryDefaultId = $this->categoryCache['Lainnya'] ?? null;
 
         foreach ($reports_v1 as $laporan_v1) {
             
@@ -164,10 +197,25 @@ class MigrateV1Data extends Command
                 $eventDateFormatted = null;
                 if (!empty($laporan_v1['tanggal_kejadian'])) {
                     try {
-                        // Gunakan createFromFormat untuk format non-standar
                         $eventDateFormatted = Carbon::createFromFormat('d/m/Y', $laporan_v1['tanggal_kejadian'])->toDateString();
                     } catch (Exception $e) {
                         Log::warning("Gagal parse tanggal kejadian V1 ID {$laporan_v1['id']}: {$laporan_v1['tanggal_kejadian']}");
+                    }
+                }
+
+                $createdAtFormatted = $laporan_v1['created_at']; 
+                if (!empty($laporan_v1['created_at'])) {
+                    try {
+                        $createdAtObject = Carbon::createFromFormat('Y-m-d H:i:s', $laporan_v1['created_at']);
+                        $createdAtFormatted = $createdAtObject;
+                    } catch (Exception $e) {
+                        try {
+                           $createdAtObject = Carbon::parse($laporan_v1['created_at']);
+                           $createdAtFormatted = $createdAtObject;
+                        } catch (Exception $e) {
+                           Log::warning("Gagal parse created_at V1 ID {$laporan_v1['id']}. Menggunakan string mentah.");
+                           $createdAtFormatted = $laporan_v1['created_at'];
+                        }
                     }
                 }
                 
@@ -176,18 +224,12 @@ class MigrateV1Data extends Command
 
                 // 3. Logika Mapping Relasi V2
                 $category_id = $this->categoryCache[$laporan_v1['kategori']] ?? null;
-                // Jika category_id adalah null (tidak ditemukan), berikan ID Kategori Default/Lainnya
                 if (is_null($category_id)) {
-                    // Cari ID untuk Kategori 'Lainnya' atau 'Unknown' di V2,
-                    // atau hardcode ID default jika Anda tahu nilainya.
-                    $category_id = $this->categoryCache['Lainnya'] ?? 1; // Contoh: Gunakan ID 1 sebagai default
-                    
-                    // Opsional: Log warning
+                    $category_id = $this->categoryCache['Lainnya'] ?? 1;
                     Log::warning("Kategori V1: '{$laporan_v1['kategori']}' (ID V1: {$laporan_v1['id']}) tidak ditemukan di V2. Menggunakan ID Default {$category_id}.");
                 }
                 
                 $unit_kerja_name = $this->getUnitKerjaNameByV1Category($laporan_v1['kategori']);
-                
                 $unit_kerja_model = $this->unitKerjaCache[$unit_kerja_name] ?? null;
                 $unit_kerja_id = $unit_kerja_model['id'] ?? null;
                 $deputy_id = $unit_kerja_model['deputy_id'] ?? null;
@@ -196,29 +238,25 @@ class MigrateV1Data extends Command
                 Report::updateOrCreate(
                     ['id' => $laporan_v1['id']], 
                     [
-                        'reporter_id' => $reporter->id, 
-                        'ticket_number' => $laporan_v1['nomor_tiket'], 
+                        'reporter_id' => $reporter->id,
+                        'ticket_number' => $laporan_v1['nomor_tiket'],
                         'uuid' => $newUuid,
                         'subject' => $laporan_v1['judul'],
-                        'details' => $laporan_v1['detail'], 
+                        'details' => $laporan_v1['detail'],
                         'location' => $laporan_v1['lokasi'],
-                        
                         'event_date' => $eventDateFormatted,
                         'source' => $laporan_v1['sumber_pengaduan'],
-                        'status' => $laporan_v1['status'], 
+                        'status' => $laporan_v1['status'],
                         'response' => $laporan_v1['tanggapan'],
-                        // 'classification' => $laporan_v1['klasifikasi'],
-                        
                         'category_id' => $category_id,
                         'unit_kerja_id' => $unit_kerja_id,
-                        'deputy_id' => $deputy_id, 
-                        
-                        'created_at' => $laporan_v1['created_at'],
+                        'deputy_id' => $deputy_id,
+                        'created_at' => $createdAtFormatted, // Waktu sudah dikonversi ke UTC
                     ]
                 );
                 
                 // 5. SIMPAN WORKSHEET KE MEMORI CACHE
-                if ($laporan_v1['lembar_kerja_analis']) {
+                if (isset($laporan_v1['lembar_kerja_analis']) && $laporan_v1['lembar_kerja_analis']) {
                     $this->worksheetCache[$laporan_v1['id']] = $laporan_v1['lembar_kerja_analis'];
                 }
                 
@@ -227,13 +265,10 @@ class MigrateV1Data extends Command
 
             } catch (Exception $e) {
                 DB::rollBack();
-                // Logika: Gagal sistem atau validasi DB yang tidak tertangkap (misal: ID relasi V2 null)
                 Log::error("Migration Error (Reports): " . $e->getMessage(), ['id_v1' => $laporan_v1['id']]);
             }
         }
-
         $this->info("Laporan Halaman {$page}/{$lastPage} berhasil diproses.");
-        
         return ($page < $lastPage) ? ($page + 1) : 0; 
     }
 
@@ -247,6 +282,9 @@ class MigrateV1Data extends Command
         $page = 1;
         $totalMigrated = 0;
 
+        $reportTicketCache = $this->reportTicketCache; 
+        $userEmailCache = $this->userEmailCache;
+        
         do {
             $data = $this->fetchApiData('assignments', $page, $credentials);
             $assignments_v1 = $data['data'] ?? [];
@@ -256,34 +294,52 @@ class MigrateV1Data extends Command
 
             foreach ($assignments_v1 as $assign_v1) {
                 
-                $report_v2 = Report::where('id', $assign_v1['laporan_id'])->first(); 
-                $analis_v2 = User::where('email', $assign_v1['analis_email'])->first();
-                $assigner_v2 = User::where('email', $assign_v1['assigned_by_email'])->first();
+                // 1. Lookup ID V2
+                $report_ticket = $assign_v1['nomor_tiket'] ?? null; 
+                
+                // 🔥 Lookup Report ID V2 berdasarkan NOMOR TIKET (Kunci Stabil)
+                $report_id_v2 = $reportTicketCache[$report_ticket] ?? null;
+                $analis_id_v2 = $userEmailCache[$assign_v1['analis_email']] ?? null;
+                $assigner_id_v2 = $userEmailCache[$assign_v1['assigned_by_email']] ?? null;
+                
+                // 2. Parsing Timestamp V1 (Kritis: Fix Timezone)
+                try {
+                    $createdAt = Carbon::createFromFormat('Y-m-d H:i:s', $assign_v1['created_at'], 'Asia/Jakarta')->setTimezone('UTC');
+                    $updatedAt = Carbon::createFromFormat('Y-m-d H:i:s', $assign_v1['updated_at'], 'Asia/Jakarta')->setTimezone('UTC');
+                } catch (Exception $e) {
+                    $this->warn("Gagal parse timestamp assignment V1 ID {$assign_v1['laporan_id']}. Dilewat. Error: " . $e->getMessage());
+                    continue; 
+                }
 
                 $worksheetData = $this->worksheetCache[$assign_v1['laporan_id']] ?? null;
 
-                if ($report_v2 && $analis_v2 && $assigner_v2) {
+                if ($report_id_v2 && $analis_id_v2 && $assigner_id_v2) {
                     
-                    Assignment::create([
-                        'report_id' => $report_v2->id,
-                        'assigned_by_id' => $assigner_v2->id,
-                        'assigned_to_id' => $analis_v2->id,
-                        'notes' => $assign_v1['notes'],
-                        'status' => 'approved', 
-                        'created_at' => $assign_v1['created_at'],
-                        'updated_at' => $assign_v1['updated_at'],
-                        'analyst_worksheet' => $worksheetData, 
-                    ]);
+                    Assignment::updateOrCreate(
+                        [
+                            'report_id' => $report_id_v2,
+                            'assigned_to_id' => $analis_id_v2,
+                        ],
+                        [
+                            'assigned_by_id' => $assigner_id_v2,
+                            'notes' => $assign_v1['notes'],
+                            'status' => 'approved',
+                            'created_at' => $createdAt, 
+                            'updated_at' => $updatedAt,
+                            'analyst_worksheet' => $worksheetData, 
+                        ]
+                    );
                     
                     $totalMigrated++;
                 } else {
-                    $this->warn("Assignment Laporan V1 ID {$assign_v1['laporan_id']} dilewati. Relasi gagal.");
+                    $laporanIdV1 = $assign_v1['laporan_id'] ?? 'N/A';
+                    $this->warn("Assignment Laporan V1 ID {$laporanIdV1} dilewati. Relasi gagal ditemukan. (Tiket: {$report_ticket})");
                 }
             }
 
             $this->info("Assignment Halaman {$page}/{$lastPage} selesai. Total: {$totalMigrated}");
             $page++;
-            usleep(500000);
+            usleep(700000);
             
         } while ($page <= $lastPage);
         $this->info("Migrasi Assignment selesai. Total: {$totalMigrated}");
