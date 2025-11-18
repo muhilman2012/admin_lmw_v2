@@ -72,6 +72,8 @@ class LaporForwardingService
         $authHeaders = $this->getAuthHeaders();
         $uploadUrl = $this->getApiSetting('base_url') . '/complaints/complaint/file';
         
+        unset($authHeaders['Content-Type']);
+
         // 1. Inisialisasi HTTP client dengan headers otentikasi
         $http = Http::withHeaders($authHeaders);
         $filesToAttach = 0;
@@ -79,29 +81,59 @@ class LaporForwardingService
         // 2. Loop semua dokumen dan lampirkan ke client (BELUM DIKIRIM)
         foreach ($dokumens as $dokumen) {
             $filePath = $dokumen->file_path;
-            $fileName = basename($filePath);
 
-            if (!$storageDisk->exists($filePath)) {
-                Log::warning("File tidak ditemukan di Minio untuk upload: {$filePath}");
+            // 1. Cek file_path kosong / 0 / null
+            if (empty($filePath) || $filePath === '0' || $filePath === 0) {
+                Log::warning('Dokumen punya file_path kosong / 0, dilewati.', [
+                    'document_id' => $dokumen->id ?? null,
+                    'file_path'   => $filePath,
+                ]);
                 continue;
             }
-            
+
+            // pastikan string
+            $filePath = (string) $filePath;
+
+            // 2. Cek keberadaan file dengan try/catch
+            try {
+                if (! $storageDisk->exists($filePath)) {
+                    Log::warning("File tidak ditemukan di Minio untuk upload: {$filePath}", [
+                        'document_id' => $dokumen->id ?? null,
+                    ]);
+                    continue;
+                }
+            } catch (\Throwable $e) {
+                Log::error('Gagal mengecek existence file di Minio: ' . $e->getMessage(), [
+                    'file_path'   => $filePath,
+                    'document_id' => $dokumen->id ?? null,
+                ]);
+                continue; // jangan hentikan seluruh proses, lanjut ke dokumen berikutnya
+            }
+
+            // 3. Ambil isi file dan attach
             try {
                 $fileContents = $storageDisk->get($filePath);
-                $mimeType = $storageDisk->mimeType($filePath);
+                $mimeType = $storageDisk->mimeType($filePath) ?? 'application/octet-stream';
 
-                if ($fileContents) {
-                    // Lampirkan dokumen ke object HTTP client menggunakan array notation yang sudah benar
-                    $http->attach(
-                        'attachments[]', 
+                if ($fileContents !== false && $fileContents !== null) {
+                    $http = $http->attach(
+                        'attachments[]',
                         $fileContents,
-                        $fileName,
+                        basename($filePath),
                         ['Content-Type' => $mimeType]
                     );
                     $filesToAttach++;
+                } else {
+                    Log::warning('Konten file kosong saat upload ke LAPOR!.', [
+                        'file_path'   => $filePath,
+                        'document_id' => $dokumen->id ?? null,
+                    ]);
                 }
-            } catch (\Exception $e) {
-                Log::error('Exception saat menyiapkan dokumen dari Minio ke LAPOR!: ' . $e->getMessage(), ['file' => $filePath]);
+            } catch (\Throwable $e) {
+                Log::error('Exception saat menyiapkan dokumen dari Minio ke LAPOR!: ' . $e->getMessage(), [
+                    'file_path'   => $filePath,
+                    'document_id' => $dokumen->id ?? null,
+                ]);
             }
         }
 
@@ -127,9 +159,10 @@ class LaporForwardingService
                         }
                         
                         Log::info('LAPOR! DOC UPLOAD SUCCESS', [
-                            'count' => count($dokumenIds), 
-                            'ids' => $dokumenIds
-                        ]); 
+                            'expected'        => $dokumens->count(),
+                            'uploaded_count'  => count($dokumenIds),
+                            'ids'             => $dokumenIds,
+                        ]);
 
                     } else {
                         Log::error('API LAPOR! sukses, tapi tidak ada ID dokumen ditemukan di array "docs".', ['response' => $response->body()]);
@@ -143,6 +176,10 @@ class LaporForwardingService
             } catch (\Exception $e) {
                 Log::error('Exception saat mengirim request batch dokumen ke LAPOR!: ' . $e->getMessage());
             }
+        } else {
+            Log::warning('Tidak ada file yang siap di-attach ke LAPOR!.', [
+                'dokumen_count' => $dokumens->count(),
+            ]);
         }
 
         // Mengembalikan SEMUA ID yang berhasil di-upload

@@ -181,6 +181,10 @@ class ReportExportController extends Controller
             }
         }
 
+        if ($sumber = $request->input('filterSumber')) {
+            $query->where('source', $sumber);
+        }
+
         // 6. Filter Status Analisis
         if ($statusAnalisis = $request->input('filterStatusAnalisis')) {
             $query->where('analysis_status', $statusAnalisis);

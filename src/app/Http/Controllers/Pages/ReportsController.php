@@ -20,6 +20,8 @@ use App\Services\LaporForwardingService;
 use App\Notifications\NewAssignmentNotification;
 use App\Notifications\AnalysisSubmittedNotification;
 use App\Notifications\AnalysisReviewedNotification;
+use App\Notifications\NewDocumentSubmitted;
+use Illuminate\Support\Facades\Notification;
 use Hashids\Hashids;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -299,6 +301,8 @@ class ReportsController extends Controller
         }
 
         DB::beginTransaction();
+        $isDocumentSubmitted = false;
+        $uploadedDocument = null;
 
         try {
             $report = Report::where('uuid', $uuid)->firstOrFail();
@@ -314,6 +318,8 @@ class ReportsController extends Controller
             ]);
 
             $eventDate = isset($validated['event_date']) ? Carbon::createFromFormat('d/m/Y', $validated['event_date'])->format('Y-m-d') : null;
+            $oldStatus = $report->status;
+
             $report->update([
                 'subject' => $validated['subject'],
                 'details' => $validated['details'],
@@ -323,32 +329,70 @@ class ReportsController extends Controller
                 'category_id' => $validated['category_id'],
             ]);
 
+            // --- Logika Unggah Dokumen Baru ---
             if ($request->hasFile('attachments')) {
                 foreach ($request->file('attachments') as $file) {
                     $path = $file->store('documents', 'complaints');
                     
-                    Document::create([
+                    $newDocument = Document::create([
                         'report_id' => $report->id,
                         'file_path' => $path,
+                        'file_name' => $file->getClientOriginalName(), // Opsional: simpan nama asli file
                         'description' => 'Dokumen Pengaduan Tambahan',
                     ]);
+                    
+                    $isDocumentSubmitted = true;
+                    $uploadedDocument = $newDocument; // Simpan dokumen terakhir yang diunggah
+                    
                     Log::info('Dokumen berhasil diunggah dan disimpan.', ['file_path' => $path]);
                 }
             }
+
+            // --- Logika Perubahan Status Otomatis ---
+            if ($isDocumentSubmitted && $oldStatus === 'Menunggu kelengkapan data dukung dari Pelapor') {
+                $report->status = 'Proses verifikasi dan telaah';
+                $report->response = 'Laporan pengaduan Saudara dalam proses verifikasi & penelaahan.';
+                $report->save(); // Simpan perubahan status
+            }
+
+            // Logika ActivityLog
+            $logDescription = 'Berhasil mengedit laporan dengan nomor tiket ' . $report->ticket_number;
+            $actionType = 'update_report';
             
+            if ($isDocumentSubmitted) {
+                $logDescription = "Berhasil mengedit laporan. Dokumen tambahan diunggah oleh user web. Status diubah ke {$report->status}.";
+                $actionType = 'submit_additional_document_web';
+            }
+
             ActivityLog::create([
                 'user_id' => auth()->id(),
-                'action' => 'update_report',
-                'description' => 'Berhasil mengedit laporan dengan nomor tiket ' . $report->ticket_number,
+                'action' => $actionType,
+                'description' => $logDescription,
                 'loggable_id' => $report->id,
                 'loggable_type' => Report::class,
             ]);
 
+            if ($isDocumentSubmitted) {
+                // Ambil Analis yang memiliki Tugas Terbaru
+                $latestAssignment = Assignment::with('assignedTo')->where('report_id', $report->id)->latest('id')->first();
+                
+                if ($latestAssignment && $latestAssignment->assignedTo) {
+                    // Notifikasi dikirim ke Analis (assignedTo)
+                    Notification::send(
+                        $latestAssignment->assignedTo, 
+                        new NewDocumentSubmitted($report, $uploadedDocument) // Menggunakan dokumen yang terakhir di-upload
+                    );
+                }
+            }
+
             DB::commit();
             Log::info('Laporan berhasil diperbarui.', ['report_id' => $report->id, 'uuid' => $report->uuid]);
 
-            return redirect()->route('reports.show', ['uuid' => $report->uuid])
-                             ->with('success', 'Laporan berhasil diperbarui.');
+            return response()->json([
+                'success' => true,
+                'message' => 'Laporan berhasil diperbarui.',
+                'uuid' => $report->uuid
+            ]);
 
         } catch (\Exception $e) {
             DB::rollBack();

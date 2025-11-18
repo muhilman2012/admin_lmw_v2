@@ -36,4 +36,5 @@ Route::middleware(['auth:sanctum', VerifyLmwApiToken::class])->group(function ()
 
     // API untuk mengecek eligibilitas dokumen tambahan
     Route::get('/reports/{ticketNumber}/document-eligibility', [ReportController::class, 'checkDocumentEligibility']);
+    Route::patch('/reports/{ticketNumber}/document-additional', [ReportController::class, 'submitAdditionalDocument']);
 });

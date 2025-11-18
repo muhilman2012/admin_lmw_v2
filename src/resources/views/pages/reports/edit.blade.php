@@ -205,7 +205,7 @@
                             method: 'POST', // Menggunakan POST karena FormData dengan _method='PATCH'
                             body: formData,
                             headers: {
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-csrf-token"]').getAttribute('content'),
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
                                 'Accept': 'application/json'
                             }
                         }).then(response => {
@@ -223,13 +223,14 @@
                                     icon: 'success',
                                     title: 'Laporan berhasil diperbarui!',
                                     showConfirmButton: false,
-                                    timer: 3000,
+                                    timer: 1500,
                                     timerProgressBar: true,
                                 });
                                 setTimeout(() => {
                                     window.location.href = "{{ url('admin/reports/') }}" + "/" + data.uuid + "/detail";
-                                }, 3000);
+                                }, 1500);
                             }
+                            return data;
                         }).catch(error => {
                             if (error.errors) {
                                 for (const [key, messages] of Object.entries(error.errors)) {

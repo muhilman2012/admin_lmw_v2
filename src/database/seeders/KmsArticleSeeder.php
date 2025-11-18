@@ -344,5 +344,256 @@ class KmsArticleSeeder extends Seeder
             'is_active' => true,
             'user_id' => $adminUser->id,
         ]);
+
+        // --- ARTIKEL 10: PANDUAN PENANGANAN ADUAN BANTUAN UMKM ---
+        \App\Models\KmsArticle::create([
+            'title' => 'Panduan Penanganan Aduan Bantuan UMKM (D2/D4)',
+            'content' => '
+                <p>Bantuan UMKM diperuntukkan bagi pemohon yang sudah memiliki usaha dan berkelanjutan (kategori D2/D4).</p>
+                
+                <h4 class="h5 mt-4">Prosedur Penanganan di Counter LMW</h4>
+                <ol>
+                    <li><strong>Mencocokkan persyaratan pemohon</strong> dengan ketentuan di masing-masing dinas UMKM di daerah. Kantor dinas dipilih berdasarkan kesesuaian tempat tinggal KTP pengadu.</li>
+                    <li><strong>Menjelaskan kewajiban registrasi UMKM</strong> melalui pendaftaran NIB. Salah satu persyaratan NIB adalah pengusaha sudah memiliki NPWP dan akta pendirian perusahaan.</li>
+                    <li>Petugas harus mencatat <strong>Kronologis Peristiwa</strong> dan <strong>Kategori usaha</strong> pengadu.</li>
+                    <li>Verifikasi kesediaan pengadu untuk mengikuti <strong>pelatihan dan pendampingan</strong> dari Dinas setempat.</li>
+                </ol>
+                
+                <h4 class="h5 mt-4">Langkah Akhir (Jika Dokumen Tidak Lengkap)</h4>
+                <p>Apabila pengadu tidak membawa dokumen lengkap, pelaporan dikategorikan <strong>Banmas (D4)</strong>. Petugas harus:</p>
+                <ul>
+                    <li>Menginformasikan bahwa bantuan usaha <strong>bukan prioritas</strong> bantuan Presiden/Wakil Presiden.</li>
+                    <li>Menuliskan keterangan bahwa sudah diinfokan ke pengadu, bukan prioritas banpres.</li>
+                    <li>Laporan pengadu tetap diproses, di-print slip khusus pengadu, dan diinformasikan ke pengadu.</li>
+                </ul>
+            ',
+            'category' => 'Penanganan Aduan Sektor Ekonomi',
+            'tags' => 'UMKM, bantuan usaha, NIB, NPWP, D2, D4',
+            'is_active' => true,
+            'user_id' => $adminUser->id,
+        ]);
+
+        // --- ARTIKEL 11: DTKS & BANTUAN LANSIA ---
+        \App\Models\KmsArticle::create([
+            'title' => 'Prosedur Pendaftaran Data Terpadu Kesejahteraan Sosial (DTKS) dan Bantuan Lansia',
+            'content' => '
+                <p>Pelaporan permohonan pendaftaran DTKS tetap dicatat melalui dashboard LMW, namun pengadu disarankan untuk aktif mendaftar ke Kelurahan domisili.</p>
+                
+                <h4 class="h5 mt-4">Syarat Umum Pendaftaran DTKS</h4>
+                <ul>
+                    <li>Merupakan warga miskin atau rentan miskin.</li>
+                    <li>Bukan pensiunan atau <strong>ASN, TNI/POLRI</strong>, maupun karyawan aktif BUMN/BUMD.</li>
+                    <li>Tidak memiliki anggota keluarga yang menjadi anggota DPR/DPRD.</li>
+                    <li>Memiliki kartu identitas, yaitu <strong>KTP dan Kartu Keluarga (KK)</strong>.</li>
+                </ul>
+
+                <h4 class="h5 mt-4">Proses Pendaftaran Mandiri</h4>
+                <ol>
+                    <li>Datang ke kantor kelurahan atau desa setempat.</li>
+                    <li>Membawa <strong>KTP dan KK asli</strong> serta salinannya.</li>
+                    <li>Mengisi formulir pendaftaran dibantu oleh petugas Kelurahan.</li>
+                    <li>Formulir akan dilanjutkan ke musyawarah kelurahan atau desa untuk persetujuan.</li>
+                    <li>Data pemohon DTKS diverifikasi dan divalidasi oleh petugas dinas sosial, kemudian diusulkan ke Kementerian Sosial.</li>
+                </ol>
+                <p class="mt-3">Pemohon DTKS dapat mengecek status pendaftaran secara berkala melalui situs <strong>cekbansos.kemensos.go.id</strong>.</p>
+                
+                <h4 class="h5 mt-4">Penanganan Bantuan Lansia (D2)</h4>
+                <p>Petugas tetap mencatatkan pelaporan tetapi berupaya menawarkan agar pelapor melapor juga ke Kelurahan sesuai domisili, dengan syarat:</p>
+                <ul>
+                    <li>Berusia <strong>60 tahun ke atas</strong>.</li>
+                    <li>Tidak memiliki penghasilan tetap.</li>
+                    <li>Terdaftar dalam <strong>DTKS</strong> atau DTSEN.</li>
+                </ul>
+            ',
+            'category' => 'Penanganan Aduan Sektor Sosial',
+            'tags' => 'DTKS, Bansos, Bantuan Lansia, KTP, KK',
+            'is_active' => true,
+            'user_id' => $adminUser->id,
+        ]);
+
+        // --- ARTIKEL 12: PERMOHONAN MENCARI KERJA ---
+        \App\Models\KmsArticle::create([
+            'title' => 'Panduan Pengaduan Permohonan Mencari Kerja (D2)',
+            'content' => '
+                <p>Pengaduan permohonan mencari kerja dicatat oleh petugas, tetapi fokus utama adalah mengarahkan pengadu untuk aktif menggunakan platform yang disediakan pemerintah.</p>
+                
+                <h4 class="h5 mt-4">Prosedur dan Pengarahan</h4>
+                <ol>
+                    <li>Petugas counter mencatat keluhan pengadu dan mengarahkan pengadu untuk menggunakan platform bernama <strong>SIAPkerja</strong>.</li>
+                    <li>Platform <strong>SIAPkerja</strong> ($\text{https://siapkerja.kemnaker.go.id/}$) disediakan oleh Kementerian Ketenagakerjaan (Kemenaker). Salah satu portal di dalamnya adalah **Karirhub** (portal lowongan pekerjaan).</li>
+                    <li><strong>Catatan Kritis:</strong> Apabila pengadu kurang dapat bekerja sama, pengaduan cukup dilaporkan, dicetak slip, tetapi <strong>tidak dijanjikan</strong> dapat ditindaklanjuti karena kurangnya data dukung.</li>
+                </ol>
+                
+                <h4 class="h5 mt-4">Kewajiban Pengadu</h4>
+                <p>Untuk permohonan mencari pekerjaan, yang terpenting adalah pengadu mau mencoba mendaftar mandiri ke <strong>SIAPkerja</strong>.</p>
+            ',
+            'category' => 'Penanganan Aduan Sektor Ketenagakerjaan',
+            'tags' => 'SIAPkerja, Karirhub, lowongan kerja, Kemenaker, D2',
+            'is_active' => true,
+            'user_id' => $adminUser->id,
+        ]);
+
+        // --- ARTIKEL 13: KJP PLUS & KIP ---
+        \App\Models\KmsArticle::create([
+            'title' => 'Syarat dan Prosedur Permohonan Kartu Pelajar (KJP Plus & KIP)',
+            'content' => '
+                <p>Pelaporan permohonan Kartu Jakarta Pintar (KJP) Plus dan Kartu Indonesia Pintar (KIP) tetap dicatat, tetapi pengadu harus secara aktif berkoordinasi dengan pihak sekolah/madrasah dan mendaftar mandiri.</p>
+                
+                <h4 class="h5 mt-4">A. Kartu Jakarta Pintar (KJP) Plus</h4>
+                <p>Target Penerima: Warga DKI Jakarta usia sekolah (6-21 tahun) dari keluarga tidak mampu.</p>
+                <ul>
+                    <li><strong>Syarat Utama:</strong> Berdomisili dan memiliki <strong>KTP serta KK DKI Jakarta</strong>. Terdaftar dalam <strong>DTKS</strong> dan/atau DTKS Daerah.</li>
+                    <li><strong>Proses Pendaftaran:</strong>
+                        <ol>
+                            <li>Calon penerima harus terdaftar dalam DTKS.</li>
+                            <li>Pemerintah Provinsi DKI Jakarta akan memadankan data DTKS dengan <strong>DAPODIK (sekolah)</strong> dan <strong>EMIS (madrasah)</strong>.</li>
+                            <li>Pihak sekolah/madrasah akan mengumumkan siswa yang lolos verifikasi. Orang tua murid perlu berkoordinasi dengan pihak sekolah untuk menginput data siswa ke dalam sistem KJP.</li>
+                        </ol>
+                    </li>
+                </ul>
+                
+                <h4 class="h5 mt-4">B. Kartu Indonesia Pintar (KIP) - Kuliah</h4>
+                <p>KIP ditujukan untuk siswa dari jenjang SD hingga SMA/SMK/Kuliah yang berasal dari keluarga kurang mampu.</p>
+                <ul>
+                    <li><strong>Kriteria:</strong> Siswa atau orang tuanya harus terdaftar sebagai penerima salah satu program bantuan sosial (KKS, PKH) atau terdaftar dalam <strong>DTKS</strong> Kementerian Sosial.</li>
+                    <li><strong>Surat Keterangan:</strong> Jika tidak memiliki kartu bantuan sosial, lampirkan <strong>Surat Keterangan Tidak Mampu (SKTM)</strong> dari kelurahan.</li>
+                    <li><strong>Proses Pendaftaran:</strong> Pendaftaran KIP Kuliah dilakukan secara online melalui situs resmi <strong>kip-kuliah.kemdikbud.go.id</strong>.</li>
+                </ul>
+            ',
+            'category' => 'Penanganan Aduan Sektor Pendidikan',
+            'tags' => 'KJP Plus, KIP, DTKS, Sekolah, Kuliah, D2',
+            'is_active' => true,
+            'user_id' => $adminUser->id,
+        ]);
+
+        // --- ARTIKEL 14: PENYELESAIAN MASALAH KJMU ---
+        \App\Models\KmsArticle::create([
+            'title' => 'Penyelesaian Masalah KJMU dan Prosedur Pengaduan Alternatif (D2)',
+            'content' => '
+                <p>Pengaduan terkait pemutusan atau masalah KJMU dicatat, namun petugas harus menginformasikan bahwa penetapan dan masa sanggah KJMU/KJP memiliki periode waktu yang ketat (misalnya, April-Mei 2025).</p>
+                
+                <h4 class="h5 mt-4">Dokumen yang Perlu Diperiksa Petugas</h4>
+                <ul>
+                    <li><strong>KTP dan Kartu Keluarga (KK).</strong></li>
+                    <li>Surat Keterangan Tidak Mampu (SKTM) dari kelurahan.</li>
+                    <li>Surat Keterangan Mahasiswa Aktif dari perguruan tinggi.</li>
+                    <li>Bukti-bukti lain yang relevan, misalnya jika ada kesalahan data terkait kepemilikan aset.</li>
+                </ul>
+                
+                <h4 class="h5 mt-4">Alternatif dan Kanal Pengaduan Resmi</h4>
+                <p>Pengadu disarankan melapor secara mandiri melalui kanal pengaduan resmi untuk menyampaikan keberatan secara formal.</p>
+                <ul>
+                    <li><strong>Situs Web Resmi:</strong> Kunjungi $\text{kjp.jakarta.go.id}$ atau $\text{p4op.jakarta.go.id/kjmu}$ untuk formulir pengaduan.</li>
+                    <li><strong>Media Sosial:</strong> Cek akun resmi Instagram <strong>@upt.p4op</strong>.</li>
+                    <li><strong>Telepon/WhatsApp:</strong> Hubungi nomor yang disediakan Disdik DKI Jakarta (Contoh: <strong>081585958706</strong>).</li>
+                </ul>
+            ',
+            'category' => 'Penanganan Aduan Sektor Pendidikan',
+            'tags' => 'KJMU, KJP, Sanggah, Disdik DKI, D2',
+            'is_active' => true,
+            'user_id' => $adminUser->id,
+        ]);
+
+        // --- ARTIKEL 15: KERINGANAN HUTANG BANK/BPD ---
+        \App\Models\KmsArticle::create([
+            'title' => 'Penanganan Aduan Permohonan Keringanan Hutang Bank/BPD (D1)',
+            'content' => '
+                <p>Petugas LMW mencatat laporan ini, namun perlu diinformasikan bahwa <strong>saat ini tidak ada pemutihan hutang dari Bank</strong>. Debitur hanya bisa mengajukan keringanan bunga, penundaan pembayaran tenor, atau keringanan perhitungan angsuran.</p>
+                
+                <h4 class="h5 mt-4">Dokumen yang Harus Dilengkapi Pemohon</h4>
+                <p>Dokumen yang harus dilengkapi pemohon sama dengan jika menghadap ke Bank/BPD langsung:</p>
+                <ol>
+                    <li><strong>Surat Permohonan:</strong> Berisi alasan yang jelas mengapa keringanan dibutuhkan.</li>
+                    <li><strong>Dokumen Identitas:</strong> KTP, KK, dan dokumen identitas lainnya.</li>
+                    <li><strong>Dokumen Bukti Keuangan:</strong> Slip gaji, laporan keuangan usaha, atau surat keterangan kehilangan/penurunan pendapatan.</li>
+                    <li><strong>Dokumen Kredit:</strong> Perjanjian (akad) kredit, bukti pembayaran cicilan sebelumnya, dan rekening koran angsuran.</li>
+                </ol>
+
+                <p class="mt-3"><strong>Catatan:</strong> Sebagai alternatif, pengadu disarankan untuk melapor/mengajukan permohonan <strong>langsung ke Bank atau BPD</strong> agar pihak bank dapat melakukan penilaian atau *assessment* terhadap permohonan keringanan kredit.</p>
+            ',
+            'category' => 'Penanganan Aduan Sektor Keuangan',
+            'tags' => 'Keringanan Cicilan, Restrukturisasi, Bank, BPD, Debitur, D1',
+            'is_active' => true,
+            'user_id' => $adminUser->id,
+        ]);
+
+        // --- ARTIKEL 16: PEMUTIHAN BI CHECKING/SLIK ---
+        \App\Models\KmsArticle::create([
+            'title' => 'Prosedur Permohonan Pemutihan BI Checking / SLIK OJK (D1)',
+            'content' => '
+                <p>Petugas mencatat pengaduan dan mencetak slip, tetapi tetap menyarankan pengadu melapor secara mandiri melalui kanal resmi OJK.</p>
+                
+                <h4 class="h5 mt-4">Langkah Pendaftaran Mandiri di iDebKu OJK</h4>
+                <ol>
+                    <li><strong>Siapkan Dokumen:</strong> Untuk perorangan (KTP/Paspor) atau Badan Usaha (KTP/Paspor pengurus, NPWP, Akta Pendirian).</li>
+                    <li><strong>Mendaftar:</strong> Akses situs web resmi iDebKu OJK di $\text{https://idebku.ojk.go.id}$.</li>
+                    <li><strong>Unggah dan Swafoto:</strong> Unggah dokumen persyaratan dan lakukan swafoto (*selfie*) dengan memegang KTP.</li>
+                    <li><strong>Ajukan Permohonan:</strong> Setelah mengisi data, klik tombol "Ajukan Permohonan".</li>
+                    <li><strong>Cek Status:</strong> Gunakan nomor pendaftaran untuk mengecek status permohonan Anda di menu "Status Layanan". OJK akan memproses dan mengirim hasilnya ke email.</li>
+                </ol>
+                
+                <h4 class="h5 mt-4">Kategori Kolektibilitas (Kol) pada Laporan SLIK</h4>
+                <p>Petugas perlu memahami status SLIK untuk memberikan informasi yang akurat:</p>
+                <ul>
+                    <li><strong>Kol 1 (Lancar):</strong> Memenuhi kewajiban membayar cicilan tepat waktu.</li>
+                    <li><strong>Kol 5 (Macet):</strong> Terlambat membayar cicilan lebih dari 180 hari (Status ini menyulitkan pengajuan pinjaman di masa depan).</li>
+                </ul>
+            ',
+            'category' => 'Penanganan Aduan Sektor Keuangan',
+            'tags' => 'BI Checking, SLIK, OJK, Kredit Macet, Kolektibilitas, D1',
+            'is_active' => true,
+            'user_id' => $adminUser->id,
+        ]);
+
+        // --- ARTIKEL 17: PENIPUAN ONLINE & PENDAMPINGAN OSS ---
+        \App\Models\KmsArticle::create([
+            'title' => 'Prosedur Pelaporan Penipuan Online dan Pendampingan OSS (D1)',
+            'content' => '
+                <h4 class="h5 mt-4">A. Penanganan Aduan Penipuan Online (Perlindungan Konsumen)</h4>
+                <p>Pelaporan penipuan online merupakan sektor jasa keuangan yang ditangani oleh OJK. Pelaporan aktif oleh pengadu ke kanal resmi sangat diperlukan.</p>
+                <ul>
+                    <li><strong>Dokumen Wajib:</strong> Buku Kepemilikan Rekening, Bukti Transfer, Nomor Telepon/Rekening Penipu, Kronologis Peristiwa, Jumlah Kerugian.</li>
+                    <li><strong>Tindakan Petugas:</strong> Dapat membantu pelaporan melalui *counter* selama pelapor memiliki email yang sama dengan yang didaftar pada saat membuka akun bank.</li>
+                    <li><strong>Kanal Wajib:</strong> Bukti lapor ke <strong>iasc.ojk.go.id</strong> dan bukti lapor ke Bank penerbit (pemilik rekening-pelapor).</li>
+                </ul>
+
+                <h4 class="h5 mt-4">B. Bantuan Pendampingan Online Single Submission (OSS)</h4>
+                <ul>
+                    <li><strong>Pengarahan:</strong> Pengadu diarahkan agar <strong>langsung mendatangi Dinas Perdagangan atau Kantor PTSP di daerahnya</strong> dengan membawa dokumen (KTP, Akta pendirian, NPWP, Izin Usaha).</li>
+                    <li><strong>Keterbatasan LMW:</strong> Kategori ini tidak bisa ditindaklanjuti bagi pemohon yang belum pernah berkonsultasi ke PTSP atau Dinas Perdagangan.</li>
+                    <li><strong>Tindak Lanjut:</strong> Petugas mencatat laporan sekaligus saran agar pengadu menghubungi PTSP terlebih dahulu.</li>
+                </ul>
+            ',
+            'category' => 'Penanganan Aduan Sektor Hukum',
+            'tags' => 'Penipuan Online, OJK, OSS, PTSP, Hukum, D1',
+            'is_active' => true,
+            'user_id' => $adminUser->id,
+        ]);
+
+        // --- ARTIKEL 18: KREDIT PERUMAHAN, SENGKETA TANAH, DAN PERUMAHAN SOSIAL ---
+        \App\Models\KmsArticle::create([
+            'title' => 'Checklist Dokumen Sengketa Tanah, Kredit Perumahan, dan Perbaikan Rusun (D1/D3)',
+            'content' => '
+                <h4 class="h5 mt-4">A. Pengaduan Sengketa/Aset Tanah (D3)</h4>
+                <p>Berkaitan dengan hukum dan status aset. Kelengkapan minimal yang perlu petugas *crosscheck* adalah:</p>
+                <ul>
+                    <li><strong>Dokumen Tanah:</strong> Sertifikat tanah, girik, atau bukti kepemilikan lain yang relevan (surat jual beli, akta waris).</li>
+                    <li><strong>Bukti Pendukung:</strong> Surat pernyataan saksi, foto, atau dokumen lain yang relevan dengan sengketa.</li>
+                    <li><strong>Bukti Lain:</strong> Laporan ke kepolisian, hasil pengadilan, atau bukti mediasi.</li>
+                </ul>
+
+                <h4 class="h5 mt-4">B. Perbaikan WC, Sewa Rusun, atau Perumahan (D1)</h4>
+                <p>Laporan dicatat, namun pengadu disarankan untuk melapor secara mandiri ke kanal resmi.</p>
+                <ul>
+                    <li><strong>Data Pendukung:</strong> Lokasi rumah/lingkungan, perincian tunggakan sewa Rusun, Surat Keterangan Tidak Mampu (SKTM).</li>
+                    <li><strong>Saran Mandiri:</strong> Pengadu disarankan melapor melalui Program BENAR PKP pada WhatsApp nomor <strong>0812-88888-911</strong> atau ke Dinas Perumahan dan Pemukiman setempat.</li>
+                    <li><strong>Program Pemerintah:</strong> Kementerian PUPR memiliki program seperti <strong>BSPS</strong> (Bantuan Stimulan Perumahan Swadaya) dan <strong>SANIMAS</strong> (Sanitasi Berbasis Masyarakat).</li>
+                </ul>
+            ',
+            'category' => 'Penanganan Aduan Sektor Infrastruktur',
+            'tags' => 'Sengketa Tanah, Rusun, Perbaikan WC, SKTM, D1, D3, BSPS',
+            'is_active' => true,
+            'user_id' => $adminUser->id,
+        ]);
     }
 }

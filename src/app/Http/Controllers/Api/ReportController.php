@@ -16,6 +16,9 @@ use App\Models\UnitKerja;
 use App\Models\Document;
 use App\Models\Category;
 use App\Models\ActivityLog;
+use App\Models\Assignment;
+use App\Notifications\NewDocumentSubmitted;
+use Illuminate\Support\Facades\Notification;
 use App\Services\GeminiCategoryService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Carbon;
@@ -304,5 +307,166 @@ class ReportController extends Controller
                 'eligible' => $isEligible
             ]
         ], 200);
+    }
+
+    /**
+     * Helper: Menangani upload dokumen tambahan (Base64) ke MinIO.
+     * Logic ini disalin dari DocumentController.
+     */
+    private function uploadBase64Document(string $base64String, ?string $description = null, ?int $reportId = null): ?Document
+    {
+        // Mendapatkan ekstensi file dari Base64 string
+        $extension = $this->getFileExtension($base64String); // 🔥 Panggilan ke helper method di bawah
+        
+        if (!$extension) return null;
+
+        $cleanedBase64 = preg_replace('/^data:([a-zA-Z0-9\/]+);base64,/', '', $base64String);
+        $decodedFile = base64_decode($cleanedBase64);
+
+        if ($decodedFile === false) return null;
+
+        $fileSize = strlen($decodedFile);
+        $maxFileSizeInBytes = 20 * 1024 * 1024; // 20 MB
+
+        if ($fileSize > $maxFileSizeInBytes) return null;
+
+        try {
+            $fileName = 'documents/' . Str::uuid() . '.' . $extension;
+            // Pastikan Anda menggunakan disk 'complaints'
+            Storage::disk('complaints')->put($fileName, $decodedFile);
+
+            $document = Document::create([
+                'file_path' => $fileName,
+                'description' => $description,
+                'report_id' => $reportId, 
+            ]);
+            
+            return $document;
+        } catch (\Exception $e) {
+            Log::error('Exception saat upload Base64 di ReportController: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Helper: Mendapatkan ekstensi file dari Base64 string.
+     * Ini adalah metode yang HILANG dan menyebabkan error 500.
+     */
+    private function getFileExtension(string $base64String): ?string
+    {
+        preg_match('/^data:([a-zA-Z0-9\/]+);base64,/', $base64String, $matches);
+        if (!isset($matches[1])) {
+            return null;
+        }
+
+        $mimeType = $matches[1];
+        
+        $allowedMimeTypes = [
+            'image/jpeg' => 'jpg',
+            'image/jpg' => 'jpg',
+            'image/png' => 'png',
+            'application/pdf' => 'pdf',
+            'application/msword' => 'doc',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+            'application/vnd.ms-excel' => 'xls',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+        ];
+
+        return $allowedMimeTypes[$mimeType] ?? null;
+    }
+    
+    /**
+     * Menerima dokumen tambahan dari pengadu untuk laporan yang eligible.
+     * Menggunakan route: PATCH /api/reports/{ticketNumber}/document-additional
+     */
+    public function submitAdditionalDocument(string $ticketNumber, Request $request)
+    {
+        // 1. Validasi Input
+        try {
+            $request->validate([
+                'file_base64' => 'required|string',
+                'description' => 'nullable|string|max:255',
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json(['status' => 'error', 'code' => 422, 'errors' => $e->errors()], 422);
+        }
+
+        // 2. Cari Laporan dan Check Eligibilitas
+        // Eager load assignments untuk notifikasi
+        $report = Report::with('assignments.assignedTo')->where('ticket_number', $ticketNumber)->first();
+
+        if (!$report) {
+            return response()->json(['status' => 'error', 'code' => 404, 'message' => 'Laporan tidak ditemukan.'], 404);
+        }
+
+        // Aturan: Dokumen tambahan hanya bisa dikirim jika statusnya "Menunggu kelengkapan data dukung dari Pelapor"
+        if ($report->status !== 'Menunggu kelengkapan data dukung dari Pelapor') {
+            return response()->json([
+                'status' => 'error',
+                'code' => 403,
+                'message' => 'Laporan ini tidak dalam status yang mengizinkan pengiriman dokumen tambahan.'
+            ], 403);
+        }
+
+        $systemUserId = Auth::id() ?? 1;
+        $actorId = $systemUserId;
+        $actionType = 'additional_document_sent';
+
+        DB::beginTransaction();
+        try {
+            // 3. Upload Dokumen dan Catat
+            // Menggunakan helper uploadBase64Document (yang harus Anda implementasikan di Controller ini)
+            $document = $this->uploadBase64Document(
+                $request->input('file_base64'),
+                $request->input('description', 'Dokumen Pengaduan Tambahan'),
+                $report->id // Link ID Laporan segera
+            );
+
+            if (!$document) {
+                 throw new \Exception("Gagal saat memproses Base64 atau ukuran file tidak valid.");
+            }
+
+            // 4. Ubah Status Laporan
+            $report->status = 'Proses verifikasi dan telaah';
+            $report->response = 'Laporan pengaduan Saudara dalam proses verifikasi & penelaahan.';
+            $report->save();
+            
+            // 5. 🔥 Log Aktivitas
+            $logDescription = "Dokumen Pengaduan Tambahan berhasil diunggah Pelapor untuk tiket {$report->ticket_number}. Status diubah ke Verifikasi.";
+            
+            ActivityLog::create([
+                'user_id' => $actorId,
+                'action' => $actionType,
+                'description' => $logDescription,
+                'loggable_id' => $report->id,
+                'loggable_type' => Report::class, // Menggunakan Report::class (bukan get_class($report))
+            ]);
+
+            // 6. 🔥 Notifikasi ke Analis yang Bertugas (Jika Ada)
+            $latestAssignment = $report->assignments()->latest('id')->first();
+            
+            if ($latestAssignment && $latestAssignment->assignedTo) {
+                // Asumsi: NewDocumentSubmitted adalah class Notifikasi yang Anda miliki
+                // Notifikasi dikirim ke Analis (assignedTo)
+                Notification::send(
+                    $latestAssignment->assignedTo, 
+                    new \App\Notifications\NewDocumentSubmitted($report, $document)
+                );
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'code' => 200,
+                'message' => 'Dokumen tambahan berhasil diterima dan status laporan diperbarui.',
+                'data' => ['document_id' => $document->id, 'new_status' => $report->status]
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Terjadi kesalahan saat submit dokumen tambahan: ' . $e->getMessage(), ['ticket' => $ticketNumber]);
+            return response()->json(['status' => 'error', 'code' => 500, 'message' => 'Kesalahan sistem saat memproses dokumen.'], 500);
+        }
     }
 }

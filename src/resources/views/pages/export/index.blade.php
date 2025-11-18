@@ -317,7 +317,7 @@ function startPolling(fileName) {
             window.appLoader.hide();
             Swal.fire('Kesalahan', 'Gagal memeriksa status export. Coba lagi.', 'error');
         });
-    }, 3000);
+    }, 1500);
 }
 </script>
 @endpush
