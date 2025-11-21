@@ -307,14 +307,14 @@
                             <div class="mt-4">
                                 <label class="form-label">Base URL API V1</label>
                                 <input id="v1-base-url-input" type="text" name="base_url" class="form-control" 
-                                    value="{{ $apiSettings['v1_migration_api']['base_url'] ?? '' }}" disabled />
+                                    value="{{ $apiSettings['v1_migration_api']['base_url'] ?? '' }}" autocomplete="off" disabled />
                                 <small class="form-hint">Contoh: http://apibot.lapormaswapres.id/api</small>
                             </div>
                             
                             <div class="mt-4">
                                 <label class="form-label">Bearer Token V1 (Auth Sanctum)</label>
                                 <input id="v1-api-token-input" type="password" name="authorization" class="form-control" 
-                                    value="{{ $apiSettings['v1_migration_api']['authorization'] ?? '' }}" disabled />
+                                    value="{{ $apiSettings['v1_migration_api']['authorization'] ?? '' }}" autocomplete="off" disabled />
                                 <small class="form-hint">Token yang didapat dari login user migrasi V1.</small>
                             </div>
                             
@@ -349,7 +349,7 @@
                             <input type="hidden" name="api_name" value="lapor_api">
                             <div class="mt-3">
                                 <label class="form-label">Base URL</label>
-                                <input type="text" name="base_url" class="form-control" value="{{ $apiSettings['lapor_api']['base_url'] ?? '' }}" disabled />
+                                <input type="text" name="base_url" class="form-control" value="{{ $apiSettings['lapor_api']['base_url'] ?? '' }}" autocomplete="off" disabled />
                             </div>
                             <div class="mt-3">
                                 <label class="form-label">Header Auth Key</label>
@@ -364,11 +364,11 @@
                             </div>
                             <div class="mt-3">
                                 <label class="form-label">Bearer Token</label>
-                                <input type="password" name="auth_value" class="form-control" value="{{ $apiSettings['lapor_api']['auth_value'] ?? '' }}" disabled />
+                                <input type="password" name="auth_value" class="form-control" value="{{ $apiSettings['lapor_api']['auth_value'] ?? '' }}" autocomplete="off" disabled />
                             </div>
                             <div class="mt-3">
                                 <label class="form-label">Token Tambahan (Key Lain)</label>
-                                <input type="password" name="token" class="form-control" value="{{ $apiSettings['lapor_api']['token'] ?? '' }}" disabled />
+                                <input type="password" name="token" class="form-control" value="{{ $apiSettings['lapor_api']['token'] ?? '' }}" autocomplete="off" disabled />
                             </div>
                         </form>
                         <div class="card-footer bg-transparent mt-4 d-none ps-0" id="lapor-api-footer">
@@ -401,15 +401,15 @@
                             <input type="hidden" name="api_name" value="dukcapil_api">
                             <div class="mt-3">
                                 <label class="form-label">Base URL</label>
-                                <input type="text" name="base_url" class="form-control" value="{{ $apiSettings['dukcapil_api']['base_url'] ?? '' }}" disabled />
+                                <input type="text" name="base_url" class="form-control" value="{{ $apiSettings['dukcapil_api']['base_url'] ?? '' }}" autocomplete="off" disabled />
                             </div>
                             <div class="mt-3">
                                 <label class="form-label">Authorization</label>
-                                <input type="password" name="authorization" class="form-control" value="{{ $apiSettings['dukcapil_api']['authorization'] ?? '' }}" disabled />
+                                <input type="password" name="authorization" class="form-control" value="{{ $apiSettings['dukcapil_api']['authorization'] ?? '' }}" autocomplete="off" disabled />
                             </div>
                             <div class="mt-3">
                                 <label class="form-label">Token</label>
-                                <input type="password" name="token" class="form-control" value="{{ $apiSettings['dukcapil_api']['token'] ?? '' }}" disabled />
+                                <input type="password" name="token" class="form-control" value="{{ $apiSettings['dukcapil_api']['token'] ?? '' }}" autocomplete="off" disabled />
                             </div>
                         </form>
                         <div class="card-footer bg-transparent mt-4 d-none ps-0" id="dukcapil-api-footer">
@@ -443,7 +443,7 @@
                             
                             <div class="mt-3">
                                 <label class="form-label">API Endpoint (Versi)</label>
-                                <input type="text" name="endpoint" class="form-control" value="{{ $apiSettings['gemini_api']['endpoint'] ?? 'https://generativelanguage.googleapis.com/v1beta' }}" disabled />
+                                <input type="text" name="endpoint" class="form-control" value="{{ $apiSettings['gemini_api']['endpoint'] ?? 'https://generativelanguage.googleapis.com/v1beta' }}" autocomplete="off" disabled />
                             </div>
 
                             <div class="mt-3">
@@ -458,13 +458,13 @@
 
                             <div class="mt-3">
                                 <label class="form-label">API Key Utama (GEMINI_API_KEY)</label>
-                                <input type="password" name="api_key_primary" class="form-control" value="{{ $apiSettings['gemini_api']['api_key_primary'] ?? '' }}" disabled />
+                                <input type="password" name="api_key_primary" class="form-control" value="{{ $apiSettings['gemini_api']['api_key_primary'] ?? '' }}" autocomplete="off" disabled />
                                 <small class="form-hint">Kunci utama untuk klasifikasi.</small>
                             </div>
 
                             <div class="mt-3">
                                 <label class="form-label">API Key Cadangan (Fallback)</label>
-                                <input type="password" name="api_key_fallback" class="form-control" value="{{ $apiSettings['gemini_api']['api_key_fallback'] ?? '' }}" disabled />
+                                <input type="password" name="api_key_fallback" class="form-control" value="{{ $apiSettings['gemini_api']['api_key_fallback'] ?? '' }}" autocomplete="off" disabled />
                                 <small class="form-hint">Kunci cadangan yang digunakan saat kunci utama gagal (untuk mekanisme retry/fallback).</small>
                             </div>
 

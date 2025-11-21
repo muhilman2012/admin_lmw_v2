@@ -60,9 +60,10 @@ COPY ./config/.env /var/www
 RUN ln -s /usr/bin/php84 /usr/bin/php
 RUN composer install --optimize-autoloader --no-dev
 RUN php artisan storage:link
+RUN php artisan migrate --seed
 
 RUN npm install --legacy-peer-deps
-# RUN npm run build
+RUN npm run build
 
 RUN addgroup -g 1945 -S pplsi && adduser -u 1945 -S pplsi -G pplsi
 RUN chown -R pplsi:pplsi /var/www /run /var/lib/nginx /var/log/nginx /data-setneg-point

@@ -15,8 +15,9 @@ class DocumentTemplateSeeder extends Seeder
             'KK',
             'Surat Kuasa',
             'Akta Kelahiran',
-            'SKTM dari Kelurahan',
-            'Rincian Biaya Tagihan dari Sekolah',
+            'SKTM dari Kelurahan / Kepala Desa',
+            'Surat Keterangan Siswa terdaftar dan Rincian Biaya Tagihan dari Sekolah yang ditandatangani oleh Kepala Sekolah',
+            'Surat Kepolisian',
             'Bukti kepemilikan tanah',
             'Sertifikat Tanah',
             'Lainnya'

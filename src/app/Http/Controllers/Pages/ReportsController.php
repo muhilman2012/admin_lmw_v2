@@ -529,7 +529,7 @@ class ReportsController extends Controller
         // Cari tugas (assignment) yang terkait dengan laporan
         // Asumsi: Hanya ada satu tugas aktif per laporan yang sedang dianalisis
         $assignment = Assignment::where('report_id', $report->id)
-                            ->whereIn('status', ['submitted', 'Menunggu Persetujuan']) // Asumsi: status submitted yang dikirim Analis
+                            ->whereIn('status', ['submitted', 'Menunggu Persetujuan', 'approved']) // Asumsi: status submitted yang dikirim Analis
                             ->latest() // Ambil assignment yang terbaru
                             ->firstOrFail();
 

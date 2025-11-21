@@ -408,7 +408,7 @@ class ReportController extends Controller
             ], 403);
         }
 
-        $systemUserId = Auth::id() ?? 1;
+        $systemUserId = Auth::id() ?? 2;
         $actorId = $systemUserId;
         $actionType = 'additional_document_sent';
 

@@ -30,7 +30,7 @@
                 @endif
                 <div class="mb-3">
                     <label class="form-label">Email</label>
-                    <input type="email" name="email" class="form-control" placeholder="email@set.wapresri.go.id" value="{{ old('email') }}">
+                    <input type="email" name="email" class="form-control" placeholder="email@set.wapresri.go.id" value="{{ old('email') }}" autocomplete="off">
                 </div>
                 <div class="mb-2">
                     <label class="form-label">

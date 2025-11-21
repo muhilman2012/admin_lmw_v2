@@ -11,7 +11,7 @@
                     <h1 class="card-title text-primary mb-3">
                         <i class="ti ti-rocket me-2"></i> Changelog Aplikasi Lapor Mas Wapres v2.0.0
                     </h1>
-                    <p class="text-secondary">Tanggal Rilis: <strong>19 November 2025</strong></p>
+                    <p class="text-secondary">Tanggal Rilis: <strong>1 Desember 2025</strong></p>
                     <hr>
 
                     <div class="alert alert-info d-flex align-items-center mb-4">

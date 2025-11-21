@@ -183,7 +183,7 @@
                             <div class="list-group-item">
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div class="label me-4">Disposisi dari:</div>
-                                    <div class="text-end" style="max-width: 70%">
+                                    <div class="badge bg-warning-lt d-block text-wrap text-end" style="max-width: 70%">
                                         {{ $assignedBy->name ?? '-' }} 
                                     </div>
                                 </div>
@@ -193,7 +193,7 @@
                             <div class="list-group-item">
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div class="label me-4">Petugas Analis:</div>
-                                    <div class="text-end" style="max-width: 70%">
+                                    <div class="badge bg-warning-lt d-block text-wrap text-end" style="max-width: 70%">
                                         {{ $assignedTo->name ?? 'Belum Ditugaskan' }}
                                     </div>
                                 </div>
@@ -203,7 +203,7 @@
                             <div class="list-group-item">
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div class="label me-4">Status Analisis:</div>
-                                    <div class="text-end" style="max-width: 70%">
+                                    <div class="badge bg-warning-lt d-block text-wrap text-end" style="max-width: 70%">
                                         {{ $status }} 
                                     </div>
                                 </div>
@@ -213,7 +213,7 @@
                             <div class="list-group-item">
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div class="label me-4">Catatan Disposisi:</div>
-                                    <div class="text-end" style="max-width: 70%">
+                                    <div class="badge bg-warning-lt d-block text-wrap text-end" style="max-width: 70%">
                                         {{ $notes }} 
                                     </div>
                                 </div>
@@ -250,7 +250,7 @@
                     <div class="list-group-item">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="label me-4">Analisis dari JF:</div>
-                            <div class="text-end" style="max-width: 70%">
+                            <div class="badge bg-warning-lt d-block text-wrap text-end" style="max-width: 70%">
                                 {{ $worksheet }} 
                             </div>
                         </div>
