@@ -9,7 +9,7 @@ services:
         container_name: lmw-web-app
         restart: always
         working_dir: /var/www/
-        
+
         volumes:
             - ./src:/var/www
             - ./config/.env:/var/www/.env
@@ -28,7 +28,7 @@ services:
                 condition: service_healthy
             minio:
                 condition: service_started
-        
+
         environment:
             APP_ENV: local
             APP_DEBUG: ${APP_DEBUG:-true}
@@ -41,7 +41,7 @@ services:
         container_name: lmw-api-app
         restart: always
         working_dir: /var/www/
-        
+
         volumes:
             - ./src:/var/www
             - ./config/.env:/var/www/.env
@@ -59,25 +59,25 @@ services:
         environment:
             APP_ENV: local
             APP_DEBUG: ${APP_DEBUG:-true}
-            IS_API_SERVER: true
+            IS_API_SERVER: 'true'
 
     lmw-scheduler:
         build:
             context: ./
             dockerfile: Dockerfile
-        
+
         image: lmw-scheduler-image
         container_name: lmw-scheduler
-        restart: always 
+        restart: always
         working_dir: /var/www/
-        
+
         volumes:
             - ./src:/var/www
             - ./config/.env:/var/www/.env
             - ./config/supervisord-scheduler.conf:/etc/supervisor/conf.d/supervisord.conf
-        
+
         command: /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
-        
+
         networks:
             - lmw-network
         depends_on:
@@ -106,7 +106,7 @@ services:
             test: [ "CMD", "mysqladmin", "ping", "-p${DB_PASSWORD}" ]
             retries: 3
             timeout: 5s
-    
+
     redis:
         image: 'redis:alpine'
         container_name: lmw-redis
@@ -130,7 +130,7 @@ services:
             - '${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
         networks:
             - lmw-network
-            
+
     minio:
         image: 'minio/minio:latest'
         container_name: lmw-minio
