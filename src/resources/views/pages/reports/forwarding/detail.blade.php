@@ -96,7 +96,7 @@
                     </div>
                     @forelse ($renderedActivities as $log) 
                     <div class="card mb-2 border-start border-4 border-info">
-                        <div class="card-body">
+                        <div class="card-body position-relative">
                             <div class="d-flex align-items-start">
                                 <div class="me-auto">
                                     
@@ -104,6 +104,8 @@
                                         $institutionFromName = $log['institution_from_name'] ?? 'Lapor Mas Wapres';
                                         $institutionToName = $log['institution_to_name'] ?? 'Lapor Mas Wapres';
                                         $attachments = $log['attachments'] ?? [];
+                                        // Ambil konten yang akan disalin
+                                        $contentToCopy = strip_tags($log['rendered_content'] ?? '');
                                     @endphp
 
                                     {{-- 1. HEADER: INSTITUTION FROM -> TO --}}
@@ -118,15 +120,13 @@
                                         {!! $log['rendered_content'] !!} 
                                     </div>
 
-                                    {{-- DISPLAY ATTACHMENTS --}}
+                                    {{-- DISPLAY ATTACHMENTS (Bagian ini tidak diubah) --}}
                                     @if (!empty($attachments))
                                     <div class="mt-3 border-top pt-2">
                                         <span class="fw-bold small text-dark d-block mb-1">Lampiran:</span>
                                         <div class="d-flex flex-wrap gap-2">
                                             @foreach ($attachments as $attachment)
                                                 @php
-                                                    // Gunakan path/url yang sudah disediakan API atau buat link download jika API menyediakan ID
-                                                    // Dalam JSON Anda, 'path' berisi URL yang sudah di-sign.
                                                     $fileUrl = $attachment['path'] ?? '#'; 
                                                     $fileName = $attachment['file_name'] ?? 'Dokumen';
                                                     $fileExtension = $attachment['extension'] ?? 'file';
@@ -134,7 +134,6 @@
                                                     // Tentukan ikon berdasarkan ekstensi
                                                     $icon = 'ti-file';
                                                     if (in_array($fileExtension, ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'png'])) {
-                                                        $icon = "ti-file-{$fileExtension}"; // Jika menggunakan Tabler Icons yang spesifik
                                                         if ($fileExtension === 'pdf') $icon = 'ti-file-type-pdf';
                                                         elseif (in_array($fileExtension, ['doc', 'docx'])) $icon = 'ti-file-type-word';
                                                         elseif (in_array($fileExtension, ['xls', 'xlsx'])) $icon = 'ti-file-type-excel';
@@ -142,7 +141,6 @@
                                                     }
                                                 @endphp
                                                 @if ($fileUrl && $fileUrl !== '#')
-                                                    {{-- HANYA RENDER TOMBOL JIKA ADA URL DOWNLOAD VALID --}}
                                                     <a href="{{ $fileUrl }}" 
                                                     target="_blank" 
                                                     class="badge bg-light text-dark d-flex align-items-center gap-1 border border-secondary-subtle text-decoration-none" 
@@ -151,7 +149,6 @@
                                                         <span class="text-truncate" style="max-width: 150px;">{{ $fileName }}</span>
                                                         <i class="ti ti-download ti-xs ms-1"></i>
                                                     </a>
-                                                    @else
                                                 @endif
                                             @endforeach
                                         </div>
@@ -172,22 +169,25 @@
                                         </div>
                                     @endif
                                     
+                                    {{-- TOMBOL Gunakan sebagai Tanggapan (di sisi kiri bawah konten) --}}
+                                    @if (!empty($contentToCopy))
+                                        <div class="mt-3">
+                                            <button 
+                                                type="button" 
+                                                class="btn btn-sm btn-ghost-primary p-0 copy-lapor-content position-absolute bottom-0 end-0 me-3 mb-2" 
+                                                title="Gunakan sebagai Tanggapan"
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#modal-quick-action" 
+                                                data-content="{{ $contentToCopy }}"
+                                                style="font-size: 0.75rem;">
+                                                <i class="ti ti-text-plus me-1 ti-sm"></i>
+                                                Gunakan sebagai Tanggapan
+                                            </button>
+                                        </div>
+                                    @endif
                                 </div>
                                 <div class="text-secondary small ms-3 text-nowrap">
                                     <span title="Waktu Log">{{ $log['created_at'] }}</span>
-                                    
-                                    @if (!empty($log['rendered_content']))
-                                        <button 
-                                            type="button" 
-                                            class="btn btn-sm btn-ghost-dark p-0 ms-2 copy-lapor-content" 
-                                            title="Gunakan sebagai Tanggapan"
-                                            data-bs-toggle="modal" 
-                                            data-bs-target="#modal-quick-action"
-                                            data-content="{{ strip_tags($log['rendered_content']) }}" 
-                                        >
-                                            <i class="ti ti-copy ti-sm"></i>
-                                        </button>
-                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -351,7 +351,7 @@
                                     required
                                 >{{ $report->response ?? '' }}</textarea> 
                                 <small class="form-hint">
-                                    Konten dari log LAPOR! akan disalin ke kolom ini saat tombol <i class="ti ti-copy"></i> diklik.
+                                    Konten dari log LAPOR! akan disalin ke kolom ini saat tombol <i class="ti ti-text-plus"></i> Gunakan sebagai Tanggapan diklik.
                                 </small>
                             </div>
                         </div>

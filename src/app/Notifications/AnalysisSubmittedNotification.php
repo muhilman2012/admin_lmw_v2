@@ -27,7 +27,7 @@ class AnalysisSubmittedNotification extends Notification
         return [
             'type' => 'analysis_submitted',
             'title' => 'Analisis Siap Diverifikasi',
-            'message' => "Analis telah mengirimkan hasil analisis untuk Laporan **#{$this->report->ticket_number}**. Mohon diverifikasi.",
+            'message' => "Analis telah mengirimkan hasil analisis untuk Laporan #{$this->report->ticket_number}. Mohon diverifikasi.",
             'report_id' => $this->report->id,
             'report_uuid' => $this->report->uuid,
             'url' => route('reports.show', $this->report->uuid),

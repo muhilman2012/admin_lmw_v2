@@ -162,10 +162,28 @@
                             </td>
                             
                             {{-- Kategori --}}
-                            <td style="max-width: 100px;">
-                                <div class="multiline-clamp-2">
-                                    <span class="fs-5">{{ $report->category?->name ?? '-' }}</span>
-                                </div>
+                            <td style="max-width: 150px;">
+                                @php
+                                    $subCategory = $report->category?->name;
+                                    $parentCategory = $report->category?->parent?->name;
+                                @endphp
+
+                                @if ($parentCategory)
+                                    <div class="multiline-clamp-2">
+                                        <span class="d-block text-primary fw-medium" style="font-size: 0.75rem; line-height: 1;">
+                                            {{ $parentCategory }}
+                                        </span>
+                                        <span class="fs-5 fw-semibold d-block mt-0 text-dark">
+                                            {{ $subCategory }}
+                                        </span>
+                                    </div>
+                                @else
+                                    <div class="multiline-clamp-2">
+                                        <span class="fs-5 fw-semibold d-block text-primary">
+                                            {{ $subCategory }}
+                                        </span>
+                                    </div>
+                                @endif
                             </td>
                             
                             {{-- Distribusi (Unit/Deputi) --}}

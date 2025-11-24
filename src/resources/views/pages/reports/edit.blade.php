@@ -94,14 +94,23 @@
                     <label class="form-label">Kategori<span class="text-danger">*</span></label>
                     <select name="category_id" id="select-optgroups" class="form-select" placeholder="Pilih Kategori" required>
                         <option value="" disabled>Pilih Kategori</option>
+                        
                         @foreach($categories as $category)
-                            <optgroup label="{{ $category->name }}">
-                                @foreach($category->children as $childCategory)
-                                    <option value="{{ $childCategory->id }}" {{ old('category_id', $report->category_id) == $childCategory->id ? 'selected' : '' }}>
-                                        {{ $childCategory->name }}
-                                    </option>
-                                @endforeach
-                            </optgroup>
+                            <option value="{{ $category->id }}" 
+                                {{ old('category_id', $selectedCategoryId) == $category->id ? 'selected' : '' }}>
+                                {{ $category->name }} (Kategori Utama)
+                            </option>
+
+                            @if($category->children->count() > 0)
+                                <optgroup label="--- {{ $category->name }} ---">
+                                    @foreach($category->children as $childCategory)
+                                        <option value="{{ $childCategory->id }}" 
+                                            {{ old('category_id', $selectedCategoryId) == $childCategory->id ? 'selected' : '' }}>
+                                            {{ $childCategory->name }}
+                                        </option>
+                                    @endforeach
+                                </optgroup>
+                            @endif
                         @endforeach
                     </select>
                     <div class="invalid-feedback">Harap pilih Kategori.</div>

@@ -203,7 +203,18 @@
                             <div class="list-group-item">
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div class="label me-4">Status Analisis:</div>
-                                    <div class="badge bg-warning-lt d-block text-wrap text-end" style="max-width: 70%">
+                                    
+                                    @php
+                                        // Menentukan warna badge berdasarkan status
+                                        $badgeColor = 'bg-warning-lt'; // Default (misalnya, Menunggu Persetujuan)
+                                        if ($status === 'approved') {
+                                            $badgeColor = 'bg-success-lt'; // Hijau untuk Disetujui
+                                        } elseif ($status === 'Perlu Perbaikan') {
+                                            $badgeColor = 'bg-danger-lt'; // Merah untuk Perlu Perbaikan
+                                        }
+                                    @endphp
+
+                                    <div class="badge {{ $badgeColor }} d-block text-wrap text-end" style="max-width: 70%">
                                         {{ $status }} 
                                     </div>
                                 </div>
@@ -213,7 +224,7 @@
                             <div class="list-group-item">
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div class="label me-4">Catatan Disposisi:</div>
-                                    <div class="badge bg-warning-lt d-block text-wrap text-end" style="max-width: 70%">
+                                    <div class="badge bg-secondary-lt d-block text-wrap text-end" style="max-width: 70%">
                                         {{ $notes }} 
                                     </div>
                                 </div>
@@ -531,7 +542,6 @@
             </div>
             <div class="modal-body text-start">
                 <p>Anda akan <strong>menyimpan perubahan</strong> berikut:</p>
-                
                 <ul class="list-unstyled p-0 mb-3">
                     <li class="mb-2 border-bottom pb-2">
                         <small class="text-muted d-block">Status Laporan:</small>
@@ -539,12 +549,11 @@
                         <span class="d-block">Ke: <strong id="konfirmasi-status-baru" class="text-primary">Memuat...</strong></span>
                     </li>
                     <li class="mb-2">
-                        <small class="text-block text-muted d-block">Klasifikasi:</small>
-                        <span class="d-block">Dari: <strong class="text-secondary">{{ $report->classification ?? 'Belum Diklasifikasi' }}</strong></span>
-                        <span class="d-block">Ke: <strong id="konfirmasi-klasifikasi-baru" class="text-primary">Memuat...</strong></span>
+                        <small class="text-block text-muted d-block">Tanggapan:</small>
+                        <span class="d-block">Dari: <strong class="text-secondary">{{ Str::limit($report->response, 100) ?? 'Kosong' }}</strong></span>
+                        <span class="d-block">Ke: <strong id="konfirmasi-tanggapan-baru" class="text-primary">Memuat...</strong></span>
                     </li>
                 </ul>
-
                 <p class="fw-bold text-center">Pastikan semua perubahan sudah sesuai.</p>
             </div>
             <div class="modal-footer justify-content-between">
@@ -771,16 +780,18 @@
 
         // 1. Ambil Nilai Baru dari Form Edit Tanggapan
         const newStatus = quickActionModalElement.querySelector('select[name="status"]').value;
-        const newClassification = quickActionModalElement.querySelector('select[name="classification"]').value;
+        const newResponse = quickActionModalElement.querySelector('textarea[name="response"]').value;
 
         // 2. Update konten modal konfirmasi
         document.getElementById('konfirmasi-status-baru').textContent = newStatus;
         
-        // Klasifikasi: Jika nilai kosong, tampilkan placeholder
-        const classificationText = newClassification || 'Belum Diklasifikasi';
-        document.getElementById('konfirmasi-klasifikasi-baru').textContent = classificationText;
+        // TANGGAPAN : Gunakan Str.limit (dari Blade) di JS
+        // Karena JS tidak memiliki helper Str::limit, kita tampilkan 50 karakter pertama
+        const responseText = newResponse.substring(0, 100) + (newResponse.length > 100 ? '...' : '');
+        document.getElementById('konfirmasi-tanggapan-baru').textContent = responseText;
 
-        // 3. Sembunyikan modal Edit Tanggapan
+        // 3. Sembunyikan modal Edit Tanggapan (hideModalPure harus didefinisikan di suatu tempat)
+        // Asumsi hideModalPure(quickActionModalElement) dan showModalPure(confirmationModalElement) tersedia
         hideModalPure(quickActionModalElement);
         
         // 4. Tampilkan modal konfirmasi setelah jeda singkat

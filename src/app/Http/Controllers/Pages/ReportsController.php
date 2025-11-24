@@ -38,15 +38,13 @@ class ReportsController extends Controller
     {
         // 1. Muat laporan, ActivityLog, dan Assignment yang ditujukan ke user saat ini
         $report = Report::with([
-            'reporter', // Contoh relasi lain
-            // Memuat log aktivitas normal
+            'reporter', 
             'activityLogs' => function($query) {
                 $query->with('user')->orderBy('created_at', 'desc');
             },
-            // PENTING: Memuat hanya assignment yang ditugaskan kepada user saat ini
             'assignments' => function($query) {
-                $query->with(['assignedBy', 'assignedTo']) // EAGER LOAD USER RELATIONS
-                    ->orderBy('created_at', 'desc'); // Urutkan untuk kemudahan mencari yang terbaru
+                $query->with(['assignedBy', 'assignedTo']) 
+                    ->orderBy('created_at', 'desc');
             }
         ])->where('uuid', $uuid)->firstOrFail();
 
@@ -59,23 +57,35 @@ class ReportsController extends Controller
         
         // 3. Ambil data statis untuk dropdown/modal
         $institutions = Institution::orderBy('name')->get();
+        
         // untuk modal quick action:
         $statusTemplates = StatusTemplate::all();
-        $documentTemplates = DocumentTemplate::all();
-        $user = Auth::user();
-        $availableAnalysts = $this->getGroupedAnalysts($user);
+        $documentTemplates = DocumentTemplate::all(); // <-- Data diambil
         
-        // 4. Pisahkan logs untuk kemudahan pemanggilan (jika Anda tidak menggunakan $report->activityLogs langsung di view)
+        $user = Auth::user();
+        // Asumsi getGroupedAnalysts() adalah method di Controller ini
+        $availableAnalysts = $this->getGroupedAnalysts($user); 
+        
+        // 4. Pisahkan logs untuk kemudahan pemanggilan
         $reportLogs = $report->activityLogs; 
 
         // 5. Logika tanggal teruskan hanya bisa dilakukan jika melebihi tanggal 17 November 2025
-        $targetDate = Carbon::create(2025, 11, 17, 0, 0, 0, 'Asia/Jakarta');
+        $targetDate = Carbon::create(2025, 11, 28, 0, 0, 0, 'Asia/Jakarta');
         $isRecentEnough = $report->created_at->greaterThanOrEqualTo($targetDate);
         $isAnalysisApproved = ($currentAssignment && $currentAssignment->status === 'approved');
         $isSuperAdmin = $user->hasRole('superadmin');
         $canForward = $isSuperAdmin || ($isRecentEnough && $isAnalysisApproved);
 
-        return view('pages.reports.show', compact('report', 'reportLogs', 'institutions', 'currentAssignment', 'statusTemplates', 'documentTemplates', 'availableAnalysts', 'canForward'));
+        return view('pages.reports.show', compact(
+            'report', 
+            'reportLogs', 
+            'institutions', 
+            'currentAssignment', 
+            'statusTemplates', 
+            'documentTemplates',
+            'availableAnalysts', 
+            'canForward'
+        ));
     }
 
     public function index()
@@ -268,12 +278,14 @@ class ReportsController extends Controller
     {
         $report = Report::with(['reporter', 'documents'])->where('uuid', $uuid)->firstOrFail();
         
+        $currentCategory = \App\Models\Category::find($report->category_id);
+        $selectedCategoryId = $report->category_id;
         $categories = Category::with('children')->whereNull('parent_id')->get();
         
         $statusTemplates = StatusTemplate::all();
         $documentTemplates = DocumentTemplate::all();
         
-        return view('pages.reports.edit', compact('report', 'categories', 'statusTemplates', 'documentTemplates'));
+        return view('pages.reports.edit', compact('report', 'categories', 'statusTemplates', 'documentTemplates', 'selectedCategoryId'));
     }
 
     public function update(Request $request, $uuid)
@@ -529,7 +541,7 @@ class ReportsController extends Controller
         // Cari tugas (assignment) yang terkait dengan laporan
         // Asumsi: Hanya ada satu tugas aktif per laporan yang sedang dianalisis
         $assignment = Assignment::where('report_id', $report->id)
-                            ->whereIn('status', ['submitted', 'Menunggu Persetujuan', 'approved']) // Asumsi: status submitted yang dikirim Analis
+                            ->whereIn('status', ['submitted', 'Menunggu Persetujuan', 'approved', 'Perlu Perbaikan']) // Asumsi: status submitted yang dikirim Analis
                             ->latest() // Ambil assignment yang terbaru
                             ->firstOrFail();
 
