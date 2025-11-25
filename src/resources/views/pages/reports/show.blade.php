@@ -481,17 +481,23 @@
             @method('PATCH')
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Edit Tanggapan Pengaduan</h5>
+                    <h5 class="modal-title">Edit Status & Tanggapan</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Status Pengaduan</label>
-                        <select name="status" class="form-select" required>
-                            <option value="Proses verifikasi dan telaah" {{ $report->status == 'Proses verifikasi dan telaah' ? 'selected' : '' }}>Proses verifikasi dan telaah</option>
-                            <option value="Menunggu kelengkapan data dukung dari Pelapor" {{ $report->status == 'Menunggu kelengkapan data dukung dari Pelapor' ? 'selected' : '' }}>Menunggu kelengkapan data dukung dari Pelapor</option>
-                            <option value="Diteruskan kepada instansi yang berwenang untuk penanganan lebih lanjut" {{ $report->status == 'Diteruskan kepada instansi yang berwenang untuk penanganan lebih lanjut' ? 'selected' : '' }}>Diteruskan kepada instansi yang berwenang untuk penanganan lebih lanjut</option>
-                            <option value="Penanganan Selesai" {{ $report->status == 'Penanganan Selesai' ? 'selected' : '' }}>Penanganan Selesai</option>
+                        <label class="form-label">Status Laporan (Pilih Template)</label>
+                        <select name="status" class="form-select" id="quick-status-select-integrated" required>
+                            <option value="" disabled>Pilih Status Template...</option>
+                            @foreach ($statusTemplates as $template)
+                                <option 
+                                    value="{{ $template->name }}"
+                                    data-status-code="{{ $template->status_code }}"
+                                    data-template="{{ $template->response_template }}"
+                                    {{ $report->status == $template->name ? 'selected' : '' }}>
+                                    {{ $template->name }}
+                                </option>
+                            @endforeach
                         </select>
                     </div>
                     <div class="mb-3">
@@ -503,7 +509,17 @@
                             <option value="Aspirasi" {{ $report->classification == 'Aspirasi' ? 'selected' : '' }}>Aspirasi</option>
                         </select>
                     </div>
-                    
+                    <div class="mb-3" id="additional-docs-section" style="display: none;">
+                        <label class="form-label">Data Pendukung yang Diperlukan</label>
+                        <div>
+                            @foreach ($documentTemplates as $docTemplate)
+                                <label class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="{{ $docTemplate->name }}" data-doc-name="{{ $docTemplate->name }}">
+                                    <span class="form-check-label">Dokumen {{ $docTemplate->name }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
                     <div class="mb-4">
                         <label class="form-check form-switch">
                             <input 
@@ -522,7 +538,7 @@
 
                     <div class="mb-3">
                         <label class="form-label">Tanggapan</label>
-                        <textarea name="response" class="form-control" rows="7" required>{{ $report->response ?? '' }}</textarea>
+                        <textarea name="response" id="quick-response-textarea" class="form-control" rows="7" required>{{ $report->response ?? '' }}</textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -712,25 +728,24 @@
     }
 </script>
 <script>
+    // =========================================================================
+    // MODAL HELPER FUNCTIONS (PURE JS)
+    // =========================================================================
+
     function showModalPure(modalElement) {
         if (!modalElement) return;
         
-        // 1. Tampilkan modal
         modalElement.style.display = 'block';
         modalElement.setAttribute('aria-modal', 'true');
         modalElement.removeAttribute('aria-hidden');
         document.body.classList.add('modal-open');
 
-        // 2. Tambahkan backdrop jika belum ada
         if (!document.querySelector('.modal-backdrop')) {
             const backdrop = document.createElement('div');
             backdrop.classList.add('modal-backdrop', 'fade', 'show');
             document.body.appendChild(backdrop);
-            // Tambahkan listener untuk menutup modal saat klik backdrop (hanya jika diperlukan)
-            // backdrop.onclick = () => hideModalPure(modalElement);
         }
 
-        // 3. Tambahkan kelas 'show' setelah delay agar transisi berfungsi
         setTimeout(() => {
             modalElement.classList.add('show');
         }, 10);
@@ -739,42 +754,48 @@
     function hideModalPure(modalElement) {
         if (!modalElement) return;
 
-        // 1. Hapus kelas 'show'
         modalElement.classList.remove('show');
         
-        // 2. Hapus backdrop
         const backdrop = document.querySelector('.modal-backdrop');
         if (backdrop) {
              backdrop.remove();
         }
 
-        // 3. Sembunyikan modal sepenuhnya setelah transisi
         setTimeout(() => {
             modalElement.style.display = 'none';
             modalElement.setAttribute('aria-hidden', 'true');
             modalElement.removeAttribute('aria-modal');
             document.body.classList.remove('modal-open');
-        }, 150); // Sesuaikan dengan durasi transisi CSS Anda
+        }, 150); 
     }
     
-    // Fungsi untuk menutup modal saat tombol close diklik
+    // Fungsi untuk memicu submit form approval di reports.show
+    function submitApprovalForm(action) {
+        document.getElementById('approval-action-input').value = action;
+        document.getElementById('approval-form').submit();
+    }
+    
+    // Fungsi untuk menutup modal saat tombol close diklik (menggantikan Bootstrap JS)
     document.addEventListener('click', function(e) {
         const closeBtn = e.target.closest('[data-bs-dismiss="modal"]');
         if (closeBtn) {
             const modal = closeBtn.closest('.modal');
             if (modal) {
                 hideModalPure(modal);
-                // Tambahan: Pastikan modal pertama (quick-action) dibuka lagi jika modal konfirmasi di-batal
+                // Tambahan: Pastikan modal quick-action dibuka lagi jika modal konfirmasi dibatalkan
                 if (modal.id === 'modal-konfirmasi-simpan' && e.target.innerText.toLowerCase().includes('batal')) {
-                     showModalPure(document.getElementById('modal-quick-action'));
+                    showModalPure(document.getElementById('modal-quick-action'));
                 }
             }
         }
     });
 
-    // --- LOGIKA KONFIRMASI EDIT TANGGAPAN ---
+    // =========================================================================
+    // LOGIKA QUICK ACTION DAN KONFIRMASI TANGGAPAN
+    // =========================================================================
+
     // Fungsi untuk menampilkan modal konfirmasi
-    function showQuickActionConfirmation() {
+    window.showQuickActionConfirmation = function() {
         const quickActionModalElement = document.getElementById('modal-quick-action');
         const confirmationModalElement = document.getElementById('modal-konfirmasi-simpan');
 
@@ -785,13 +806,11 @@
         // 2. Update konten modal konfirmasi
         document.getElementById('konfirmasi-status-baru').textContent = newStatus;
         
-        // TANGGAPAN : Gunakan Str.limit (dari Blade) di JS
-        // Karena JS tidak memiliki helper Str::limit, kita tampilkan 50 karakter pertama
+        // TANGGAPAN: Tampilkan 100 karakter pertama
         const responseText = newResponse.substring(0, 100) + (newResponse.length > 100 ? '...' : '');
         document.getElementById('konfirmasi-tanggapan-baru').textContent = responseText;
 
-        // 3. Sembunyikan modal Edit Tanggapan (hideModalPure harus didefinisikan di suatu tempat)
-        // Asumsi hideModalPure(quickActionModalElement) dan showModalPure(confirmationModalElement) tersedia
+        // 3. Sembunyikan modal Edit Tanggapan
         hideModalPure(quickActionModalElement);
         
         // 4. Tampilkan modal konfirmasi setelah jeda singkat
@@ -801,131 +820,165 @@
     }
 
     // Fungsi untuk menyembunyikan modal konfirmasi dan kembali ke modal aksi cepat (jika batal)
-    function hideConfirmationModal() {
+    window.hideConfirmationModal = function() {
         const confirmationModalElement = document.getElementById('modal-konfirmasi-simpan');
         hideModalPure(confirmationModalElement);
         
         // Jika dibatalkan, buka kembali modal aksi cepat
         const quickActionModalElement = document.getElementById('modal-quick-action');
         setTimeout(() => {
-             showModalPure(quickActionModalElement);
+            showModalPure(quickActionModalElement);
         }, 150);
     }
 
     // Fungsi untuk melanjutkan submit form setelah konfirmasi
-    function submitQuickActionForm() {
+    window.submitQuickActionForm = function() {
         const confirmationModalElement = document.getElementById('modal-konfirmasi-simpan');
         
         // 1. Sembunyikan modal konfirmasi
         hideModalPure(confirmationModalElement);
         
         // 2. Lanjutkan submit form Edit Tanggapan (Quick Action Form)
-        // Kita tidak perlu delay di sini, karena browser akan segera pindah halaman.
         document.getElementById('quick-action-form').submit();
     }
+    
+    // =========================================================================
+    // LOGIKA QUICK ACTION TEMPLATE (UPDATE RESPONSE)
+    // =========================================================================
 
-    let kkHistoryModalElement;
-    let kkHistoryContent;
-
-    window.showKKHistoryModal = function (kkNumber) {
-        if (!kkHistoryModalElement) {
-            console.error('Modal element not initialized.');
-            return;
-        }
-
-        if (!kkNumber || kkNumber === '-') {
-            console.warn('Nomor KK tidak tersedia.');
-            return;
-        }
-
-        // 1. Tampilkan Backdrop
-        let backdrop = document.querySelector('.modal-backdrop');
-        if (!backdrop) {
-            backdrop = document.createElement('div');
-            backdrop.classList.add('modal-backdrop', 'fade', 'show'); 
-            document.body.appendChild(backdrop);
-            backdrop.onclick = window.hideKKHistoryModal; // Tutup saat klik backdrop
-        }
-
-        // 2. Tampilkan Modal
-        kkHistoryModalElement.style.display = 'block';
-        kkHistoryModalElement.removeAttribute('aria-hidden');
-        kkHistoryModalElement.setAttribute('aria-modal', 'true');
-        document.body.classList.add('modal-open');
+    document.addEventListener("DOMContentLoaded", function () {
         
-        setTimeout(() => {
-            kkHistoryModalElement.classList.add('show');
-        }, 1);
+        // Elemen-elemen utama Quick Action
+        const statusSelect = document.getElementById('quick-status-select-integrated'); 
+        const additionalDocsSection = document.getElementById('additional-docs-section');
+        const responseTextarea = document.getElementById('quick-response-textarea');
 
-        // 3. Panggil AJAX untuk memuat konten
-        loadKKHistoryContent(kkNumber);
-    };
-
-    // --- Fungsi Pure JS untuk Menyembunyikan Modal ---
-    window.hideKKHistoryModal = function () {
-        if (kkHistoryModalElement) {
-            kkHistoryModalElement.classList.remove('show');
-            kkHistoryModalElement.setAttribute('aria-hidden', 'true');
+        if (statusSelect) {
             
-            setTimeout(() => {
-                kkHistoryModalElement.style.display = 'none';
-                document.body.classList.remove('modal-open');
-                const backdrop = document.querySelector('.modal-backdrop');
-                if (backdrop) {
-                    backdrop.remove();
+            // Fungsi untuk memperbarui textarea Tanggapan berdasarkan template
+            function updateQuickResponse() {
+                const selectedStatusOption = statusSelect.options[statusSelect.selectedIndex];
+                
+                // Tambahkan pengamanan untuk opsi disabled
+                if (!selectedStatusOption || selectedStatusOption.disabled) return;
+                
+                // 🔥 Ambil status code dari data attribute (untuk logic)
+                const statusCode = selectedStatusOption.dataset.statusCode; 
+                const template = selectedStatusOption.dataset.template;
+                
+                // Logic untuk menampilkan/menyembunyikan checklist dokumen
+                if (statusCode === 'additional_data_required') { 
+                    additionalDocsSection.style.display = 'block';
+                    
+                    // Ambil data checklist
+                    const selectedDocs = Array.from(document.querySelectorAll('#additional-docs-section input[type="checkbox"]:checked'))
+                                                             .map(checkbox => checkbox.value);
+                    
+                    // Pastikan template TIDAK null sebelum memanggil replace
+                    let finalResponse = template ? template.replace('[dokumen_yang_dibutuhkan]', selectedDocs.join(', ')) : '';
+                    responseTextarea.value = finalResponse;
+                } else {
+                    additionalDocsSection.style.display = 'none';
+                    responseTextarea.value = template;
                 }
-            }, 150); // Sesuaikan dengan durasi transisi CSS
-        }
-    };
-
-    // --- Fungsi AJAX untuk Memuat Konten ---
-    function loadKKHistoryContent(kkNumber) {
-        if (!kkHistoryContent) {
-            console.error('Modal content element not initialized.');
-            return;
-        }
-        
-        // Tampilkan loading spinner
-        kkHistoryContent.innerHTML = '<div class="text-center p-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Memuat riwayat laporan...</p></div>';
-
-        // Panggil endpoint AJAX
-        fetch('{{ route('reports.by.kk') }}?kk_number=' + kkNumber)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Gagal memuat data riwayat.');
-                }
-                return response.json();
-            })
-            .then(data => {
-                // Masukkan konten HTML yang dirender dari controller
-                kkHistoryContent.innerHTML = data.html;
-            })
-            .catch(error => {
-                console.error('AJAX Error:', error);
-                kkHistoryContent.innerHTML = `<div class="alert alert-danger">Gagal memuat riwayat: ${error.message}</div>`;
+            }
+            
+            // Event listener untuk perubahan select status
+            statusSelect.addEventListener('change', updateQuickResponse);
+            
+            // Event listener untuk perubahan checklist dokumen
+            document.querySelectorAll('#additional-docs-section input[type="checkbox"]').forEach(checkbox => {
+                checkbox.addEventListener('change', updateQuickResponse);
             });
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        // Inisialisasi variabel di sini setelah DOM siap
-        kkHistoryModalElement = document.getElementById('modal-kk-history');
-        kkHistoryContent = document.getElementById('kk-history-content');
+            
+            // KRITIS: Jalankan sekali saat DOM dimuat untuk mengisi template default/selected
+            updateQuickResponse();
+        }
         
-        // Cek jika elemen tidak ditemukan, log error
-        if (!kkHistoryModalElement) {
-            console.error("Error: Element with ID 'modal-kk-history' not found.");
-            return; // Hentikan eksekusi jika modal tidak ditemukan
-        }
-        if (!kkHistoryContent) {
-            console.error("Error: Element with ID 'kk-history-content' not found.");
-            // Lanjutkan jika hanya konten yang hilang, tetapi log error
-        }
+        // =========================================================================
+        // LOGIKA KK HISTORY (MODAL)
+        // =========================================================================
+        
+        let kkHistoryModalElement = document.getElementById('modal-kk-history');
+        let kkHistoryContent = document.getElementById('kk-history-content');
+        
+        window.kkHistoryModalElement = kkHistoryModalElement;
+        window.kkHistoryContent = kkHistoryContent;
+        
+        window.showKKHistoryModal = function (kkNumber) {
+            if (!kkHistoryModalElement || !kkNumber || kkNumber === '-') {
+                console.warn('Nomor KK tidak tersedia atau modal tidak diinisialisasi.');
+                return;
+            }
 
-        // Daftarkan listener untuk tombol close bawaan modal
-        const closeButton = kkHistoryModalElement.querySelector('.btn-close');
-        if (closeButton) {
-            closeButton.onclick = window.hideKKHistoryModal;
+            // 1. Tampilkan Modal & Backdrop
+            showModalPure(kkHistoryModalElement);
+
+            // 3. Panggil AJAX untuk memuat konten
+            loadKKHistoryContent(kkNumber);
+        };
+
+        window.hideKKHistoryModal = function () {
+            hideModalPure(kkHistoryModalElement);
+        };
+
+        // Fungsi AJAX untuk Memuat Konten
+        function loadKKHistoryContent(kkNumber) {
+            if (!kkHistoryContent) return;
+            
+            kkHistoryContent.innerHTML = '<div class="text-center p-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Memuat riwayat laporan...</p></div>';
+
+            fetch('{{ route('reports.by.kk') }}?kk_number=' + kkNumber)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Gagal memuat data riwayat.');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    kkHistoryContent.innerHTML = data.html;
+                })
+                .catch(error => {
+                    console.error('AJAX Error:', error);
+                    kkHistoryContent.innerHTML = `<div class="alert alert-danger">Gagal memuat riwayat: ${error.message}</div>`;
+                });
         }
+        
+        // Daftarkan listener untuk tombol close bawaan modal KK History
+        if (kkHistoryModalElement) {
+            const closeButton = kkHistoryModalElement.querySelector('.btn-close');
+            if (closeButton) {
+                closeButton.onclick = window.hideKKHistoryModal;
+            }
+        }
+        
+        // =========================================================================
+        // INISIALISASI PLUGIN (TomSelect & Disposisi)
+        // =========================================================================
+
+        const initTomSelect = (selector, options = {}) => {
+            const element = document.getElementById(selector);
+            if (window.TomSelect && element) {
+                if (element.tomselect) {
+                    element.tomselect.destroy();
+                }
+                new TomSelect(`#${selector}`, options);
+            }
+        };
+
+        // Inisialisasi TomSelect untuk Disposisi Cepat
+        initTomSelect('select-analyst-cepat', {
+            plugins: { dropdown_input: {} },
+            create: false,
+            sortField: { field: "text", direction: "asc" },
+        });
+
+        // Inisialisasi TomSelect untuk Teruskan Lapor (Institusi)
+        initTomSelect('select-institution', {
+            plugins: { dropdown_input: {} },
+            create: false,
+            sortField: { field: "text", direction: "asc" },
+        });
     });
 </script>
 <script>

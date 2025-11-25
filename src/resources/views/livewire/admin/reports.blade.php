@@ -162,24 +162,28 @@
                             </td>
                             
                             {{-- Kategori --}}
-                            <td style="max-width: 150px;">
+                            <td style="max-width: 50px;">
                                 @php
-                                    $subCategory = $report->category?->name;
+                                    $subCategory = $report->category?->name ?? '-';
                                     $parentCategory = $report->category?->parent?->name;
                                 @endphp
 
                                 @if ($parentCategory)
-                                    <div class="multiline-clamp-2">
-                                        <span class="d-block text-primary fw-medium" style="font-size: 0.75rem; line-height: 1;">
+                                    <div>
+                                        {{-- Baris 1: Kategori Utama (Dibuat 1 baris dengan Ellipsis) --}}
+                                        <span class="d-block text-primary fw-medium text-truncate" 
+                                            style="font-size: 0.75rem; line-height: 1;"> 
                                             {{ $parentCategory }}
                                         </span>
+                                        {{-- Baris 2: Sub-Kategori (Teks utama) --}}
                                         <span class="fs-5 fw-semibold d-block mt-0 text-dark">
                                             {{ $subCategory }}
                                         </span>
                                     </div>
                                 @else
-                                    <div class="multiline-clamp-2">
-                                        <span class="fs-5 fw-semibold d-block text-primary">
+                                    {{-- Kondisi jika hanya ada Kategori Tingkat Atas --}}
+                                    <div>
+                                        <span class="fs-5 fw-semibold d-block text-primary text-truncate">
                                             {{ $subCategory }}
                                         </span>
                                     </div>

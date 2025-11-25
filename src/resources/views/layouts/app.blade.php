@@ -24,7 +24,7 @@
         </div>
     </div>
     
-    @include('layouts.partials.theme-settings')
+    {{-- @include('layouts.partials.theme-settings') --}}
     @include('layouts.partials.scripts')
     @stack('scripts')
     @push('scripts')

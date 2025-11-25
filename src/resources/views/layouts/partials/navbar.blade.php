@@ -27,7 +27,6 @@
                 <div class="nav-item dropdown d-none d-md-flex">
                     <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" tabindex="-1" aria-label="Show notifications">
                         <i class="ti ti-bell-ringing"></i>
-                        
                         @php
                             $unreadCount = auth()->user()->unreadNotifications->count();
                         @endphp
@@ -39,40 +38,40 @@
                     <div class="dropdown-menu dropdown-menu-arrow dropdown-menu-end dropdown-menu-card">
                         <div class="card">
                             <div class="card-header d-flex">
-                                {{-- Menghapus hitungan dari judul di sini, fokus pada badge di luar --}}
                                 <h3 class="card-title">Notifications</h3>
                                 <div class="btn-close ms-auto" data-bs-dismiss="dropdown"></div>
                             </div>
-                            
-                            <div class="list-group list-group-flush list-group-hoverable" id="notification-dropdown-list">
-                                @forelse (auth()->user()->unreadNotifications->take(5) as $notification)
-                                    @php
-                                        $data = $notification->data;
-                                        $icon = $data['icon'] ?? 'ti ti-bell-ringing';
-                                        $color = $data['color'] ?? 'primary';
-                                        $url = $data['url'] . '?read=' . $notification->id; // Tambahkan query untuk mark as read
-                                    @endphp
-                                    <div class="list-group-item">
-                                        <a href="{{ $url }}" class="d-flex text-decoration-none">
-                                            <div>
-                                                <span class="avatar avatar-sm rounded bg-{{ $color }}-lt me-3">
-                                                    <i class="{{ $icon }}"></i>
-                                                </span>
-                                            </div>
-                                            <div class="d-flex flex-column flex-grow-1">
-                                                <div class="font-weight-medium">{{ $data['title'] ?? 'Notifikasi Baru' }}</div>
-                                                <div class="text-secondary" style="font-size: 0.85rem;">
-                                                    {!! Str::limit($data['message'] ?? 'Lihat detail laporan.', 50) !!}
+                            <div class="card-body p-0 overflow-auto" style="max-height: 400px;">
+                                <div class="list-group list-group-flush list-group-hoverable" id="notification-dropdown-list">
+                                    @forelse (auth()->user()->unreadNotifications->take(10) as $notification) 
+                                        @php
+                                            $data = $notification->data;
+                                            $icon = $data['icon'] ?? 'ti ti-bell-ringing';
+                                            $color = $data['color'] ?? 'primary';
+                                            $url = $data['url'] . '?read=' . $notification->id;
+                                        @endphp
+                                        <div class="list-group-item">
+                                            <a href="{{ $url }}" class="d-flex text-decoration-none">
+                                                <div>
+                                                    <span class="avatar avatar-sm rounded bg-{{ $color }}-lt me-3">
+                                                        <i class="{{ $icon }}"></i>
+                                                    </span>
                                                 </div>
-                                                <div class="text-secondary mt-1" style="font-size: 0.75rem;">
-                                                    {{ $notification->created_at->diffForHumans() }}
+                                                <div class="d-flex flex-column flex-grow-1">
+                                                    <div class="font-weight-medium">{{ $data['title'] ?? 'Notifikasi Baru' }}</div>
+                                                    <div class="text-secondary" style="font-size: 0.85rem;">
+                                                        {!! Str::limit($data['message'] ?? 'Lihat detail laporan.', 50) !!}
+                                                    </div>
+                                                    <div class="text-secondary mt-1" style="font-size: 0.75rem;">
+                                                        {{ $notification->created_at->diffForHumans() }}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </a>
-                                    </div>
-                                @empty
-                                    <div class="p-3 text-center text-secondary">Tidak ada notifikasi baru.</div>
-                                @endforelse
+                                            </a>
+                                        </div>
+                                    @empty
+                                        <div class="p-3 text-center text-secondary">Tidak ada notifikasi baru.</div>
+                                    @endforelse
+                                </div>
                             </div>
 
                             @if (auth()->user()->unreadNotifications->isNotEmpty())

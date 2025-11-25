@@ -5,6 +5,7 @@ namespace App\Providers;
 use Aws\Credentials\Credentials;
 use Aws\S3\S3Client;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\ServiceProvider;
 
@@ -31,5 +32,7 @@ class AppServiceProvider extends ServiceProvider
 
             URL::forceScheme('https');
         }
+
+        Paginator::useBootstrapFive();
     }
 }

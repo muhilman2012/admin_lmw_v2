@@ -143,7 +143,7 @@
                 </button>
                 <div class="d-flex gap-2">
                     <a href="{{ route('reports.index') }}" class="btn btn-1">Batal</a>
-                    <button type="submit" class="btn btn-primary btn-2">Simpan</button>
+                    <button type="submit" class="btn btn-primary btn-2" id="btn-submit-laporan">Simpan</button>
                 </div>
             </div>
         </div>
@@ -194,6 +194,21 @@
 @push('scripts')
 <script>
     document.addEventListener("DOMContentLoaded", () => {
+        // Mendapatkan referensi ke tombol submit
+        const submitButton = document.getElementById('btn-submit-laporan');
+
+        // Fungsi Helper untuk mengelola status tombol
+        function toggleSubmitButton(isLoading) {
+            if (isLoading) {
+                submitButton.setAttribute('disabled', 'disabled');
+                // Teks memproses (spinner)
+                submitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Memproses...';
+            } else {
+                submitButton.removeAttribute('disabled');
+                submitButton.innerHTML = 'Simpan';
+            }
+        }
+
         if (window.Dropzone) {
             // Matikan autodiscovery untuk kontrol manual
             Dropzone.autoDiscover = false;
@@ -221,6 +236,9 @@
                     document.getElementById('form-tambah-pengaduan').addEventListener('submit', function(e) {
                         e.preventDefault();
                         e.stopPropagation();
+                        
+                        // 🔥 1. DISABLE TOMBOL SEBELUM FETCH DIMULAI
+                        toggleSubmitButton(true);
 
                         document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
                         document.querySelectorAll('.invalid-feedback').forEach(el => el.remove());
@@ -240,33 +258,40 @@
                             body: formData,
                             headers: {
                                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                                'Accept': 'application/json'
+                                'Accept': 'application/json' // 🔥 MENERIMA RESPONSE JSON
                             }
-                        }).then(response => {
-                            // Cek status respons. Jika tidak OK (misal 422), langsung tangani error.
+                        })
+                        .then(response => {
                             if (!response.ok) {
                                 return response.json().then(errorData => {
                                     throw errorData;
                                 });
                             }
-                            // Jika OK (200-299), lanjutkan dengan respons JSON
                             return response.json();
-                        }).then(data => {
+                        })
+                        .then(data => {
                             // Blok ini hanya akan dieksekusi jika respons.ok = true
                             if (data.success && data.uuid) {
+                                
+                                // Set tombol ke status berhasil
+                                submitButton.innerHTML = '<i class="ti ti-check me-1"></i>Berhasil!';
+                                
                                 Swal.fire({
                                     toast: true,
                                     position: 'top-end',
                                     icon: 'success',
                                     title: 'Laporan berhasil dibuat!',
                                     showConfirmButton: false,
-                                    timer: 3000,
+                                    timer: 1500, // Toast duration
                                     timerProgressBar: true,
                                 });
 
+                                // REDIRECT DILAKUKAN SETELAH TOASTER SELESAI
                                 setTimeout(() => {
+                                    toggleSubmitButton(false); // Reset status tombol (Opsional, sebelum redirect)
                                     window.location.href = "{{ url('admin/reports/') }}" + "/" + data.uuid + "/detail";
-                                }, 3000);
+                                }, 1500); // Harus sama atau lebih lama dari timer Swal.fire
+
                             } else {
                                 console.error('UUID not found in server response or success is false.');
                                 Swal.fire({
@@ -279,23 +304,24 @@
                                     timerProgressBar: true,
                                 });
                             }
-                        }).catch(error => {
-                            // Blok ini akan menangkap error dari server (seperti 422) atau network error
+                        })
+                        .catch(error => {
+                            // Blok ini akan menangkap error (422 validation, 500 server)
                             if (error.errors) {
-                                // Handle validation errors from the server
+                                // Handle validation errors
                                 for (const [key, messages] of Object.entries(error.errors)) {
                                     const inputElement = document.querySelector(`[name="${key}"]`);
                                     if (inputElement) {
                                         inputElement.classList.add('is-invalid');
                                         const parent = inputElement.closest('div');
                                         if (parent) {
-                                        let errorDiv = parent.querySelector('.invalid-feedback');
-                                        if (!errorDiv) {
-                                            errorDiv = document.createElement('div');
-                                            errorDiv.classList.add('invalid-feedback');
-                                            parent.appendChild(errorDiv);
-                                        }
-                                        errorDiv.textContent = messages[0];
+                                            let errorDiv = parent.querySelector('.invalid-feedback');
+                                            if (!errorDiv) {
+                                                errorDiv = document.createElement('div');
+                                                errorDiv.classList.add('invalid-feedback');
+                                                parent.appendChild(errorDiv);
+                                            }
+                                            errorDiv.textContent = messages[0];
                                         }
                                     }
                                 }
@@ -320,6 +346,14 @@
                                     timer: 3000,
                                     timerProgressBar: true,
                                 });
+                            }
+                        })
+                        .finally(() => {
+                            // AKTIFKAN KEMBALI TOMBOL JIKA ADA KESALAHAN
+                            // Jika sukses, tombol akan tetap disabled hingga redirect
+                            const isSuccess = submitButton.innerHTML.includes('Berhasil');
+                            if (!isSuccess) {
+                                toggleSubmitButton(false);
                             }
                         });
                     });

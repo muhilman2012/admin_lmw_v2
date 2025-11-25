@@ -15,7 +15,6 @@
     <link href="{{ asset('tabler/css/tabler-flags.min.css') }}" rel="stylesheet"/>
     <link href="{{ asset('tabler/css/tabler-payments.min.css') }}" rel="stylesheet"/>
     <link href="{{ asset('tabler/css/tabler-vendors.min.css') }}" rel="stylesheet"/>
-    <link href="{{ asset('tabler/css/demo.min.css') }}" rel="stylesheet"/>
     <link rel="stylesheet" href="{{ asset('assets/css/sweetalert2.min.css') }}">
     <style>
       @import url('https://rsms.me/inter/inter.css');
@@ -35,7 +34,6 @@
 
     <script src="{{ asset('assets/js/sweetalert2.all.min.js') }}"></script>
     <script src="{{ asset('tabler/js/tabler.min.js') }}" defer></script>
-    <script src="{{ asset('tabler/js/demo.min.js') }}" defer></script>
 
     @stack('scripts')
     

@@ -252,9 +252,9 @@
                                 </div>
                             @endif
                         </div>
-                        @if ($reportStats['pending_assignment'] > 5)
+                        @if ($reportStats['pending_assignment'] > 7)
                             <div class="card-footer text-center border-0">
-                                <small class="text-muted">Menampilkan 5 dari {{ $reportStats['pending_assignment'] }} tugas.</small>
+                                <small class="text-muted">Menampilkan 7 dari {{ $reportStats['pending_assignment'] }} tugas.</small>
                             </div>
                         @endif
                     </div>

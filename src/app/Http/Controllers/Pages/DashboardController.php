@@ -283,21 +283,43 @@ class DashboardController extends Controller
         }
 
         if ($user->hasRole('analyst')) {
-            $pendingAssignmentCount = Report::whereHas('assignments', function (Builder $query) use ($user) {
-                $query->where('assigned_to_id', $user->id) 
-                    ->where('status', 'pending');
-            })
-            ->count();
+            // 🔥 Status Report yang diizinkan untuk Assignment 'approved'
+            $targetReportStatus = 'Proses verifikasi dan telaah';
+            
+            // Status Assignment yang SELALU memerlukan tindakan Analis
+            $actionRequiredAssignmentStatuses = ['pending', 'rejected', 'Perlu Perbaikan'];
+            
+            // 1. Buat Base Query dengan kondisi OR yang kompleks
+            $analystReportsQuery = Report::query();
+            
+            $analystReportsQuery->where(function ($query) use ($user, $targetReportStatus, $actionRequiredAssignmentStatuses) {
+                
+                // A. Kondisi OR 1: Assignment status yang memerlukan tindakan (pending, rejected, Perlu Perbaikan)
+                // Laporan ini selalu muncul jika assignment-nya memiliki salah satu status ini.
+                $query->whereHas('assignments', function (Builder $q) use ($user, $actionRequiredAssignmentStatuses) {
+                    $q->where('assigned_to_id', $user->id)
+                    ->whereIn('status', $actionRequiredAssignmentStatuses);
+                });
 
-            // Ambil data Report pending (Mini-Datatable)
-            $pendingAssignments = Report::whereHas('assignments', function (Builder $query) use ($user) {
-                $query->where('assigned_to_id', $user->id)
-                    ->where('status', 'pending');
-            })
-            ->with('category')
-            ->orderBy('created_at', 'desc')
-            ->limit(5)
-            ->get();
+                // B. Kondisi OR 2: Assignment status 'approved' HANYA JIKA Report status masih target/default
+                $query->orWhere(function ($q) use ($user, $targetReportStatus) {
+                    $q->where('status', $targetReportStatus) // Report status HARUS sesuai
+                    ->whereHas('assignments', function (Builder $qq) use ($user) {
+                        $qq->where('assigned_to_id', $user->id)
+                            ->where('status', 'approved'); // Assignment status HARUS 'approved'
+                    });
+                });
+            });
+            
+            // 2. Ambil data hitungan Report
+            $pendingAssignmentCount = (clone $analystReportsQuery)->count();
+
+            // 3. Ambil data Report (Mini-Datatable)
+            $pendingAssignments = (clone $analystReportsQuery)
+                ->with('category')
+                ->orderBy('created_at', 'desc')
+                ->limit(7)
+                ->get();
         }
 
         $reportStats = [

@@ -122,18 +122,33 @@ Route::middleware(['auth', CheckPasswordReset::class])->prefix('admin')->group(f
 
     // --- Settings Aplikasi ---
     Route::prefix('settings')->name('settings.')->group(function () {
-        Route::get('/', [SettingsController::class, 'index'])->name('index');
+        
+        // 1. ROUTE UTAMA (settings.index)
+        // 🔥 PERBAIKAN: Mengarahkan /settings ke method index() yang sudah digabungkan
+        Route::get('/', [SettingsController::class, 'index'])->name('index'); 
+
+        // 2. KATEGORI (CREATE, STORE, DELETE, TOGGLE)
+        // Catatan: Route::put('/{category}', [SettingsController::class, 'update'])->name('update'); masih hilang, tambahkan jika Anda memiliki method update kategori
         Route::post('/', [SettingsController::class, 'store'])->name('store');
-        Route::put('/{category}', [SettingsController::class, 'update'])->name('update');
         Route::delete('/{category}', [SettingsController::class, 'destroy'])->name('destroy');
         Route::patch('/{category}/toggle-active', [SettingsController::class, 'toggleCategoryActive'])->name('toggle-active');
+
+        // 3. PENUGASAN/MATRIKS
         Route::post('/assign-units', [SettingsController::class, 'assignUnits'])->name('assign.units');
         Route::get('/assignments-by-deputy', [SettingsController::class, 'getAssignmentsByDeputy'])->name('assignments.by.deputy');
         Route::put('/matrix/update', [SettingsController::class, 'updateMatrix'])->name('matrix.update');
+
+        // 4. MAINTENANCE (COMMANDS)
         Route::post('/run-maintenance', [SettingsController::class, 'runSystemMaintenance'])->name('run-maintenance');
-        Route::post('/retry-lapor', [SettingsController::class, 'retryLaporForwarding'])->name('retry.lapor');
+        Route::post('/retry-lapor', [SettingsController::class, 'retryLaporForwarding'])->name('retry.lapor'); // Catatan: Route ini sudah diubah ke POST di Controller
         Route::get('/gemini-status', [SettingsController::class, 'getGeminiStatus'])->name('gemini.status');
 
+        // 5. 🔥 TEMPLATES (CRUD)
+        Route::post('/templates/status', [SettingsController::class, 'storeStatusTemplate'])->name('templates.status.store');
+        Route::post('/templates/document', [SettingsController::class, 'storeDocumentTemplate'])->name('templates.document.store');
+        Route::delete('/templates/destroy/{id}', [SettingsController::class, 'destroyTemplate'])->name('templates.destroy');
+
+        // 6. UNIT KERJA (Prefix/Nested Grouping)
         Route::prefix('unit-kerjas')->name('unitkerjas.')->group(function () {
             Route::post('/', [UnitKerjaController::class, 'store'])->name('store');
             Route::put('/{unitKerja}', [UnitKerjaController::class, 'update'])->name('update');

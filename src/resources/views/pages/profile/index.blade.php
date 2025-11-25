@@ -151,10 +151,10 @@
                             <a data-bs-toggle="modal" data-bs-target="#modal-reset-password" role="button" class="btn btn-1">Perbarui Kata Sandi</a>
                         </div>
                     </div>
-                    
+
                     <div class="tab-pane fade" id="pane-notifications" role="tabpanel" aria-labelledby="tab-notifications">
-                        <div class="list-group list-group-flush list-group-hoverable">
-                            @forelse (auth()->user()->notifications()->latest()->get() as $notification)
+                        <div id="notifications-container" class="list-group list-group-flush list-group-hoverable overflow-auto" style="max-height: 40rem;">
+                            @forelse (auth()->user()->notifications()->latest()->limit(50)->get() as $notification) 
                                 @php
                                     $data = $notification->data;
                                     $icon = $data['icon'] ?? 'ti ti-bell-ringing';
@@ -188,6 +188,14 @@
                                 <div class="p-4 text-center text-muted">Anda tidak memiliki riwayat notifikasi.</div>
                             @endforelse
                         </div>
+                        
+                        {{-- @if (auth()->user()->notifications()->count() > 15)
+                            <div class="card-footer bg-transparent text-center">
+                                <a href="{{ route('notifications.index') }}" class="btn btn-sm btn-outline-secondary">
+                                    Lihat Semua Notifikasi ({{ auth()->user()->notifications()->count() }})
+                                </a>
+                            </div>
+                        @endif --}}
                     </div>
                     
                     <div class="tab-pane fade" id="pane-log" role="tabpanel" aria-labelledby="tab-log">

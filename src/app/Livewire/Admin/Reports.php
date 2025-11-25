@@ -874,7 +874,7 @@ class Reports extends Component
         $reportsCollection = $reportsPaginator->getCollection();
 
         // Nilai Treshold dan Deadline
-        $thresholdDate = Carbon::create(2025, 11, 02); // Treshold baru: 6 Nov 2025
+        $thresholdDate = Carbon::create(2025, 12, 01); // Treshold baru: 01 Des 2025
         $verificationDeadlineDays = 3;
         $now = Carbon::now();
         // Normalisasi waktu saat ini ke awal hari untuk perbandingan hari yang adil
@@ -909,7 +909,7 @@ class Reports extends Component
                     // KONDISI 1: BELUM TERLAMBAT
                     
                     // --- 2. HITUNG SISA HARI KERJA DARI SEKARANG HINGGA DEADLINE (LOOP MANUAL) ---
-                    $remainingDays = 0;
+                    $remainingDays = 1;
                     $currentCheckDay = $nowStartOfDay->copy(); 
                     
                     // Mulai dari hari ini (startOfDay) dan cek sampai TEPAT sebelum $deadline.
