@@ -6,6 +6,8 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use App\Models\Reporter;
 use Hashids\Hashids;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 
 class Reporters extends Component
 {
@@ -17,13 +19,16 @@ class Reporters extends Component
 
     public function render()
     {
+        $today = Carbon::today();
         $reporters = Reporter::query()
+            ->whereDate('created_at', $today)
+            ->where('checkin_status', 'pending_report_creation')
             ->when($this->search, function ($query) {
                 $query->where('name', 'like', '%' . $this->search . '%')
                       ->orWhere('nik', 'like', '%' . $this->search . '%')
                       ->orWhere('phone_number', 'like', '%' . $this->search . '%');
             })
-            ->where('checkin_status', 'pending_report_creation')
+            
             ->paginate($this->perPage);
 
         return view('livewire.admin.reporters', [

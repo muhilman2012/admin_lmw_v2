@@ -37,6 +37,10 @@ class Kernel extends ConsoleKernel
         $schedule->command('lapor:retry-forwarding')
                  ->everyFiveMinutes()
                  ->withoutOverlapping();
+
+        $schedule->command('report:cleanup')
+                 ->dailyAt('01:00');
+                 ->withoutOverlapping();
     }
 
     /**

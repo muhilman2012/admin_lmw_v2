@@ -18,11 +18,11 @@
             <thead class="sticky-top bg-white" style="z-index:10;">
                 <tr>
                     <th class="w-1">No.</th>
-                    <th>Nama Lengkap</th>
+                    <th style="max-width: 150px;">Nama Lengkap</th>
                     <th>NIK</th>
                     <th>Nomor HP</th>
-                    <th>Email</th>
-                    <th>Alamat</th>
+                    <th style="max-width: 150px;">Email</th>
+                    <th style="max-width: 200px;">Alamat</th>
                     <th class="w-1"></th>
                 </tr>
             </thead>
@@ -30,11 +30,11 @@
                 @forelse ($reporters as $index => $reporter)
                     <tr>
                         <td>{{ $reporters->firstItem() + $index }}</td>
-                        <td>{{ $reporter->name }}</td>
+                        <td class="text-truncate" style="max-width: 150px;">{{ $reporter->name }}</td>
                         <td>{{ $reporter->nik }}</td>
                         <td>{{ $reporter->phone_number }}</td>
-                        <td>{{ $reporter->email }}</td>
-                        <td>{{ $reporter->address }}</td>
+                        <td class="text-truncate" style="max-width: 150px;">{{ $reporter->email }}</td>
+                        <td class="text-truncate" style="max-width: 200px;">{{ $reporter->address }}</td>
                         <td>
                             <div class="btn-list flex-nowrap">
                                 <a href="{{ 

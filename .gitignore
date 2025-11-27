@@ -1,0 +1,43 @@
+# -----------------------------------------------------
+# A. FILE SENSITIF & KONFIGURASI LOKAL
+# -----------------------------------------------------
+/.env
+.env.testing
+.env.development.local
+
+# 🔥 PENTING UNTUK LOCAL/SERVER CONFIG SPLIT
+# File config yang berbeda antara production dan local.
+/config/nginx.conf
+/docker-compose.override.yml
+/supervisord-scheduler.conf
+/supervisord-worker.conf
+
+# -----------------------------------------------------
+# B. DEPENDENSI & BUILD ARTIFACTS
+# -----------------------------------------------------
+/vendor
+/node_modules
+/public/build
+/public/hot
+npm-debug.log
+yarn-error.log
+
+# -----------------------------------------------------
+# C. LARAVEL SPECIFIC IGNORES
+# -----------------------------------------------------
+/storage/*.key
+/public/storage
+/public/assets
+/public/css
+/public/js
+
+/storage/*.sqlite
+/storage/logs/*.log
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/testing/*
+/storage/framework/views/*
+
+# macOS & Linux desktop files
+.DS_Store
+Thumbs.db
