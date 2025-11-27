@@ -865,13 +865,30 @@
     // C. LOGIKA CRUD & EVENT BINDING (UTAMA)
     // =======================================================
 
-    // --- KATEGORI CRUD/TOGGLE ---
     function setupDeleteConfirmation(buttonSelector, isSubCategory) {
         document.querySelectorAll(buttonSelector).forEach(button => {
             button.removeEventListener('click', null); 
             button.addEventListener('click', function(event) {
                 event.preventDefault(); 
-                // ... (Logic Delete Confirmation Kategori) ...
+                const categoryId = this.getAttribute('data-category-id');
+                const categoryName = this.getAttribute('data-category-name');
+                const formId = isSubCategory ? `delete-subcategory-${categoryId}` : `delete-category-${categoryId}`;
+                const formElement = document.getElementById(formId);
+                
+                Swal.fire({
+                    title: isSubCategory ? 'Hapus Sub-Kategori?' : 'Hapus Kategori Utama?',
+                    html: `Anda yakin ingin menghapus kategori: <strong>${categoryName}</strong>?` + (!isSubCategory ? '<br><small class="text-danger">Semua sub-kategori di dalamnya harus dihapus terlebih dahulu!</small>' : ''), 
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'Ya, Hapus!',
+                    cancelButtonText: 'Batal',
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        if (formElement) { formElement.submit(); } else { console.error('Form tidak ditemukan:', formId); }
+                    }
+                });
             });
         });
     }
@@ -991,7 +1008,66 @@
         }
         
         // 3. SETUP DELETE CONFIRMATION (Global)
-        // (Logic Delete Template tetap sama, karena menggunakan form submit)
+        document.querySelectorAll('.delete-template-btn').forEach(button => {
+            // Hapus listener lama jika ada
+            button.removeEventListener('click', null); 
+            
+            button.addEventListener('click', function(event) {
+                event.preventDefault();
+                
+                const id = this.getAttribute('data-id');
+                const name = this.getAttribute('data-name');
+                const type = this.getAttribute('data-type'); // 'status' atau 'document'
+                
+                Swal.fire({
+                    title: `Hapus ${type === 'status' ? 'Status' : 'Dokumen'} Template?`,
+                    html: `Anda yakin ingin menghapus template <strong>${name}</strong>?`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonText: 'Batal',
+                    confirmButtonText: 'Ya, Hapus!'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        // Membuat form DELETE secara dinamis (Pure JS)
+                        const form = document.createElement('form');
+                        
+                        // Route: /admin/settings/templates/destroy/{id}
+                        form.action = '{{ route('settings.templates.destroy', ['id' => 'TEMP_ID']) }}'.replace('TEMP_ID', id);
+                        form.method = 'POST'; // Harus POST untuk method override
+                        form.style.display = 'none';
+
+                        // CSRF Token
+                        const csrf = document.createElement('input');
+                        csrf.name = '_token';
+                        csrf.value = '{{ csrf_token() }}';
+                        
+                        // DELETE method override
+                        const method = document.createElement('input');
+                        method.name = '_method';
+                        method.value = 'DELETE';
+                        
+                        // Input Type (Status/Document)
+                        const typeInput = document.createElement('input');
+                        typeInput.name = 'type';
+                        typeInput.value = type;
+                        
+                        // Input Active Tab Hash (Untuk persistensi setelah redirect)
+                        const hashInput = document.createElement('input');
+                        hashInput.name = 'active_tab_hash';
+                        hashInput.value = '#tab-templates'; // Arahkan kembali ke tab Templates
+
+                        form.appendChild(csrf);
+                        form.appendChild(method);
+                        form.appendChild(typeInput);
+                        form.appendChild(hashInput);
+                        
+                        document.body.appendChild(form);
+                        form.submit();
+                    }
+                });
+            });
+        });
     }
 
     // --- LOGIKA EDIT/DELETE UNIT KERJA (MATRIKS) ---
@@ -1045,29 +1121,107 @@
     }
     
     function setupUnitDeleteListeners() {
-        document.querySelectorAll('.delete-unit-btn').forEach(button => {
+        const deleteButtons = document.querySelectorAll('.delete-unit-btn');
+
+        deleteButtons.forEach(button => {
             button.removeEventListener('click', null); 
+            
             button.addEventListener('click', function(event) {
                 event.preventDefault();
-                // ... (Logic Delete Unit Kerja tetap sama) ...
+                
+                const unitId = this.getAttribute('data-unit-id'); 
+                const row = this.closest('tr');
+                
+                // Logic untuk mendapatkan nama unit (dipertahankan)
+                const unitNameElement = row.querySelector('td:nth-child(2)');
+                const unitName = unitNameElement ? unitNameElement.textContent.trim().replace(/^\s*[\u200B\s\uFEFF]*\u2192?\s*|\s*[\u200B\s\uFEFF]*\u2192?\s*$/g, '').trim() : 'Unit Tidak Dikenal';
+                
+                Swal.fire({
+                    title: 'Hapus Unit Kerja?',
+                    text: `Anda yakin ingin menghapus Unit Kerja: ${unitName}? Tindakan ini tidak dapat dibatalkan.`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    confirmButtonText: 'Ya, Hapus!',
+                    cancelButtonText: 'Batal',
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        const form = document.createElement('form');
+                        
+                        // FIX ROUTE: Tambahkan /admin prefix
+                        form.action = `/admin/settings/unit-kerjas/${unitId}`; 
+                        form.method = 'POST'; // Harus POST untuk method override
+                        form.style.display = 'none';
+                        
+                        const methodInput = document.createElement('input');
+                        methodInput.type = 'hidden';
+                        methodInput.name = '_method';
+                        methodInput.value = 'DELETE';
+                        
+                        const tokenInput = document.createElement('input');
+                        tokenInput.type = 'hidden';
+                        tokenInput.name = '_token';
+                        // Ambil CSRF token dari meta tag global
+                        tokenInput.value = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+                        // Input untuk persistensi tab (opsional)
+                        const tabHashInput = document.createElement('input');
+                        tabHashInput.type = 'hidden';
+                        tabHashInput.name = 'active_tab_hash';
+                        tabHashInput.value = '#tab-matrix'; 
+                        
+                        form.appendChild(methodInput);
+                        form.appendChild(tokenInput);
+                        form.appendChild(tabHashInput);
+                        
+                        document.body.appendChild(form);
+                        form.submit();
+                    }
+                });
             });
         });
     }
     
     // --- BINDING TOMBOL LAIN UNTUK PURE JS MODAL ---
+    // =======================================================
+    // LOGIKA KHUSUS MODAL TAMBAH KATEGORI
+    // =======================================================
     
-    function setupModalTriggers() {
-        // Tombol Tambah Kategori
-        const createCategoryButton = document.querySelector('[data-bs-target="#modal-create-category"]');
-        const categoryModal = document.getElementById('modal-create-category');
-        if (createCategoryButton) {
-             createCategoryButton.removeAttribute('data-bs-toggle');
-             createCategoryButton.addEventListener('click', function(e) {
-                 e.preventDefault();
-                 window.showModalPureJS(categoryModal);
+    const createCategoryButton = document.querySelector('[data-bs-target="#modal-create-category"]');
+    const categoryModal = document.getElementById('modal-create-category');
+
+    if (createCategoryButton && categoryModal) {
+         
+         // 1. Hapus atribut Bootstrap dari tombol trigger (agar tidak konflik)
+         createCategoryButton.removeAttribute('data-bs-toggle');
+         
+         // 2. Ikat listener Buka Modal ke tombol trigger
+         createCategoryButton.addEventListener('click', function(e) {
+             e.preventDefault();
+             
+             // Reset form dan TomSelect saat modal dibuka untuk Tambah Baru
+             const form = categoryModal.querySelector('form');
+             if (form) form.reset();
+             const parentSelect = document.getElementById('parent_id');
+             if (parentSelect && parentSelect.tomselect) {
+                 parentSelect.tomselect.clear();
+             }
+             
+             window.showModalPureJS(categoryModal);
+         });
+         
+         // 3. Ikat listener Tutup Modal ke tombol-tombol yang memiliki data-bs-dismiss="modal"
+         categoryModal.querySelectorAll('[data-bs-dismiss="modal"]').forEach(closeBtn => {
+             // 🔥 KRITIS: Hapus event listener lama dan atribut Bootstrap
+             closeBtn.removeAttribute('data-bs-dismiss'); 
+             closeBtn.addEventListener('click', function(e) { 
+                 e.preventDefault(); 
+                 window.hideModalPureJS(categoryModal); 
              });
-        }
-        
+         });
+    }
+    
+    function setupModalTriggers() {        
         // Tombol Tambah Unit Kerja Baru (GLOBAL)
         const createUnitButton = document.querySelector('[data-mode="create"][data-bs-target="#modal-manage-unit"]');
         const unitModal = document.getElementById('modal-manage-unit');

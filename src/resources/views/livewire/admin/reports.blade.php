@@ -176,7 +176,7 @@
                                             {{ $parentCategory }}
                                         </span>
                                         {{-- Baris 2: Sub-Kategori (Teks utama) --}}
-                                        <span class="fs-5 fw-semibold d-block mt-0 text-dark">
+                                        <span class="fs-5 fw-semibold d-block mt-0 text-dark text-truncate">
                                             {{ $subCategory }}
                                         </span>
                                     </div>

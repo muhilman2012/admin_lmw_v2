@@ -30,7 +30,7 @@
             <div id="advanced-table-pengadu">
                 <div class="table-responsive" style="min-height: 50vh; max-height: 58vh; overflow-y: auto">
                     <table class="table table-selectable card-table table-vcenter text-nowrap datatable">
-                        <thead class="sticky-top bg-white">
+                        <thead class="sticky-top bg-white" style="z-index:10;">
                             <tr>
                                 <th class="w-1">#</th>
                                 <th class="w-1">

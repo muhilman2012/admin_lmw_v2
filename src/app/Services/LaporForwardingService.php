@@ -62,6 +62,7 @@ class LaporForwardingService
 
     /**
      * Langkah 1: Mengunggah dokumen laporan ke API LAPOR!. (Multipart Form Data, Batch Upload)
+     * Diperbaiki untuk menangani respons multi-format (images dan docs).
      */
     public function uploadDocuments(Report $report): array
     {
@@ -80,38 +81,19 @@ class LaporForwardingService
 
         // 2. Loop semua dokumen dan lampirkan ke client (BELUM DIKIRIM)
         foreach ($dokumens as $dokumen) {
-            $filePath = $dokumen->file_path;
+            $filePath = (string) $dokumen->file_path;
 
-            // 1. Cek file_path kosong / 0 / null
             if (empty($filePath) || $filePath === '0' || $filePath === 0) {
-                Log::warning('Dokumen punya file_path kosong / 0, dilewati.', [
-                    'document_id' => $dokumen->id ?? null,
-                    'file_path'   => $filePath,
-                ]);
+                Log::warning('Dokumen punya file_path kosong, dilewati.', ['document_id' => $dokumen->id ?? null]);
                 continue;
             }
 
-            // pastikan string
-            $filePath = (string) $filePath;
-
-            // 2. Cek keberadaan file dengan try/catch
             try {
                 if (! $storageDisk->exists($filePath)) {
-                    Log::warning("File tidak ditemukan di Minio untuk upload: {$filePath}", [
-                        'document_id' => $dokumen->id ?? null,
-                    ]);
+                    Log::warning("File tidak ditemukan di Minio untuk upload: {$filePath}", ['document_id' => $dokumen->id ?? null]);
                     continue;
                 }
-            } catch (\Throwable $e) {
-                Log::error('Gagal mengecek existence file di Minio: ' . $e->getMessage(), [
-                    'file_path'   => $filePath,
-                    'document_id' => $dokumen->id ?? null,
-                ]);
-                continue; // jangan hentikan seluruh proses, lanjut ke dokumen berikutnya
-            }
-
-            // 3. Ambil isi file dan attach
-            try {
+                
                 $fileContents = $storageDisk->get($filePath);
                 $mimeType = $storageDisk->mimeType($filePath) ?? 'application/octet-stream';
 
@@ -124,16 +106,10 @@ class LaporForwardingService
                     );
                     $filesToAttach++;
                 } else {
-                    Log::warning('Konten file kosong saat upload ke LAPOR!.', [
-                        'file_path'   => $filePath,
-                        'document_id' => $dokumen->id ?? null,
-                    ]);
+                    Log::warning('Konten file kosong saat upload ke LAPOR!.', ['file_path' => $filePath]);
                 }
             } catch (\Throwable $e) {
-                Log::error('Exception saat menyiapkan dokumen dari Minio ke LAPOR!: ' . $e->getMessage(), [
-                    'file_path'   => $filePath,
-                    'document_id' => $dokumen->id ?? null,
-                ]);
+                Log::error('Exception saat menyiapkan dokumen dari Minio ke LAPOR!: ' . $e->getMessage(), ['file_path' => $filePath]);
             }
         }
 
@@ -144,28 +120,35 @@ class LaporForwardingService
                 $responseData = $response->json();
                 
                 if ($response->successful()) {
-                    $uploadedDocs = $responseData['results']['docs'] ?? [];
+                    $uploadedDocs = [];
+                    
+                    // 🔥 KOREKSI KRITIS: Gabungkan results dari 'images' dan 'docs'
+                    $results = $responseData['results'] ?? [];
+                    
+                    $uploadedDocs = array_merge(
+                        $results['images'] ?? [], // Ambil jika ada gambar/foto
+                        $results['docs'] ?? []    // Ambil jika ada dokumen/file lainnya
+                    );
                     
                     if (!empty($uploadedDocs)) {
                         foreach ($uploadedDocs as $doc) {
-                            
                             $dokumenIdResult = $doc['id'] ?? null; 
                             
                             if ($dokumenIdResult) {
                                 $dokumenIds[] = $dokumenIdResult; 
                             } else {
-                                Log::error('API LAPOR! sukses, tapi ID dokumen tidak ditemukan di array docs.', ['response' => $response->body()]);
+                                Log::error('API LAPOR! sukses, tapi ID dokumen tidak ditemukan dalam respons file.', ['response' => $response->body()]);
                             }
                         }
                         
                         Log::info('LAPOR! DOC UPLOAD SUCCESS', [
-                            'expected'        => $dokumens->count(),
+                            'expected'      => $filesToAttach,
                             'uploaded_count'  => count($dokumenIds),
                             'ids'             => $dokumenIds,
                         ]);
 
                     } else {
-                        Log::error('API LAPOR! sukses, tapi tidak ada ID dokumen ditemukan di array "docs".', ['response' => $response->body()]);
+                        Log::error('API LAPOR! sukses, tapi tidak ada ID dokumen ditemukan di array "images" atau "docs".', ['response' => $response->body()]);
                     }
                 } else {
                     Log::error('Gagal mengunggah dokumen ke LAPOR!', [
@@ -194,9 +177,28 @@ class LaporForwardingService
         $attachmentsJson = json_encode($uploadedDocumentIds);
         $finalAttachmentsPayload = $attachmentsJson . ".";
         
-        $content = $isAnonymous
-             ? "Nomor Tiket pada Aplikasi LMW: {$report->ticket_number}\n Detail Laporan: {$report->details}\n Lokasi: {$report->location}"
-             : "Nomor Tiket pada Aplikasi LMW: {$report->ticket_number}, Nama Lengkap: {$report->reporter->name}, NIK: {$report->reporter->nik}, Alamat Lengkap: {$report->reporter->address}, Detail Laporan: {$report->details}, Lokasi: {$report->location}";
+        // 1. Definisikan komponen opsional
+        $locationText = $report->location ? ", Lokasi Kejadian: {$report->location}" : '';
+        
+        // 2. Tentukan Konten Laporan berdasarkan Anonimitas
+        $baseContent = "[Nomor Tiket LMW: {$report->ticket_number}]. ";
+        
+        if ($isAnonymous) {
+            // Mode ANONYMOUS
+            $content = $baseContent;
+            $content .= "Detail Laporan: {$report->details}";
+            $content .= $locationText; // Ditambahkan hanya jika ada lokasi
+        } else {
+            // Mode NON-ANONYMOUS (Default)
+            $content = $baseContent;
+            
+            // Data Pelapor (Wajib ada jika non-anonim)
+            $content .= "Nama Lengkap: {$report->reporter->name}, NIK: {$report->reporter->nik}, Alamat Lengkap: {$report->reporter->address}. ";
+            
+            // Data Laporan
+            $content .= "Detail Laporan: {$report->details}";
+            $content .= $locationText; // Ditambahkan hanya jika ada lokasi
+        }
 
         $data = [
             'title' => $report->subject,
