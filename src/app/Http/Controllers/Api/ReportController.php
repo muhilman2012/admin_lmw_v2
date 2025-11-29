@@ -245,14 +245,14 @@ class ReportController extends Controller
         ]);
     }
 
-    /**
+   /**
      * Mengecek status pengaduan setelah verifikasi berhasil.
      */
     public function checkStatus(string $ticketNumber)
     {
         $report = Report::with('reporter')
-                        ->where('ticket_number', $ticketNumber)
-                        ->first();
+                            ->where('ticket_number', $ticketNumber)
+                            ->first();
 
         if (!$report) {
             return response()->json([
@@ -261,14 +261,18 @@ class ReportController extends Controller
                 'message' => 'Laporan tidak ditemukan.'
             ], 404);
         }
-    
+        
+        // Perbaikan: Memformat tanggal laporan
+        $tanggalLaporanFormatted = $report->created_at->format('d-m-Y');
+        
         return response()->json([
             'status' => 'success',
             'code' => 200,
             'data' => [
                 'ticket_number' => $report->ticket_number,
                 'nama_pengadu' => $report->reporter->name,
-                'tanggal_laporan' => $report->created_at,
+                // Menggunakan variabel yang sudah diformat
+                'tanggal_laporan' => $tanggalLaporanFormatted, 
                 'status_laporan' => $report->status,
                 'tanggapan' => $report->response,
             ]
