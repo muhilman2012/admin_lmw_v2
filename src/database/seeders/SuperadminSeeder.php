@@ -16,8 +16,8 @@ class SuperadminSeeder extends Seeder
         $superadminUser = User::firstOrCreate(
             ['email' => 'superadmin@set.wapresri.go.id'],
             [
-                'name' => 'Superadmin',
-                'password' => Hash::make('password'),
+                'name' => 'System LMW',
+                'password' => Hash::make('S3tW2PRE$@2025!@#'),
                 'role' => 'superadmin',
                 'is_active' => true,
                 'phone' => '1234567890',

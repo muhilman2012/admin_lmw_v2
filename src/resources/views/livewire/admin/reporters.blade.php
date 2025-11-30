@@ -35,6 +35,7 @@
                         <td>{{ $reporter->phone_number }}</td>
                         <td class="text-truncate" style="max-width: 150px;">{{ $reporter->email }}</td>
                         <td class="text-truncate" style="max-width: 200px;">{{ $reporter->address }}</td>
+                        @can('create reports')
                         <td>
                             <div class="btn-list flex-nowrap">
                                 <a href="{{ 
@@ -46,6 +47,7 @@
                                 </a>
                             </div>
                         </td>
+                        @endcan
                     </tr>
                 @empty
                     <tr>

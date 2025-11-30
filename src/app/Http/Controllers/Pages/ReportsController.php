@@ -614,7 +614,6 @@ class ReportsController extends Controller
         $service = new LaporForwardingService();
 
         $uploadedDocumentIds = [];
-        $uploadedIdsString = '';
         $complaintId = null;
 
         DB::beginTransaction();
@@ -623,9 +622,11 @@ class ReportsController extends Controller
             $uploadedDocumentIds = $service->uploadDocuments($report);
             $uploadedIdsString = implode(',', $uploadedDocumentIds);
 
-            if (empty($uploadedIdsString) && $report->documents->count() > 0) {
-                // Jika ada dokumen yang seharusnya diunggah tapi ID-nya kosong
-                throw new \Exception("Gagal mengumpulkan ID dokumen dari LAPOR! setelah upload.");
+            if ($report->documents->count() > 0 && empty($uploadedDocumentIds)) {
+                Log::warning("SEMUA DOKUMEN GAGAL DIUNGGAH KE LAPOR!. Laporan utama akan dikirim tanpa attachment.", [
+                    'report_uuid' => $uuid,
+                    'dokumen_count' => $report->documents->count(),
+                ]);
             }
 
             // B. Langkah 2: Kirim Laporan Utama ke LAPOR!

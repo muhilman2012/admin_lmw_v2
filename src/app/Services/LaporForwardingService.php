@@ -158,11 +158,13 @@ class LaporForwardingService
                 }
             } catch (\Exception $e) {
                 Log::error('Exception saat mengirim request batch dokumen ke LAPOR!: ' . $e->getMessage());
+                return [];
             }
         } else {
             Log::warning('Tidak ada file yang siap di-attach ke LAPOR!.', [
                 'dokumen_count' => $dokumens->count(),
             ]);
+            return [];
         }
 
         // Mengembalikan SEMUA ID yang berhasil di-upload
@@ -174,8 +176,12 @@ class LaporForwardingService
      */
     public function sendToLapor(Report $report, array $uploadedDocumentIds, bool $isAnonymous): array
     {
-        $attachmentsJson = json_encode($uploadedDocumentIds);
-        $finalAttachmentsPayload = $attachmentsJson . ".";
+        if (empty($uploadedDocumentIds)) {
+            $finalAttachmentsPayload = false; 
+        } else {
+            $attachmentsJson = json_encode($uploadedDocumentIds);
+            $finalAttachmentsPayload = $attachmentsJson . "."; 
+        }
         
         // 1. Definisikan komponen opsional
         $locationText = $report->location ? ", Lokasi Kejadian: {$report->location}" : '';

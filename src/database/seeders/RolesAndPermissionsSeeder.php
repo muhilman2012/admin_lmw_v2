@@ -66,7 +66,6 @@ class RolesAndPermissionsSeeder extends Seeder
         $admin = Role::firstOrCreate(['name' => 'admin']);
         $admin->givePermissionTo([
             'view all reports',
-            'create reports',
             'edit reports',
             'view users',
             'create users',
@@ -76,7 +75,6 @@ class RolesAndPermissionsSeeder extends Seeder
             'create kms article',
         ]);
         
-        // ... (Peran lainnya tetap sama)
         // Peran 3: Analis (Fokus pada Tugas Sendiri)
         $analyst = Role::firstOrCreate(['name' => 'analyst']);
         $analyst->givePermissionTo([

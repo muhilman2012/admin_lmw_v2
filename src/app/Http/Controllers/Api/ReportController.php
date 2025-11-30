@@ -54,18 +54,42 @@ class ReportController extends Controller
         DB::beginTransaction();
         
         try {
-            $geminiService = new GeminiCategoryService();
-            $categoryName = $geminiService->classifyReport(
-                $validatedData['report_details']['details']
-            );
+            $categoryName = 'Lainnya';
+            $defaultCategoryModel = Category::where('name', 'Lainnya')->first();
+            $categoryId = $defaultCategoryModel ? $defaultCategoryModel->id : null; 
             
-            $category = Category::where('name', $categoryName)->first();
-            $categoryId = $category ? $category->id : Category::where('name', 'Lainnya')->first()->id;
+            if ($categoryId === null) {
+                 throw new \Exception("Kategori default 'Lainnya' tidak ditemukan di database.");
+            }
+
+            try {
+                $geminiService = new GeminiCategoryService();
+                $classifiedCategoryName = $geminiService->classifyReport(
+                    $validatedData['report_details']['details']
+                );
+                
+                $category = Category::where('name', $classifiedCategoryName)->first();
+                
+                if ($category) {
+                    $categoryName = $classifiedCategoryName;
+                    $categoryId = $category->id;
+                    Log::info('Klasifikasi Gemini berhasil.', ['category' => $categoryName]);
+                } else {
+                    Log::warning('Kategori hasil Gemini tidak ditemukan di DB. Menggunakan "Lainnya".', ['gemini_result' => $classifiedCategoryName]);
+                }
+            } catch (\Exception $e) {
+                // Jika Gemini Service gagal (network, timeout, API error)
+                Log::error('Gagal melakukan klasifikasi kategori dengan Gemini. Menggunakan kategori "Lainnya".', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
             $ticketNumber = $this->generateUniqueTicketNumber();
             $uuid = Str::uuid();
             
             $unitKerjaId = null;
             $deputyId = null;
+
             // 1. Dapatkan kategori yang dipilih dan identifikasi Parent ID
             $selectedCategory = Category::find($categoryId);
             
@@ -77,7 +101,6 @@ class ReportController extends Controller
             }
 
             // 2. Cari Unit Kerja berdasarkan Target Category ID (Parent atau Child)
-            // Lakukan pencarian unit kerja hanya berdasarkan ID target
             $categoryForDistribution = Category::with('unitKerjas.deputy')->find($targetCategoryId);
 
             if ($categoryForDistribution && $categoryForDistribution->unitKerjas->count() > 0) {
@@ -102,7 +125,7 @@ class ReportController extends Controller
                 'source' => $validatedData['report_details']['source'],
                 'status' => 'Proses verifikasi dan telaah',
                 'response' => 'Laporan pengaduan Saudara dalam proses verifikasi & penelaahan.',
-                'category_id' => $categoryId, // Menggunakan kategori dari Gemini
+                'category_id' => $categoryId, // Menggunakan kategori dari Gemini atau Lainnya
                 'unit_kerja_id' => $unitKerjaId,
                 'deputy_id' => $deputyId,
             ]);
@@ -126,7 +149,7 @@ class ReportController extends Controller
             ]);
 
             ActivityLog::create([
-                'user_id' => Auth::id(), // ID user yang melakukan aksi, null jika dari bot
+                'user_id' => Auth::id(), 
                 'action' => 'create_report',
                 'description' => "Laporan baru dengan nomor tiket {$report->ticket_number} berhasil dibuat.",
                 'loggable_id' => $report->id,
@@ -135,6 +158,7 @@ class ReportController extends Controller
             
             DB::commit();
             
+            // RESPON SUKSES 200 OK
             return response()->json([
                 'status' => 'success',
                 'code' => 200,
@@ -152,6 +176,7 @@ class ReportController extends Controller
                 'request_data' => $request->all(),
             ]);
             
+            // RESPON ERROR 500
             return response()->json([
                 'status' => 'error',
                 'code' => 500,
