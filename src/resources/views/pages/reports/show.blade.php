@@ -271,7 +271,21 @@
         </div>
         <div class="col-lg-4">
             <div class="card card-border mb-3">
-            <div class="card-header"><strong>Info Laporan</strong></div>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>Info Laporan</strong>
+                @php
+                    $source = $report->source ?? 'Lainnya';
+                    $badgeClass = match (strtolower($source)) {
+                        'whatsapp' => 'bg-green-lt',
+                        'tatap muka' => 'bg-blue-lt',
+                        'surat' => 'bg-yellow-lt',
+                        default => 'bg-gray-lt',
+                    };
+                @endphp                
+                <span class="badge {{ $badgeClass }} text-uppercase fw-bolder">
+                    {{ $source }}
+                </span>
+            </div>
             <div class="list-group list-group-flush">
                 <div class="list-group-item">
                 <div class="d-flex justify-content-between align-items-start">
