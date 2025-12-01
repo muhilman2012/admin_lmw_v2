@@ -74,7 +74,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view api settings',
             'create kms article',
         ]);
-        
+
         // Peran 3: Analis (Fokus pada Tugas Sendiri)
         $analyst = Role::firstOrCreate(['name' => 'analyst']);
         $analyst->givePermissionTo([

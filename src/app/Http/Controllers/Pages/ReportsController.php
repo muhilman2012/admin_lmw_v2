@@ -70,7 +70,7 @@ class ReportsController extends Controller
         $reportLogs = $report->activityLogs; 
 
         // 5. Logika tanggal teruskan hanya bisa dilakukan jika melebihi tanggal 17 November 2025
-        $targetDate = Carbon::create(2025, 11, 28, 0, 0, 0, 'Asia/Jakarta');
+        $targetDate = Carbon::create(2025, 11, 10, 0, 0, 0, 'Asia/Jakarta');
         $isRecentEnough = $report->created_at->greaterThanOrEqualTo($targetDate);
         $isAnalysisApproved = ($currentAssignment && $currentAssignment->status === 'approved');
         $isSuperAdmin = $user->hasRole('superadmin');

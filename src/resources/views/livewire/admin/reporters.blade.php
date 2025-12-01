@@ -35,7 +35,7 @@
                         <td>{{ $reporter->phone_number }}</td>
                         <td class="text-truncate" style="max-width: 150px;">{{ $reporter->email }}</td>
                         <td class="text-truncate" style="max-width: 200px;">{{ $reporter->address }}</td>
-                        @can('create reports')
+			@can('create reports')
                         <td>
                             <div class="btn-list flex-nowrap">
                                 <a href="{{ 

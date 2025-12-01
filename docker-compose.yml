@@ -138,8 +138,8 @@ services:
             - '0.0.0.0:${FORWARD_MINIO_PORT:-9000}:9000'
             - '0.0.0.0:${FORWARD_MINIO_CONSOLE_PORT:-8900}:8900'
         environment:
-            MINIO_ROOT_USER: lmw
-            MINIO_ROOT_PASSWORD: password
+            MINIO_ROOT_USER: lmw_v2
+            MINIO_ROOT_PASSWORD: C3Nd00Ld!L4UT
         volumes:
             - 'lmw-minio-data:/data'
         networks:
