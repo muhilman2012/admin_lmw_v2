@@ -20,7 +20,7 @@ use Exception;
 
 class MigrateV1Data extends Command
 {
-    protected $signature = 'migrate:v1 {--start-page=1 : Page number to start migration from} {--limit=500 : Records per page}';
+    protected $signature = 'migrate:v1 {--start-page=1 : Page number to start migration from} {--limit=500 : Records per page} {--only-assignments : Migrate assignments only, assumes reports and users are present}';
     protected $description = 'Migrate data (Reports & Assignments) from V1 API.';
 
     private $categoryCache = [];
@@ -75,23 +75,32 @@ class MigrateV1Data extends Command
         
         $this->loadRelationCaches();
 
-        $nextPageReports = $this->migrateReportsAndReporters($credentials, $startPage);
+        $onlyAssignments = $this->option('only-assignments');
         
-        if ($startPage == 1) {
-            // 🔥 TAHAP PENTING: Load cache ID V2 setelah Reports selesai
-            $this->loadReportTicketCache(); 
-            $this->loadUserEmailCache(); 
+        // 1. Jika TIDAK menggunakan --only-assignments, migrasi Reports
+        if (!$onlyAssignments) {
+            $nextPageReports = $this->migrateReportsAndReporters($credentials, $startPage);
             
+            // Simpan logic paging Reports (jika Anda ingin melanjutkan loop reports)
+            if ($nextPageReports > $startPage) {
+                $this->info("Halaman {$startPage}/[LAST_PAGE] berhasil diproses. Total records: [COUNT]");
+            } else {
+                $this->info("Migrasi Reports selesai.");
+            }
+        } else {
+            $this->warn("Melewati migrasi Reports. Fokus hanya pada Assignments.");
+        }
+        
+        // 2. Load semua cache yang diperlukan untuk Assignments, terlepas dari Tahap 1
+        // (Ini dijalankan terlepas dari 'startPage' karena kita mungkin melewati Reports)
+        $this->loadReportTicketCache(); 
+        $this->loadUserEmailCache(); 
+        
+        // 3. Jalankan Assignments jika Reports sudah dimigrasi atau jika --only-assignments digunakan
+        if ($startPage == 1 || $onlyAssignments) {
             $this->migrateAssignments($credentials);
-            // migrateLogs dihapus dari sini
         }
 
-        if ($nextPageReports > $startPage) {
-            $this->info("Halaman {$startPage}/[LAST_PAGE] berhasil diproses. Total records: [COUNT]");
-        } else {
-            $this->info("Migrasi Reports selesai.");
-        }
-        
         return 0;
     }
     
