@@ -29,7 +29,7 @@
 
                 {{-- 1. Tombol Kirim Analisis --}}
                 @can('fill analysis worksheet')
-                    @if ($isSuperAdmin || ($assignedAnalystId === $user->id && !$isAnalysisApproved))
+                    @if ($isSuperAdmin || ($assignedAnalystId === $user->id))
                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-kirim-analisis">
                             <i class="ti ti-check me-2"></i> Kirim Analisis
                         </button>
