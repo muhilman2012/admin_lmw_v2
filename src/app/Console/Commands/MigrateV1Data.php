@@ -20,7 +20,11 @@ use Exception;
 
 class MigrateV1Data extends Command
 {
-    protected $signature = 'migrate:v1 {--start-page=1 : Page number to start migration from} {--limit=500 : Records per page} {--only-assignments : Migrate assignments only, assumes reports and users are present}';
+    protected $signature = 'migrate:v1 
+                            {--start-page=1 : Page number to start migration from} 
+                            {--limit=500 : Records per page} 
+                            {--only-assignments : Migrate assignments only, assumes reports and users are present}
+                            {--only-worksheet : Migrate analysis worksheet data only}';
     protected $description = 'Migrate data (Reports & Assignments) from V1 API.';
 
     private $categoryCache = [];
@@ -76,9 +80,10 @@ class MigrateV1Data extends Command
         $this->loadRelationCaches();
 
         $onlyAssignments = $this->option('only-assignments');
+        $onlyWorksheet = $this->option('only-worksheet');
         
         // 1. Jika TIDAK menggunakan --only-assignments, migrasi Reports
-        if (!$onlyAssignments) {
+        if (!$onlyAssignments && !$onlyWorksheet) {
             $nextPageReports = $this->migrateReportsAndReporters($credentials, $startPage);
             
             // Simpan logic paging Reports (jika Anda ingin melanjutkan loop reports)
@@ -97,8 +102,8 @@ class MigrateV1Data extends Command
         $this->loadUserEmailCache(); 
         
         // 3. Jalankan Assignments jika Reports sudah dimigrasi atau jika --only-assignments digunakan
-        if ($startPage == 1 || $onlyAssignments) {
-            $this->migrateAssignments($credentials);
+        if ($startPage == 1 || $onlyAssignments || $onlyWorksheet) {
+            $this->migrateAssignments($credentials, $onlyWorksheet);
         }
 
         return 0;
@@ -285,7 +290,7 @@ class MigrateV1Data extends Command
     // =========================================================
     // TAHAP 2: MIGRASI ASSIGNMENTS (Global Run)
     // =========================================================
-    private function migrateAssignments(array $credentials)
+    private function migrateAssignments(array $credentials, bool $onlyWorksheet = false)
     {
         $this->info("Memulai Migrasi Assignment (Relasi) secara keseluruhan...");
         $page = 1;
@@ -306,7 +311,7 @@ class MigrateV1Data extends Command
                 // 1. Lookup ID V2
                 $report_ticket = $assign_v1['nomor_tiket'] ?? null; 
                 
-                // 🔥 Lookup Report ID V2 berdasarkan NOMOR TIKET (Kunci Stabil)
+                // Lookup Report ID V2 berdasarkan NOMOR TIKET (Kunci Stabil)
                 $report_id_v2 = $reportTicketCache[$report_ticket] ?? null;
                 $analis_id_v2 = $userEmailCache[$assign_v1['analis_email']] ?? null;
                 $assigner_id_v2 = $userEmailCache[$assign_v1['assigned_by_email']] ?? null;
@@ -320,10 +325,25 @@ class MigrateV1Data extends Command
                     continue; 
                 }
 
-                $worksheetData = $this->worksheetCache[$assign_v1['laporan_id']] ?? null;
+                $worksheetData = $assign_v1['analyst_worksheet_v1'] ?? null;
 
                 if ($report_id_v2 && $analis_id_v2 && $assigner_id_v2) {
                     
+                    // Kondisi 1: Hanya update worksheet (Mengabaikan fields lain)
+                    if ($onlyWorksheet) {
+                        if ($worksheetData) {
+                            Assignment::where('report_id', $report_id_v2)
+                                ->where('assigned_to_id', $analis_id_v2)
+                                ->update([
+                                    'analyst_worksheet' => $worksheetData,
+                                    'updated_at' => $updatedAt,
+                                ]);
+                            $totalMigrated++;
+                        }
+                        continue;
+                    }
+                    
+                    // Kondisi 2: Update/Create Assignment Penuh (Termasuk Worksheet)
                     Assignment::updateOrCreate(
                         [
                             'report_id' => $report_id_v2,
@@ -335,7 +355,7 @@ class MigrateV1Data extends Command
                             'status' => 'approved',
                             'created_at' => $createdAt, 
                             'updated_at' => $updatedAt,
-                            'analyst_worksheet' => $worksheetData, 
+                            'analyst_worksheet' => $worksheetData,
                         ]
                     );
                     
