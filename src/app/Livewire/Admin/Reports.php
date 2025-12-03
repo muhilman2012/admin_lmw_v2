@@ -668,7 +668,7 @@ class Reports extends Component
 
         if (!$assignmentId) {
             $this->dispatch('swal:toast', message: 'Tugas tidak ditemukan atau ID hilang.', icon: 'error');
-            $this->closeDeleteModal();
+            $this->dispatch('close-confirm-delete-assignment-modal');
             return;
         }
 
@@ -686,16 +686,15 @@ class Reports extends Component
 
             \Illuminate\Support\Facades\DB::commit();
             $this->dispatch('swal:toast', message: 'Disposisi berhasil dibatalkan.', icon: 'success');
-
+            $this->reset(['confirmDeleteAssignmentId', 'confirmDeleteAssignmentTicket', 'confirmDeleteAssignmentAnalyst']);
+            $this->dispatch('close-confirm-delete-assignment-modal');
+            $this->resetPage();
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\DB::rollBack();
             \Illuminate\Support\Facades\Log::error('Delete Assignment Gagal: ' . $e->getMessage(), ['id' => $assignmentId]);
             $this->dispatch('swal:toast', message: 'Gagal membatalkan disposisi karena kesalahan sistem.', icon: 'error');
+            $this->dispatch('close-confirm-delete-assignment-modal');
         }
-        
-        $this->reset(['confirmDeleteAssignmentId', 'confirmDeleteAssignmentTicket', 'confirmDeleteAssignmentAnalyst']);
-        $this->resetPage(); 
-        $this->dispatch('hide-delete-assignment-modal');
     }
 
     public function updatedSelectAll($value)

@@ -805,7 +805,7 @@
                         type="button" 
                         class="btn-close" 
                         aria-label="Close" 
-                        wire:click.prevent="reset(['confirmDeleteAssignmentId', 'confirmDeleteAssignmentTicket'])"
+                        wire:click.prevent="reset(['confirmDeleteAssignmentId', 'confirmDeleteAssignmentTicket', 'confirmDeleteAssignmentAnalyst'])"
                     ></button>
                 </div>
                 <div class="modal-body text-center py-4">
@@ -817,7 +817,7 @@
                     <button 
                         type="button" 
                         class="btn btn-link link-secondary" 
-                        wire:click.prevent="reset(['confirmDeleteAssignmentId', 'confirmDeleteAssignmentTicket'])"
+                        wire:click.prevent="reset(['confirmDeleteAssignmentId', 'confirmDeleteAssignmentTicket', 'confirmDeleteAssignmentAnalyst'])"
                     >Batal</button>
                     
                     <button 
@@ -1136,9 +1136,33 @@
                             }
                         });
 
+                        Livewire.on('show-delete-assignment-modal', () => { 
+                            const dispositionModalElement = document.getElementById('modal-disposition');
+                            const confirmDeleteAssignmentModalElement = document.getElementById('modal-confirm-delete-assignment');
+
+                            hideModalPureJS(dispositionModalElement); 
+                            
+                            showModalPureJS(confirmDeleteAssignmentModalElement);
+                        });
+
+                        Livewire.on('close-confirm-delete-assignment-modal', () => { 
+                            const modalElement = document.getElementById('modal-confirm-delete-assignment');
+                            if (modalElement) {
+                                window.hideModalPureJS(modalElement); 
+                            }
+                        });
+
                         // Listener untuk modal Kategori Massal (TomSelect diinisialisasi saat modal dibuka)
                         if (massCategoryModalElement) {
                             massCategoryModalElement.addEventListener('shown.bs.modal', initializeMassCategoryTomSelect);
+                        }
+
+                        if (dispositionModalElement) {
+                            dispositionModalElement.querySelector('.modal-header .btn-close').addEventListener('click', function(e) {
+                                e.preventDefault();
+                                const component = getReportsComponent();
+                                if (component) component.$wire.call('resetDispositionData');
+                            });
                         }
                         
                         // --- SETUP LISTENER PADA MODAL FILTER ---
