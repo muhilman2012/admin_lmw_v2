@@ -676,6 +676,8 @@ class Reports extends Component
         try {
             $assignment = \App\Models\Assignment::findOrFail($assignmentId);
             $report = \App\Models\Report::findOrFail($assignment->report_id);
+            $analystName = $assignment->assignedTo->name ?? 'Analis (ID: ' . $assignment->assigned_to_id . ')'; // Amankan nama analis
+            $assigner = \Illuminate\Support\Facades\Auth::user();
             
             $assignment->delete(); 
             
@@ -684,11 +686,20 @@ class Reports extends Component
                 $report->update(['status' => 'Proses verifikasi dan telaah']); 
             }
 
+            \App\Models\ActivityLog::create([
+                'user_id' => $assigner->id,
+                'action' => 'DELETE_ASSIGNMENT',
+                'description' => "Tugas analis ({$analystName}) untuk laporan #{$report->ticket_number} dibatalkan. Status laporan direset ke '{$report->status}'.",
+                'loggable_id' => $report->id,
+                'loggable_type' => get_class($report),
+            ]);
+
             \Illuminate\Support\Facades\DB::commit();
             $this->dispatch('swal:toast', message: 'Disposisi berhasil dibatalkan.', icon: 'success');
             $this->reset(['confirmDeleteAssignmentId', 'confirmDeleteAssignmentTicket', 'confirmDeleteAssignmentAnalyst']);
             $this->dispatch('close-confirm-delete-assignment-modal');
             $this->resetPage();
+            
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\DB::rollBack();
             \Illuminate\Support\Facades\Log::error('Delete Assignment Gagal: ' . $e->getMessage(), ['id' => $assignmentId]);
