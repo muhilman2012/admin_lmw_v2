@@ -56,11 +56,9 @@
 
                 {{-- 4. Tombol Edit Laporan --}}
                 @can('edit reports')
-                    @if ($isSuperAdmin || $isNotAnalyst)
-                        <a id="vw-edit-link" href="{{ route('reports.edit', $report->uuid) }}" class="btn btn-outline-primary">
-                            <i class="ti ti-edit me-2"></i>Edit Laporan
-                        </a>
-                    @endif
+                    <a id="vw-edit-link" href="{{ route('reports.edit', $report->uuid) }}" class="btn btn-outline-primary">
+                        <i class="ti ti-edit me-2"></i>Edit Laporan
+                    </a>
                 @endcan
 
                 {{-- 5. Tombol Edit Tanggapan --}}
