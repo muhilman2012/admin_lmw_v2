@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('phone_number')->nullable();
             $table->string('email')->nullable();
-            $table->string('nik', 16)->unique();
+            $table->string('nik', 16);
             $table->string('kk_number', 16)->nullable();
             $table->string('gender')->nullable();
             $table->text('address')->nullable();
