@@ -58,10 +58,14 @@
                     <h5 class="fw-bold mb-2">Dokumen Pengaduan (LMW):</h5>
                     <div class="d-flex flex-column gap-2">
                         @forelse($report->documents as $document)
-                            {{-- Asumsi Anda memiliki helper untuk mendapatkan URL file yang aman --}}
+                            {{-- Menggunakan helper Minio untuk mendapatkan URL file yang aman --}}
                             @php
-                                $fileUrl = asset('storage/' . $document->file_path); // Sesuaikan dengan helper Minio Anda
+                                $key = ltrim($document->file_path, '/');
+                                // Gunakan helper Minio untuk membuat Signed URL
+                                // Asumsi AWS_COMPLAINT_BUCKET adalah bucket yang benar
+                                $fileUrl = signMinioUrlSmart(env('AWS_COMPLAINT_BUCKET'), $key, 10); 
                             @endphp
+                            
                             <a class="btn btn-outline-primary btn-sm justify-content-start" 
                                 target="_blank" href="{{ $fileUrl }}">
                                 <i class="ti ti-file-text me-1"></i> 
