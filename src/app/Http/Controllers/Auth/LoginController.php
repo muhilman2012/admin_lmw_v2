@@ -97,7 +97,7 @@ class LoginController extends Controller
         // 4. Redirect ke halaman login dengan pesan sukses
         return redirect()->route('login')->with('status', [
             'type' => 'success',
-            'message' => "Kata sandi baru sementara Anda telah dibuat: <strong class='text-primary'>{$temporaryPassword}</strong>. Silakan login menggunakan kata sandi ini dan segera ubah di halaman profil."
+            'message' => "Kata sandi baru sementara Anda telah dibuat: <strong class='text-primary'>{$temporaryPassword}</strong> <br>Silakan login menggunakan kata sandi ini dan segera ubah di halaman profil."
         ]);
     }
 }
