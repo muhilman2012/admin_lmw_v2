@@ -25,4 +25,12 @@ class Reporter extends Model
     {
         return $this->belongsTo(Document::class, 'ktp_document_id');
     }
+
+    /**
+     * Define the relationship: A Reporter has many Reports.
+     */
+    public function reports()
+    {
+        return $this->hasMany(Report::class, 'reporter_id'); 
+    }
 }

@@ -36,9 +36,12 @@ class ReportsController extends Controller
 
     public function show($uuid)
     {
-        // 1. Muat laporan, ActivityLog, dan Assignment yang ditujukan ke user saat ini
+        // 1. Muat laporan, ActivityLog, Assignment, dan Laporan Ganda dari Reporter
         $report = Report::with([
-            'reporter', 
+            'reporter.reports' => function($query) use ($uuid) {
+                $query->select('id', 'uuid', 'ticket_number', 'subject', 'reporter_id', 'source', 'created_at')
+                      ->orderBy('created_at', 'desc');
+            },
             'activityLogs' => function($query) {
                 $query->with('user')->orderBy('created_at', 'desc');
             },
@@ -52,25 +55,31 @@ class ReportsController extends Controller
             app(\App\Http\Controllers\Pages\NotificationController::class)->markSpecificAsReadById(request('read'));
         }
         
-        // 2. Ambil assignment yang relevan (hanya ada satu)
+        // 2. Ambil assignment yang relevan
         $currentAssignment = $report->assignments->first();
         
         // 3. Ambil data statis untuk dropdown/modal
         $institutions = Institution::orderBy('name')->get();
-        
-        // untuk modal quick action:
         $statusTemplates = StatusTemplate::all();
-        $documentTemplates = DocumentTemplate::all(); // <-- Data diambil
+        $documentTemplates = DocumentTemplate::all();
         
         $user = Auth::user();
         // Asumsi getGroupedAnalysts() adalah method di Controller ini
         $availableAnalysts = $this->getGroupedAnalysts($user); 
         
-        // 4. Pisahkan logs untuk kemudahan pemanggilan
+        // 4. Pisahkan logs
         $reportLogs = $report->activityLogs; 
 
         // 5. Logika tanggal teruskan hanya bisa dilakukan jika melebihi tanggal 17 November 2025
         $targetDate = Carbon::create(2025, 11, 10, 0, 0, 0, 'Asia/Jakarta');
+
+        // 5. LOGIKA LAPORAN GANDA
+        // Hitungan ini termasuk laporan yang sedang dilihat. Count > 1 menunjukkan duplikasi.
+        $duplicateReportsCount = $report->reporter->reports->count();
+        $relatedReports = $report->reporter->reports;
+
+        // 6. Logika Tombol Teruskan (dibiarkan sama)
+        $targetDate = Carbon::create(2025, 11, 28, 0, 0, 0, 'Asia/Jakarta');
         $isRecentEnough = $report->created_at->greaterThanOrEqualTo($targetDate);
         $isAnalysisApproved = ($currentAssignment && $currentAssignment->status === 'approved');
         $isSuperAdmin = $user->hasRole('superadmin');
@@ -84,7 +93,9 @@ class ReportsController extends Controller
             'statusTemplates', 
             'documentTemplates',
             'availableAnalysts', 
-            'canForward'
+            'canForward',
+            'duplicateReportsCount',
+            'relatedReports'
         ));
     }
 

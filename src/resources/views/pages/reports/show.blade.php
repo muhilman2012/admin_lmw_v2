@@ -91,7 +91,21 @@
             <div class="row">
             <div class="col-lg-6">
                 <div class="card card-border mb-3">
-                <div class="card-header"><strong>Data Pelapor</strong></div>
+                <div class="card-header">
+                    <strong>Data Pelapor</strong>
+                    @if ($duplicateReportsCount > 1)
+                        <button 
+                            type="button" 
+                            class="btn btn-sm bg-danger text-white ms-auto"
+                            data-bs-toggle="modal" 
+                            data-bs-target="#modal-duplicate-reports" 
+                            title="Klik untuk melihat daftar laporan terkait"
+                        >
+                            <i class="ti ti-alert-triangle me-1"></i> 
+                            TERDAPAT {{ $duplicateReportsCount }} LAPORAN GANDA PADA DATA INI
+                        </button>
+                    @endif
+                </div>
                 <div class="list-group list-group-flush">
                     <div class="list-group-item">
                     <div class="d-flex justify-content-between align-items-start">
@@ -728,6 +742,44 @@
                 </div>
             </div>
         </form>
+    </div>
+</div>
+
+<div class="modal fade" id="modal-duplicate-reports" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-md modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger-lt border-bottom-0">
+                <h5 class="modal-title text-danger">⚠️ Laporan Ganda Ditemukan!</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3 text-secondary">Pengadu ini memiliki <strong>{{ $duplicateReportsCount }}</strong> laporan yang terdaftar. Harap tinjau laporan duplikat untuk konsolidasi data:</p>
+                
+                <div class="list-group list-group-flush overflow-auto" style="max-height: 40vh;">
+                    @forelse ($relatedReports as $index => $relatedReport)
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div class="me-auto" style="max-width: 60%;">
+                                <span class="badge bg-secondary-lt me-2">{{ $index + 1 }}</span>
+                                <span class="fw-bold d-block">NOMOR TIKET : {{ $relatedReport->ticket_number }}</span>
+                                <small class="text-muted d-block mt-1">
+                                    SUMBER : {{ $relatedReport->source ?? 'N/A' }} <br>
+                                    <span class="fst-italic">TANGGAL ADUAN : {{ $relatedReport->created_at?->format('d/m/Y') ?? 'Tgl Hilang' }}</span> 
+                                </small>
+                            </div>
+                            
+                            <a href="{{ route('reports.show', $relatedReport->uuid) }}" target="_blank" class="btn btn-sm btn-outline-danger ms-3">
+                                <i class="ti ti-eye"></i> Tinjau
+                            </a>
+                        </div>
+                    @empty
+                        <div class="list-group-item text-muted text-center">Tidak ada laporan terkait yang ditemukan (Data LMW V2 tidak lengkap).</div>
+                    @endforelse
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+            </div>
+        </div>
     </div>
 </div>
 @endsection
