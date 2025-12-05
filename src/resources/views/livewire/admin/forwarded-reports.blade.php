@@ -66,10 +66,18 @@
                                             {{ $forward->laporan->ticket_number ?? '-' }}
                                         </a>
                                     </td>
-                                    <td>{{ $forward->laporan->reporter->name ?? '-' }}</td>
-                                    <td>{{ $forward->institution->name ?? '-' }}</td>
                                     <td>
-                                        <span class="text-wrap" style="max-width: 250px;">
+                                        <span class="text-wrap" style="max-width: 100px;">
+                                            {{ $forward->laporan->reporter->name ?? '-' }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="text-wrap" style="max-width: 100px;">
+                                            {{ $forward->institution->name ?? '-' }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="text-wrap" style="max-width: 100px;">
                                             {{ $forward->disposisi->institution_name ?? 'Belum Ada Disposisi' }} 
                                         </span>
                                     </td>
@@ -87,7 +95,7 @@
                                                 default => 'bg-secondary-lt',
                                             };
                                         @endphp
-                                        <span class="badge {{ $badgeClass }}">
+                                        <span class="badge {{ $badgeClass }} text-wrap" style="max-width: 100px;">
                                             {{ $statusName }}
                                         </span>
                                     </td>
