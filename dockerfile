@@ -60,7 +60,7 @@ COPY ./config/.env /var/www
 RUN ln -s /usr/bin/php84 /usr/bin/php
 RUN composer install --optimize-autoloader --no-dev
 RUN php artisan storage:link
-RUN php artisan migrate --seed
+#RUN php artisan migrate --seed
 
 RUN npm install --legacy-peer-deps
 RUN npm run build
