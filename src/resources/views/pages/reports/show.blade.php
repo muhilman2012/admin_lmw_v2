@@ -63,7 +63,7 @@
 
                 {{-- 5. Tombol Edit Tanggapan --}}
                 @can('update report response')
-                    @if ($isSuperAdmin || $isAnalysisApproved)
+                    @if ($isSuperAdmin || $isAnalysisApproved || $user->hasRole('asdep_karo'))
                         <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modal-quick-action">
                             <i class="ti ti-pencil me-2"></i>Edit Tanggapan
                         </button>
