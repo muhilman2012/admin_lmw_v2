@@ -127,6 +127,7 @@ class Reports extends Component
 
     private function applyUserScope(Builder $query, User $user): Builder
     {
+        // --- LEVEL 1 & 2: SUPERADMIN, ADMIN, ANALIS ---
         if ($user->hasRole('superadmin') || $user->hasRole('admin')) {
             return $query;
         }
@@ -135,33 +136,54 @@ class Reports extends Component
                 $q->where('assigned_to_id', $user->id);
             });
         }
+
+        // --- LEVEL 3 & 4: DEPUTI & ASDEP/KARO ---
+        
+        // Tentukan Unit ID target berdasarkan role
+        $targetUnitIds = collect();
         if ($user->hasRole('deputy') && $user->deputy_id) {
-            $unitIds = UnitKerja::where('deputy_id', $user->deputy_id)->pluck('id');
-            return $query->where(function ($q) use ($unitIds) {
-                $q->whereHas('category', function (Builder $qCategory) use ($unitIds) {
-                    $qCategory->whereHas('parent', function (Builder $qParent) use ($unitIds) {
-                        $qParent->whereHas('unitKerjas', function ($qUnit) use ($unitIds) {
-                            $qUnit->whereIn('unit_kerjas.id', $unitIds);
+            $targetUnitIds = UnitKerja::where('deputy_id', $user->deputy_id)->pluck('id');
+        } elseif ($user->unit_kerja_id) {
+            $targetUnitIds = collect([$user->unit_kerja_id]);
+        }
+
+        if ($targetUnitIds->isNotEmpty()) {
+            
+            return $query->where(function ($q) use ($targetUnitIds, $user) {
+                
+                // KONDISI A: VISIBILITAS BERDASARKAN KATEGORI/DISPOSISI UNIT KERJA
+                $q->where(function ($qCategoryFilter) use ($targetUnitIds) {
+                    
+                    // 1. Laporan yang terdisposisi ke Kategori yang terhubung dengan Unit Kerja (termasuk Sub-Category melalui parent)
+                    $qCategoryFilter->whereHas('category', function (Builder $qCategory) use ($targetUnitIds) {
+                        $qCategory->whereHas('parent', function (Builder $qParent) use ($targetUnitIds) {
+                            $qParent->whereHas('unitKerjas', function ($qUnit) use ($targetUnitIds) {
+                                $qUnit->whereIn('unit_kerjas.id', $targetUnitIds);
+                            });
+                        })
+                        // ATAU Report yang terhubung langsung ke UnitKerja (untuk Main Category lama)
+                        ->orWhereHas('unitKerjas', function ($qUnit) use ($targetUnitIds) {
+                            $qUnit->whereIn('unit_kerjas.id', $targetUnitIds);
                         });
                     });
                 })
-                ->orWhereNull('category_id');
-            });
-        }
-        if ($user->unit_kerja_id) {
-            $unitId = $user->unit_kerja_id;
-            return $query->where(function ($q) use ($unitId) {
-                $q->whereHas('category', function (Builder $qCategory) use ($unitId) {
-                    $qCategory->whereHas('parent', function (Builder $qParent) use ($unitId) {
-                        $qParent->whereHas('unitKerjas', function ($qUnit) use ($unitId) {
-                            $qUnit->where('unit_kerjas.id', $unitId);
-                        });
+
+                // KONDISI B: ATAU LAPORAN YANG SUDAH TERDISPOSISI KE ANALIS DI BAWAH NAUNGAN UNIT INI
+                // Memperbaiki masalah hilangnya laporan setelah di-disposisi.
+                ->orWhereHas('assignments', function (Builder $qAssgn) use ($targetUnitIds) {
+                    // Analis yang ditugaskan harus termasuk dalam Unit Kerja Deputy/Asdep/Karo ini
+                    $qAssgn->whereHas('assignedTo', function (Builder $qUser) use ($targetUnitIds) {
+                        $qUser->whereIn('unit_kerja_id', $targetUnitIds);
                     });
                 })
+                
+                // KONDISI C: ATAU LAPORAN YANG BELUM TERDISPOSISI SAMA SEKALI
                 ->orWhereNull('category_id');
             });
         }
-        return $query->where('id', 0);
+        
+        // --- LEVEL 5: DEFAULT/FALLBACK ---
+        return $query->where('id', 0); // Mengembalikan query kosong jika tidak ada scope yang cocok
     }
 
     public function getReportsProperty()
