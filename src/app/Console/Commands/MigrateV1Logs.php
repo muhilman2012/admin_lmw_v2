@@ -31,7 +31,7 @@ class MigrateV1Logs extends Command
         $baseUrl = $settings->get('base_url');
         $Authorization = $settings->get('authorization'); 
         $limit = (int) $this->option('limit');
-        $startPage = (int) $this->option('start-page');
+        $startPage = (int) $this->option('start-page'); // Ambil nilai startPage
 
         if (!$baseUrl || !$Authorization) {
             $this->error("Kredensial API V1 ('{$apiName}') tidak lengkap. Migrasi dibatalkan.");
@@ -44,11 +44,11 @@ class MigrateV1Logs extends Command
             'limit' => $limit
         ];
         
-        // 🔥 Tahap 1: Persiapan Cache (Wajib)
+        // Tahap 1: Persiapan Cache
         $this->loadReportTicketCache();
         $this->loadUserEmailCache();
         
-        // 🔥 Tahap 2: Eksekusi Migrasi
+        // Tahap 2: Eksekusi Migrasi (Kirim startPage)
         $this->migrateLogs($credentials, $startPage);
         
         $this->info("--- MIGRASI LOG AKTIVITAS SELESAI ---");
@@ -105,17 +105,19 @@ class MigrateV1Logs extends Command
     // =========================================================
     // TAHAP 3: MIGRASI LOGS (Activity Logs)
     // =========================================================
-    private function migrateLogs(array $credentials)
+    private function migrateLogs(array $credentials, int $startPage = 1)
     {
         $this->info("Memulai Migrasi Log Aktivitas secara keseluruhan...");
-        $page = 1;
+        
+        $page = $startPage;
+        
         $totalMigrated = 0;
 
         $reportTicketCache = $this->reportTicketCache; 
         $userEmailCache = $this->userEmailCache;
         
         do {
-            $data = $this->fetchApiData('logs', $page, $credentials); // Memanggil /migration/logs
+            $data = $this->fetchApiData('logs', $page, $credentials);
             $logs_v1 = $data['data'] ?? [];
             $lastPage = $data['last_page'] ?? 0;
 
@@ -136,7 +138,6 @@ class MigrateV1Logs extends Command
                     $action = $this->deduceActionFromActivity($log_v1['action_description_v1']);
                     
                     try {
-                        // 🔥 TIMEZONE FIX: Ambil sebagai waktu mentah V1 (tanpa konversi TZ)
                         $createdAt = Carbon::createFromFormat('Y-m-d H:i:s', $log_v1['created_at']);
                     } catch (Exception $e) {
                         $logIdV1 = $log_v1['log_id_v1'] ?? 'N/A';
@@ -144,23 +145,22 @@ class MigrateV1Logs extends Command
                         continue;
                     }
                     
-                    // 🔥 KRITERIA UNIK (UNTUK UPDATEORCREATE)
+                    // 3. KRITERIA UNIK (UNTUK UPDATEORCREATE)
                     $uniqueCriteria = [
-                        // Kombinasi unik dari log lama
                         'loggable_id' => $report_id_v2,
                         'loggable_type' => Report::class,
                         'action' => $action, 
                         'user_id' => $user_id_v2,
-                        'created_at' => $createdAt, // Waktu V1 sebagai kunci unik
+                        'created_at' => $createdAt, 
                     ];
 
                     // Data yang akan disisipkan/diperbarui
                     $updateData = [
                         'description' => $log_v1['action_description_v1'],
-                        'updated_at' => $createdAt, // Pastikan updated_at sama dengan created_at
+                        'updated_at' => $createdAt, 
                     ];
                     
-                    // 3. Simpan Log Aktivitas V2 dengan menonaktifkan timestamp otomatis
+                    // 4. Simpan Log Aktivitas V2
                     \App\Models\ActivityLog::withoutTimestamps(function () use ($uniqueCriteria, $updateData) {
                         \App\Models\ActivityLog::updateOrCreate($uniqueCriteria, $updateData);
                     });
@@ -178,6 +178,7 @@ class MigrateV1Logs extends Command
             usleep(700000);
             
         } while ($page <= $lastPage);
+        
         $this->info("Migrasi Log Aktivitas selesai. Total: {$totalMigrated}");
     }
 
