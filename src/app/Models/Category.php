@@ -53,4 +53,16 @@ class Category extends Model
     {
         return $query->where('is_active', true);
     }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class, 'category_id'); 
+    }
+
+    public function mainCategory(): HasOne
+    {
+        return $this->hasOne(Category::class, 'id', 'category_id')
+                    ->whereNotNull('parent_id')
+                    ->with('parent');
+    }
 }

@@ -39,20 +39,39 @@ class DashboardController extends Controller
         // --- LEVEL 3: DEPUTI ---
         if ($user->hasRole('deputy') && $user->deputy_id) {
             $unitIds = UnitKerja::where('deputy_id', $user->deputy_id)->pluck('id');
+            return $query->where(function ($q) use ($unitIds) {
+                $q->whereHas('category', function (Builder $qCategory) use ($unitIds) {
+                    $qCategory->whereHas('parent', function (Builder $qParent) use ($unitIds) {
+                        $qParent->whereHas('unitKerjas', function ($qUnit) use ($unitIds) {
+                            $qUnit->whereIn('unit_kerjas.id', $unitIds);
+                        });
+                    })
+                    ->orWhereHas('unitKerjas', function ($qUnit) use ($unitIds) {
+                        $qUnit->whereIn('unit_kerjas.id', $unitIds);
+                    });
 
-            return $query->whereHas('category', function (Builder $q) use ($unitIds) {
-                $q->whereHas('unitKerjas', function ($qUnit) use ($unitIds) {
-                    $qUnit->whereIn('unit_kerjas.id', $unitIds);
-                });
+                })
+                // 🔥 Kondisi 2: ATAU Laporan yang BELUM terdisposisi (category_id NULL)
+                ->orWhereNull('category_id');
             });
         }
         
         // --- LEVEL 4: ASDEP/KARO (Unit Kerja) ---
         if ($user->unit_kerja_id) {
-            return $query->whereHas('category', function (Builder $q) use ($user) {
-                $q->whereHas('unitKerjas', function ($qUnit) use ($user) {
-                    $qUnit->where('unit_kerjas.id', $user->unit_kerja_id);
-                });
+            $unitId = $user->unit_kerja_id;
+            
+            return $query->where(function ($q) use ($unitId) {
+                $q->whereHas('category', function (Builder $qCategory) use ($unitId) {
+                    $qCategory->whereHas('parent', function (Builder $qParent) use ($unitId) {
+                        $qParent->whereHas('unitKerjas', function ($qUnit) use ($unitId) {
+                            $qUnit->where('unit_kerjas.id', $unitId);
+                        });
+                    })
+                    ->orWhereHas('unitKerjas', function ($qUnit) use ($unitId) {
+                        $qUnit->where('unit_kerjas.id', $unitId);
+                    });
+                })
+                ->orWhereNull('category_id');
             });
         }
         
