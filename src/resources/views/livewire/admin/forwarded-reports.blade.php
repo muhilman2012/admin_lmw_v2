@@ -106,12 +106,12 @@
                                                 class="btn btn-sm btn-outline-primary load-detail-link" 
                                             ><i class="ti ti-eye me-2"></i>Detail TL</a>
                                             
-                                            @if ($forward->status === 'gagal_forward')
+                                            {{-- @if ($forward->status === 'gagal_forward')
                                                 <button class="btn btn-sm btn-outline-warning" 
                                                     wire:click="retryForwarding({{ $forward->id }})">
                                                     <i class="ti ti-reload me-1"></i>Ulangi
                                                 </button>
-                                            @endif
+                                            @endif --}}
 
                                             @hasrole('superadmin')
                                                 <button 
