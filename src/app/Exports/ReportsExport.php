@@ -179,7 +179,7 @@ class ReportsExport extends DefaultValueBinder implements
             'Detail Pengaduan',
             'Nama Pelapor',
             'NIK Pelapor',          // <- kolom ini = G
-            'Alamat Pelapor'
+            'Alamat Pelapor',
             'Sumber',
             'Kategori',
             'Unit Distribusi',
