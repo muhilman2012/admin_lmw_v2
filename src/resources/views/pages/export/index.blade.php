@@ -88,7 +88,7 @@
                 {{-- Sumber --}}
                 <div class="col-md-4">
                     <label class="form-label">Sumber Pengaduan</label>
-                    <select class="form-select" name="filterSumber" id="filter-export-sumber">
+                    <select class="form-select" name="filterSource" id="filter-export-sumber"> 
                         <option value="">Semua Sumber</option>
                         @foreach ($sources as $source)
                             <option>{{ $source }}</option>

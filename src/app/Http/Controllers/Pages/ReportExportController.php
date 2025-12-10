@@ -181,13 +181,13 @@ class ReportExportController extends Controller
             }
         }
 
-        if ($sumber = $request->input('filterSumber')) {
+        if ($sumber = $request->input('filterSource')) { 
             $query->where('source', $sumber);
         }
 
         // 6. Filter Status Analisis
         if ($statusAnalisis = $request->input('filterStatusAnalisis')) {
-            $query->where('analysis_status', $statusAnalisis);
+            $query->where('analysis_status', $statusAnalisis); 
         }
 
         // 7. Filter Tanggal
@@ -213,6 +213,7 @@ class ReportExportController extends Controller
         $filters = $request->only([
             'q', 'filterKategori', 'filterStatus', 'filterKlasifikasi',
             'filterDistribusi', 'filterStatusAnalisis', 'filterDateRange',
+            'filterSource',
         ]);
         
         $fileName = 'Laporan_Pengaduan_Export_' . now()->format('Ymd_His') . '_' . \Str::random(10) . '.xlsx';

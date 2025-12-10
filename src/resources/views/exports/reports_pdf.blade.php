@@ -23,6 +23,7 @@
                 <th>Judul Laporan</th>
                 <th>Nama Pelapor</th>
                 <th>NIK</th>
+                <th>Alamat Pelapor</th>
                 <th>Kategori</th>
                 <th>Distribusi</th>
                 <th>Tgl. Dibuat</th>
@@ -37,6 +38,7 @@
                 <td>{{ Str::limit($report->subject, 50) }}</td>
                 <td>{{ $report->reporter->name ?? '-' }}</td>
                 <td>{{ $report->reporter->nik ?? '-' }}</td>
+                <td>{{ $report->reporter->address ?? '-' }}</td>
                 <td>{{ $report->category->name ?? '-' }}</td>
                 <td>{{ $report->unitKerja->name ?? $report->deputy->name ?? '-' }}</td>
                 <td>{{ $report->created_at->format('d/m/Y') }}</td>

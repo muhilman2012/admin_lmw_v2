@@ -116,7 +116,12 @@ class ReportsExport extends DefaultValueBinder implements
             $q->where('classification', $this->filters['filterKlasifikasi']);
         }
 
-        // 5. Filter Distribusi
+        // 5. Filter Sumber Pengaduan
+        if (!empty($this->filters['filterSource'])) {
+            $q->where('source', $this->filters['filterSource']);
+        }
+
+        // 6. Filter Distribusi
         if (!empty($this->filters['filterDistribusi'])) {
             [$type, $id] = array_pad(explode('_', $this->filters['filterDistribusi']), 2, null);
             if ($type === 'deputy') {
@@ -126,12 +131,12 @@ class ReportsExport extends DefaultValueBinder implements
             }
         }
 
-        // 6. Filter Status Analisis
+        // 7. Filter Status Analisis
         if (!empty($this->filters['filterStatusAnalisis'])) {
             $q->where('analysis_status', $this->filters['filterStatusAnalisis']);
         }
 
-        // 7. Filter Tanggal
+        // 8. Filter Tanggal
         if (!empty($this->filters['filterDateRange']) && str_contains($this->filters['filterDateRange'], ' - ')) {
             [$start, $end] = explode(' - ', $this->filters['filterDateRange']);
             $startDate = Carbon::createFromFormat('d/m/Y', $start)->startOfDay();
@@ -140,8 +145,16 @@ class ReportsExport extends DefaultValueBinder implements
         }
 
         // Default Sorting dan Eager Loading
-        $q->with(['reporter', 'category', 'unitKerja', 'deputy'])
-          ->orderBy('created_at', 'desc');
+        $q->with([
+            'reporter', 
+            'category', 
+            'unitKerja', 
+            'deputy',
+            'activityLogs' => function($query) {
+                $query->where('action', 'create_report')->with('user');
+            }
+        ])
+        ->orderBy('created_at', 'desc');
 
         return $q;
     }
@@ -186,6 +199,7 @@ class ReportsExport extends DefaultValueBinder implements
             'Deputi Distribusi',
             'Tanggal Kejadian',
             'Waktu Dibuat',
+            'Petugas Input',
         ];
     }
 
@@ -196,6 +210,9 @@ class ReportsExport extends DefaultValueBinder implements
         $short   = mb_strlen($details) > 100 ? mb_substr($details, 0, 100) . '...' : $details;
 
         $nik = (string) ($report->reporter->nik ?? ''); // pastikan string dari sisi PHP
+
+        $creatorLog = $report->activityLogs->first();
+        $creatorName = $creatorLog->user->name ?? 'Pelapor Sendiri/N/A';
 
         return [
             $report->ticket_number,
@@ -212,6 +229,7 @@ class ReportsExport extends DefaultValueBinder implements
             $report->deputy->name ?? '-',
             optional($report->event_date)->format('d/m/Y') ?? '-',
             $report->created_at->format('d/m/Y H:i:s'),
+            $creatorName,
         ];
     }
 }
