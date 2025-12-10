@@ -179,6 +179,7 @@ class ReportsExport extends DefaultValueBinder implements
             'Detail Pengaduan',
             'Nama Pelapor',
             'NIK Pelapor',          // <- kolom ini = G
+            'Alamat Pelapor'
             'Sumber',
             'Kategori',
             'Unit Distribusi',
@@ -204,6 +205,7 @@ class ReportsExport extends DefaultValueBinder implements
             $short,
             $report->reporter->name ?? 'N/A',
             $nik, // biarkan tanpa apostrof
+            $report->reporter->address ?? 'N/A',
             $report->source,
             $report->category->name ?? 'N/A',
             $report->unitKerja->name ?? '-',
