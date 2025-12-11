@@ -207,7 +207,7 @@ class ReportsExport extends DefaultValueBinder implements
     public function map($report): array
     {
         $details = (string) ($report->details ?? '');
-        $short   = mb_strlen($details) > 100 ? mb_substr($details, 0, 100) . '...' : $details;
+        $short   = mb_strlen($details) > 1000 ? mb_substr($details, 0, 1000) . '...' : $details;
 
         $nik = (string) ($report->reporter->nik ?? ''); // pastikan string dari sisi PHP
 
