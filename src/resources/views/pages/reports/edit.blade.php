@@ -122,6 +122,9 @@
                 <textarea name="details" placeholder="Isi Detail Laporan" rows="6" class="form-control" required>{{ old('details', $report->details ?? '') }}</textarea>
                 <div class="invalid-feedback mb-3">Harap isi Detail Laporan.</div>
             </div>
+
+            <input type="hidden" name="status" value="{{ $report->status ?? 'Proses verifikasi dan telaah' }}" />
+            <textarea name="response" style="display: none;">{{ $report->response ?? '' }}</textarea>
             
             <div class="col-12">
                 <label class="form-label">Lampiran Lama</label>
@@ -158,6 +161,10 @@
             </div>
             
             <div class="card-footer d-flex align-items-center justify-content-between">
+                <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#quick-status-modal">
+                    <i class="ti ti-rotate-2 me-1"></i> Aksi Cepat
+                </button>
+                
                 <div class="d-flex gap-2">
                     <a href="{{ route('reports.show', $report->uuid) }}" class="btn btn-1">Batal</a>
                     <button type="submit" class="btn btn-primary btn-2">Simpan Perubahan</button>
@@ -167,14 +174,68 @@
     </div>
 </form>
 
+{{-- MODAL QUICK ACTION --}}
+<div class="modal fade" id="quick-status-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Ubah Status & Tanggapan Cepat</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Status Laporan</label>
+                    <select class="form-select" id="quick-status-select">
+                        <option value="" disabled>Pilih Status Template...</option> 
+                        @foreach ($statusTemplates as $template)
+                            <option 
+                                value="{{ $template->status_code }}"
+                                data-template="{{ $template->response_template }}"
+                                {{ ($report->status == $template->name) ? 'selected' : '' }} 
+                            >
+                                {{ $template->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                
+                <div class="mb-3" id="additional-docs-section" style="display: none;">
+                    <label class="form-label">Data Pendukung yang Diperlukan</label>
+                    <div>
+                        @foreach ($documentTemplates as $docTemplate)
+                            <label class="form-check">
+                                <input class="form-check-input" type="checkbox" value="{{ $docTemplate->name }}" data-doc-name="{{ $docTemplate->name }}">
+                                <span class="form-check-label">Dokumen {{ $docTemplate->name }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Tanggapan</label>
+                    <textarea id="quick-response-textarea" class="form-control" rows="7"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-primary" id="apply-quick-status-btn">Terapkan</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @push('scripts')
 <script>
-    document.addEventListener("DOMContentLoaded", () => {
-        if (window.Dropzone) {
+    document.addEventListener("DOMContentLoaded", function () {
+        // --- PENTING: Pengecekan Dropzone (Harus di luar scope fungsi) ---
+        const dropzoneElement = document.querySelector("#dropzone-multiple");
+        if (window.Dropzone && dropzoneElement && !dropzoneElement.dropzone) { 
             Dropzone.autoDiscover = false;
-            const myDropzone = new Dropzone("#dropzone-multiple", {
+            
+            // Konfigurasi Dropzone
+            const myDropzone = new Dropzone(dropzoneElement, {
                 url: "{{ route('reports.update', $report->uuid) }}",
                 paramName: "attachments",
                 uploadMultiple: true,
@@ -186,6 +247,8 @@
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                 },
                 dictDefaultMessage: `<div class="dz-message"><h3 class="dropzone-msg-title">Drop file atau klik untuk upload</h3><span class="dropzone-msg-desc">-maks 20MB per file-</span></div>`,
+                
+                // Hook Init Dropzone
                 init: function() {
                     const dropzone = this;
 
@@ -202,6 +265,7 @@
                         // Append Dropzone files
                         if (dropzone.files.length > 0) {
                             dropzone.files.forEach((file, index) => {
+                                // Pastikan nama field sama dengan yang di-handle oleh Controller
                                 formData.append('attachments[' + index + ']', file);
                             });
                         }
@@ -209,9 +273,9 @@
                         // Append the PATCH method
                         formData.append('_method', 'PATCH');
 
-                        // Submit via Fetch API
+                        // Submit via Fetch API (untuk menangani JSON response)
                         fetch(form.action, {
-                            method: 'POST', // Menggunakan POST karena FormData dengan _method='PATCH'
+                            method: 'POST', 
                             body: formData,
                             headers: {
                                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
@@ -219,11 +283,12 @@
                             }
                         }).then(response => {
                              if (response.ok) {
-                                return response.json();
-                            }
-                            return response.json().then(errorData => {
-                                throw errorData;
-                            });
+                                 return response.json();
+                             }
+                             // Tangani error validasi dari server (422)
+                             return response.json().then(errorData => {
+                                 throw errorData;
+                             });
                         }).then(data => {
                             if (data.success && data.uuid) {
                                 Swal.fire({
@@ -239,24 +304,26 @@
                                     window.location.href = "{{ url('admin/reports/') }}" + "/" + data.uuid + "/detail";
                                 }, 1500);
                             }
-                            return data;
+                            // Tambahan: Tambahkan else case untuk kegagalan non-validasi jika perlu
                         }).catch(error => {
                             if (error.errors) {
+                                // Menampilkan error validasi
                                 for (const [key, messages] of Object.entries(error.errors)) {
-                                    const inputElement = document.querySelector(`[name="${key}"]`);
-                                    if (inputElement) {
-                                        inputElement.classList.add('is-invalid');
-                                        const parent = inputElement.closest('div');
-                                        if (parent) {
-                                            let errorDiv = parent.querySelector('.invalid-feedback');
-                                            if (!errorDiv) {
-                                                errorDiv = document.createElement('div');
-                                                errorDiv.classList.add('invalid-feedback');
-                                                parent.appendChild(errorDiv);
-                                            }
-                                            errorDiv.textContent = messages[0];
-                                        }
-                                    }
+                                     const inputElement = document.querySelector(`[name="${key}"]`);
+                                     // ... (Logika penampilan error tetap sama) ...
+                                     if (inputElement) {
+                                         inputElement.classList.add('is-invalid');
+                                         const parent = inputElement.closest('div');
+                                         if (parent) {
+                                             let errorDiv = parent.querySelector('.invalid-feedback');
+                                             if (!errorDiv) {
+                                                 errorDiv = document.createElement('div');
+                                                 errorDiv.classList.add('invalid-feedback');
+                                                 parent.appendChild(errorDiv);
+                                             }
+                                             errorDiv.textContent = messages[0];
+                                         }
+                                     }
                                 }
                                 Swal.fire({
                                     toast: true,
@@ -268,11 +335,12 @@
                                     timerProgressBar: true,
                                 });
                             } else {
+                                // Error handling umum (Misal 500 server error)
                                 Swal.fire({
                                     toast: true,
                                     position: 'top-end',
                                     icon: 'error',
-                                    title: 'Terjadi kesalahan.',
+                                    title: 'Terjadi kesalahan pada server.',
                                     showConfirmButton: false,
                                     timer: 3000,
                                     timerProgressBar: true,
@@ -284,66 +352,28 @@
             });
         }
     });
-</script>
 
-<script>
+    // ==========================================================
+    // LOGIKA QUICK ACTION
+    // ==========================================================
     document.addEventListener("DOMContentLoaded", function () {
-        // Logika Quick Action Modal
+        // --- SELECTOR UTAMA ---
         const quickStatusModal = document.getElementById('quick-status-modal');
         const statusSelect = document.getElementById('quick-status-select');
         const additionalDocsSection = document.getElementById('additional-docs-section');
-        const responseTextarea = document.getElementById('quick-response-textarea');
+        const responseTextarea = document.getElementById('quick-response-textarea'); 
         const applyBtn = document.getElementById('apply-quick-status-btn');
-        const mainStatusInput = document.querySelector('input[name="status"]');
-        const mainResponseTextarea = document.querySelector('textarea[name="response"]');
-
-        function updateQuickResponse() {
-            const selectedStatusOption = statusSelect.options[statusSelect.selectedIndex];
-            const template = selectedStatusOption.dataset.template;
-            
-            if (selectedStatusOption.value === 'additional_data_required') {
-                const selectedDocs = Array.from(document.querySelectorAll('#additional-docs-section input[type="checkbox"]:checked'))
-                                                     .map(checkbox => checkbox.value);
-                let finalResponse = template.replace('[dokumen_yang_dibutuhkan]', selectedDocs.join(', '));
-                responseTextarea.value = finalResponse;
-            } else {
-                responseTextarea.value = template;
-            }
-        }
-        
-        statusSelect.addEventListener('change', function() {
-            if (this.value === 'additional_data_required') {
-                additionalDocsSection.style.display = 'block';
-            } else {
-                additionalDocsSection.style.display = 'none';
-            }
-            updateQuickResponse();
-        });
-
-        document.querySelectorAll('#additional-docs-section input[type="checkbox"]').forEach(checkbox => {
-            checkbox.addEventListener('change', updateQuickResponse);
-        });
-        
-        // --- Logika Buka/Tutup Modal Tanpa Bootstrap JS ---
         const modalTriggerBtn = document.querySelector('[data-bs-toggle="modal"][data-bs-target="#quick-status-modal"]');
-        if (modalTriggerBtn) {
-            modalTriggerBtn.removeAttribute('data-bs-toggle');
-            modalTriggerBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                showModal();
-            });
-        }
+        const modalCloseBtns = quickStatusModal ? quickStatusModal.querySelectorAll('[data-bs-dismiss="modal"]') : [];
         
-        const modalCloseBtns = quickStatusModal.querySelectorAll('[data-bs-dismiss="modal"]');
-        modalCloseBtns.forEach(btn => {
-            btn.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.target.blur();
-                hideModal();
-            });
-        });
+        // SELECTOR FIELD UTAMA DI FORM EDIT
+        const mainStatusInput = document.querySelector('input[name="status"]'); 
+        const mainResponseTextarea = document.querySelector('textarea[name="response"]');
         
+        // --- PURE JS MODAL HANDLER ---
         function showModal() {
+            if (!quickStatusModal) return;
+
             quickStatusModal.classList.add('show');
             quickStatusModal.style.display = 'block';
             quickStatusModal.setAttribute('aria-hidden', 'false');
@@ -356,9 +386,39 @@
                 backdrop.id = 'quick-status-backdrop';
                 document.body.appendChild(backdrop);
             }
+            
+            // 🔥 INISIALISASI MODAL DENGAN NILAI FORM UTAMA SAAT DIBUKA
+            if (mainStatusInput) {
+                const statusName = mainStatusInput.value.trim();
+                const statusOption = Array.from(statusSelect.options).find(opt => opt.textContent.trim() === statusName);
+                if (statusOption) {
+                    statusSelect.value = statusOption.value;
+                    if (statusSelect.tomselect) statusSelect.tomselect.setValue(statusOption.value);
+                }
+            }
+            if (mainResponseTextarea) {
+                responseTextarea.value = mainResponseTextarea.value;
+            }
+
+            // Panggil updateQuickResponse untuk mengatur visibilitas dokumen/template awal
+            // Kita panggil di sini, tapi tanpa menimpa response lama (kecuali jika status baru memerlukannya)
+            updateQuickResponse(false); 
+
+            // TomSelect for Category (Optional - jika TomSelect untuk kategori juga diinisialisasi di sini)
+            const selectOptgroups = document.getElementById("select-optgroups");
+            if (window.TomSelect && selectOptgroups && !selectOptgroups.tomselect) {
+                new TomSelect("#select-optgroups", {
+                    plugins: { dropdown_input: {} },
+                    create: false,
+                    allowEmptyOption: true,
+                    sortField: { field: "text", direction: "asc" },
+                });
+            }
         }
 
         function hideModal() {
+            if (!quickStatusModal) return;
+
             quickStatusModal.classList.remove('show');
             quickStatusModal.style.display = 'none';
             quickStatusModal.setAttribute('aria-hidden', 'true');
@@ -373,46 +433,115 @@
             const allBackdrops = document.querySelectorAll('.modal-backdrop');
             allBackdrops.forEach(backdrop => backdrop.remove());
         }
-        
-        applyBtn.addEventListener('click', function(e) {
-            const selectedStatusOption = statusSelect.options[statusSelect.selectedIndex];
-            const selectedStatusName = selectedStatusOption.textContent.trim();
-            
-            if (mainStatusInput) {
-                mainStatusInput.value = selectedStatusName;
-            }
-            if (mainResponseTextarea) {
-                mainResponseTextarea.value = responseTextarea.value;
-            }
-            
-            e.target.blur();
-            hideModal();
-        });
-        
-        // Trigger inisialisasi awal
-        statusSelect.dispatchEvent(new Event('change'));
-    });
-</script>
 
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        window.Litepicker &&
-        new Litepicker({
-            element: document.getElementById("datepicker-tgl-kejadian"),
-            format: "DD/MM/YYYY",
-            buttonText: {
-                previousMonth: `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"icon icon-1\"><path d=\"M15 6l-6 6l6 6\" /></svg>`,
-                nextMonth: `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"icon icon-1\"><path d=\"M9 6l6 6l-6 6\" /></svg>`,
-            },
+        // FUNGSI UTAMA: Update Response Textarea Modal
+        function updateQuickResponse(isManualChange = false) {
+            const selectedStatusOption = statusSelect.options[statusSelect.selectedIndex];
+            const template = selectedStatusOption ? selectedStatusOption.dataset.template : '';
+            const isAdditionalDataRequired = selectedStatusOption && selectedStatusOption.value === 'additional_data_required';
+            
+            let newResponseContent = template;
+
+            // 1. Tentukan visibilitas Data Pendukung
+            if (isAdditionalDataRequired) {
+                additionalDocsSection.style.display = 'block';
+                const selectedDocs = Array.from(document.querySelectorAll('#additional-docs-section input[type="checkbox"]:checked'))
+                                                     .map(checkbox => checkbox.value);
+                newResponseContent = template.replace('[dokumen_yang_dibutuhkan]', selectedDocs.join(', '));
+            } else {
+                additionalDocsSection.style.display = 'none';
+            }
+            
+            // 2. KONTROL PENIMPAAN (Langsung timpa jika status diubah)
+            if (isManualChange || isAdditionalDataRequired) {
+                 responseTextarea.value = newResponseContent;
+            }
+        }
+
+        // --- ATTACH EVENT LISTENERS ---
+        
+        // Event listener saat status di modal berubah
+        if (statusSelect) {
+            statusSelect.addEventListener('change', function() {
+                updateQuickResponse(true); // Panggil sebagai perubahan manual
+            });
+        }
+
+        // Event listener saat checkbox dokumen berubah
+        document.querySelectorAll('#additional-docs-section input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                updateQuickResponse(false); // Panggil sebagai perubahan checkbox
+            });
         });
         
-        window.TomSelect &&
-        new TomSelect("#select-optgroups", {
-            plugins: { dropdown_input: {} },
-            create: false,
-            allowEmptyOption: true,
-            sortField: { field: "text", direction: "asc" },
+        // Event saat tombol 'Aksi Cepat' diklik
+        if (modalTriggerBtn) {
+            modalTriggerBtn.removeAttribute('data-bs-toggle');
+            modalTriggerBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                showModal();
+            });
+        }
+        
+        // Listener untuk tombol close modal
+        modalCloseBtns.forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.target.blur();
+                hideModal();
+            });
         });
+        
+        // --- LOGIKA TERAPKAN (APPLY) ---
+        if (applyBtn) {
+            applyBtn.addEventListener('click', function(e) {
+                const selectedStatusOption = statusSelect.options[statusSelect.selectedIndex];
+                const selectedStatusName = selectedStatusOption.textContent.trim();
+                
+                // 🔥 Terapkan status ke input tersembunyi
+                if (mainStatusInput) {
+                    mainStatusInput.value = selectedStatusName;
+                }
+                // 🔥 Terapkan response ke textarea tersembunyi
+                if (mainResponseTextarea) {
+                    mainResponseTextarea.value = responseTextarea.value; 
+                }
+                
+                e.target.blur();
+                hideModal();
+            });
+        }
+        
+        // PENTING: Inisialisasi awal nilai field tersembunyi agar terkirim
+        if (mainStatusInput) {
+             const statusValue = '{{ $report->status ?? 'Proses verifikasi dan telaah' }}'; 
+             mainStatusInput.value = statusValue; 
+        }
+        if (mainResponseTextarea) {
+             mainResponseTextarea.value = '{{ $report->response ?? '' }}';
+        }
+
+        // --- Logika TomSelect (Kategori Utama) ---
+        const selectOptgroups = document.getElementById("select-optgroups");
+        if (window.TomSelect && selectOptgroups && !selectOptgroups.tomselect) {
+             new TomSelect("#select-optgroups", {
+                 plugins: { dropdown_input: {} },
+                 create: false,
+                 allowEmptyOption: true,
+                 sortField: { field: "text", direction: "asc" },
+             });
+         }
+         
+         // Logika Litepicker tetap dipertahankan
+         window.Litepicker &&
+         new Litepicker({
+             element: document.getElementById("datepicker-tgl-kejadian"),
+             format: "DD/MM/YYYY",
+             buttonText: {
+                 previousMonth: `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"icon icon-1\"><path d=\"M15 6l-6 6l6 6\" /></svg>`,
+                 nextMonth: `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"icon icon-1\"><path d=\"M9 6l6 6l-6 6\" /></svg>`,
+             },
+         });
     });
 </script>
 @endpush

@@ -7,6 +7,8 @@ use App\Models\Report;
 use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Builder;
+use Carbon\Carbon;
 
 class SearchController extends Controller
 {
@@ -25,7 +27,7 @@ class SearchController extends Controller
      */
     public function index()
     {
-        return view('pages.search.index', ['statuses' => $this->statusOptions]);
+        return view('pages.search.index'); 
     }
 
     /**
@@ -34,29 +36,56 @@ class SearchController extends Controller
     public function runSearch(Request $request)
     {
         $query = $request->input('q');
-        $status = $request->input('status');
-
-        if (empty($query) && empty($status)) {
-            return response()->json(['reports' => []]);
-        }
-
-        $reports = Report::with(['reporter', 'category'])
-            ->where(function ($q) use ($query) {
-                // Pencarian berdasarkan Nomor Tiket, Judul, NIK, atau Nama Pelapor
-                $q->where('ticket_number', 'like', "%{$query}%")
-                  ->orWhere('subject', 'like', "%{$query}%")
-                  ->orWhereHas('reporter', function ($q) use ($query) {
-                      $q->where('name', 'like', "%{$query}%")
-                        ->orWhere('nik', 'like', "%{$query}%");
-                  });
+        $searchColumn = $request->input('search_column', 'global');
+        $dateRange = $request->input('date_range');
+        
+        $reports = Report::query()->with(['reporter', 'category'])
+            ->when($query, function (Builder $q) use ($query, $searchColumn) {
+                // 1. Logika Pencarian Terarah atau Global
+                $searchTerm = '%' . $query . '%';
+                
+                if ($searchColumn === 'ticket_number') {
+                    $q->where('ticket_number', 'like', $searchTerm);
+                } elseif ($searchColumn === 'subject') {
+                    $q->where('subject', 'like', $searchTerm);
+                } elseif ($searchColumn === 'reporter_name') {
+                    $q->whereHas('reporter', function ($r) use ($searchTerm) {
+                        $r->where('name', 'like', $searchTerm);
+                    });
+                } elseif ($searchColumn === 'reporter_nik') {
+                    $q->whereHas('reporter', function ($r) use ($searchTerm) {
+                        $r->where('nik', 'like', $searchTerm);
+                    });
+                } else {
+                    // Pencarian Global (Default)
+                    $q->where(function ($subQuery) use ($searchTerm) {
+                        $subQuery->where('ticket_number', 'like', $searchTerm)
+                                 ->orWhere('subject', 'like', $searchTerm)
+                                 ->orWhereHas('reporter', function ($r) use ($searchTerm) {
+                                     $r->where('name', 'like', $searchTerm)
+                                       ->orWhere('nik', 'like', $searchTerm);
+                                 });
+                    });
+                }
             })
-            ->when($status, function ($q) use ($status) {
-                return $q->where('status', $status);
+            ->when($dateRange, function (Builder $q) use ($dateRange) {
+                // 2. Logika Filter Tanggal Dibuat
+                if (str_contains($dateRange, ' - ')) {
+                    list($start, $end) = explode(' - ', $dateRange);
+                    try {
+                        $startDate = Carbon::createFromFormat('d/m/Y', trim($start))->startOfDay();
+                        $endDate = Carbon::createFromFormat('d/m/Y', trim($end))->endOfDay();
+                        $q->whereBetween('reports.created_at', [$startDate, $endDate]);
+                    } catch (\Exception $e) {
+                        // Log error jika format tanggal salah
+                        \Log::warning('Search date format error: ' . $dateRange);
+                    }
+                }
             })
-            ->limit(50) // Batasi hasil untuk performa
+            ->orderBy('reports.created_at', 'desc')
+            ->limit(50) // Batasi hasil pencarian agar cepat
             ->get();
-
-        // Mengembalikan hasil sebagai JSON
+            
         return response()->json(['reports' => $reports]);
     }
 }

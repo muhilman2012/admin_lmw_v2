@@ -317,6 +317,8 @@ class ReportsController extends Controller
                 'details' => 'required|string',
                 'attachments' => 'nullable|array',
                 'attachments.*' => 'file|mimes:jpg,jpeg,png,pdf,doc,docx|max:20480',
+                'status' => 'nullable|string|max:255', 
+                'response' => 'nullable|string',
             ]);
         } catch (ValidationException $e) {
             Log::warning('Validasi form gagal saat update.', ['errors' => $e->errors()]);
@@ -343,14 +345,18 @@ class ReportsController extends Controller
             $eventDate = isset($validated['event_date']) ? Carbon::createFromFormat('d/m/Y', $validated['event_date'])->format('Y-m-d') : null;
             $oldStatus = $report->status;
 
-            $report->update([
+            $reportDataUpdate = [
                 'subject' => $validated['subject'],
                 'details' => $validated['details'],
-                'location' => $validated['location'],
+                'location' => $validated['location'] ?? null,
                 'event_date' => $eventDate,
                 'source' => $validated['source'],
                 'category_id' => $validated['category_id'],
-            ]);
+                'status' => $request->has('status') ? $validated['status'] : $report->status,
+                'response' => $request->has('response') ? $validated['response'] : $report->response,
+            ];
+            
+            $report->update($reportDataUpdate);
 
             // --- Logika Unggah Dokumen Baru ---
             if ($request->hasFile('attachments')) {
@@ -852,5 +858,36 @@ class ReportsController extends Controller
             Log::error('Gagal Disposisi Cepat: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Gagal memproses disposisi cepat.');
         }
+    }
+
+    public function checkForwardingStatus($uuid)
+    {
+        $report = Report::where('uuid', $uuid)->firstOrFail();
+
+        $forwardedLogs = LaporanForwarding::where('laporan_id', $report->id)
+            ->where('status', 'terkirim') // Filter status yang sukses
+            ->with('institution') // Asumsi relasi ke model Institution ada di LaporanForwarding
+            ->orderBy('sent_at', 'desc')
+            ->get();
+
+        if ($forwardedLogs->isEmpty()) {
+            return response()->json(['status' => 'new', 'message' => 'Laporan belum pernah diteruskan.']);
+        }
+
+        // Ambil log forwarding terakhir
+        $lastLog = $forwardedLogs->first(); 
+        $institutionName = $lastLog->institution->name ?? 'Instansi Tidak Diketahui';
+
+        return response()->json([
+            'status' => 'duplicate',
+            'institution_name' => $institutionName,
+            'sent_at' => optional($lastLog->sent_at)->format('d/m/Y H:i') ?? 'N/A',
+            'logs' => $forwardedLogs->map(function ($log) {
+                return [
+                    'institution' => $log->institution->name ?? 'N/A',
+                    'sent_at' => optional($log->sent_at)->format('d/m/Y H:i'),
+                ];
+            })
+        ]);
     }
 }

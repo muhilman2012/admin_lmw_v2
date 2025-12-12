@@ -48,7 +48,7 @@
                 {{-- 3. Tombol Teruskan --}}
                 @can('forward reports to lapor')
                     @if ($canForward) 
-                        <button class="btn btn-info" data-bs-toggle="modal" data-bs-target="#modal-teruskan-lapor">
+                        <button id="btn-check-forward" class="btn btn-info" data-uuid="{{ $report->uuid }}">
                             <i class="ti ti-share me-2"></i>Teruskan
                         </button>
                     @endif
@@ -917,6 +917,9 @@
         const additionalDocsSection = document.getElementById('additional-docs-section');
         const responseTextarea = document.getElementById('quick-response-textarea');
 
+        const initialResponseValue = responseTextarea.value.trim();
+        let isInitialLoad = true;
+
         if (statusSelect) {
             
             // Fungsi untuk memperbarui textarea Tanggapan berdasarkan template
@@ -926,9 +929,24 @@
                 // Tambahkan pengamanan untuk opsi disabled
                 if (!selectedStatusOption || selectedStatusOption.disabled) return;
                 
-                // 🔥 Ambil status code dari data attribute (untuk logic)
+                // Ambil status code dari data attribute (untuk logic)
                 const statusCode = selectedStatusOption.dataset.statusCode; 
                 const template = selectedStatusOption.dataset.template;
+                
+                // LOGIC KRITIS: JIKA INI ADALAH LOAD AWAL DAN RESPONSE SUDAH ADA, JANGAN TIMPA.
+                if (isInitialLoad && initialResponseValue !== '') {
+                    // Jangan lakukan apa-apa pada responseTextarea.value
+                    // Hanya atur visibilitas checklist dokumen jika perlu
+                    if (statusCode === 'additional_data_required') {
+                        additionalDocsSection.style.display = 'block';
+                    } else {
+                        additionalDocsSection.style.display = 'none';
+                    }
+                    
+                    // Set flag menjadi false setelah pemeriksaan awal selesai
+                    isInitialLoad = false;
+                    return;
+                }
                 
                 // Logic untuk menampilkan/menyembunyikan checklist dokumen
                 if (statusCode === 'additional_data_required') { 
@@ -1047,22 +1065,25 @@
 </script>
 <script>
     document.addEventListener("DOMContentLoaded", function () {
+        const btnCheckForward = document.getElementById('btn-check-forward'); 
         const forwardModal = document.getElementById('modal-teruskan-lapor');
         const forwardForm = document.getElementById('forward-form');
         
         // --- Fungsi Pure JS untuk Menyembunyikan Modal & Menghapus Backdrop ---
         const hideForwardModal = () => {
+
             if (!forwardModal) return;
 
-            // 1. Sembunyikan modal secara visual (menghapus kelas Bootstrap)
+            // 1. Sembunyikan modal secara visual
             forwardModal.classList.remove('show');
             forwardModal.style.display = 'none';
             forwardModal.setAttribute('aria-hidden', 'true');
-            
+            forwardModal.removeAttribute('aria-modal'); // Tambahkan ini untuk konsistensi
+
             // 2. Bersihkan body class dan overflow
             document.body.classList.remove('modal-open');
             document.body.style.overflow = ''; 
-
+            
             // 3. Hapus elemen backdrop
             const modalBackdrop = document.querySelector('.modal-backdrop');
             if (modalBackdrop) {
@@ -1070,10 +1091,34 @@
             }
         };
 
+        // 🔥 FUNGSI BARU: Pure JS untuk Menampilkan Modal dan Membuat Backdrop
+        const showForwardModal = () => {
+
+            if (!forwardModal) return;
+
+            // 1. Tampilkan modal secara visual
+            forwardModal.classList.add('show');
+            forwardModal.style.display = 'block';
+            forwardModal.setAttribute('aria-modal', 'true');
+            forwardModal.removeAttribute('aria-hidden');
+
+            // 2. Tambahkan class dan overflow ke body
+            document.body.classList.add('modal-open');
+            document.body.style.overflow = 'hidden'; 
+
+            // 3. Tambahkan elemen backdrop (diperlukan untuk tampilan Bootstrap)
+            const modalBackdrop = document.createElement('div');
+            modalBackdrop.className = 'modal-backdrop fade show';
+            document.body.appendChild(modalBackdrop);
+            
+            // PENTING: Panggil initializeTomSelect setelah modal tampil
+            initializeTomSelect();
+        };
+        
         // --- Fungsi untuk Menginisialisasi TomSelect ---
         const initializeTomSelect = () => {
             const selectElement = document.getElementById('select-institution');
-
+            // ... (Logic TomSelect tetap sama) ...
             if (window.TomSelect && selectElement) {
                 if (selectElement.tomselect) {
                     selectElement.tomselect.destroy();
@@ -1088,27 +1133,89 @@
             }
         };
 
-        // --- Logika Loader dan Form Submit Utama ---
+        // --- Logika Pengecekan Status Forwarding ---
+        if (btnCheckForward) {
+            const reportUuid = btnCheckForward.dataset.uuid;
+            const checkUrlTemplate = "{{ route('reports.forward-status', ['uuid' => ':uuid']) }}";
+
+            // Pasang event listener pada tombol pemicu baru
+            btnCheckForward.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                if (!reportUuid) {
+                    Swal.fire('Error', 'UUID Laporan tidak ditemukan.', 'error');
+                    return;
+                }
+
+                window.appLoader.show('Memeriksa riwayat penerusan laporan...'); 
+                const checkUrl = checkUrlTemplate.replace(':uuid', reportUuid);
+
+                fetch(checkUrl)
+                    .then(response => response.json())
+                    .then(data => {
+                        window.appLoader.hide();
+
+                        if (data.status === 'new') {
+                            // Langsung buka modal
+                            showForwardModal(); 
+                            forwardForm.reset(); 
+                            return;
+                        }
+
+                        if (data.status === 'duplicate') {
+                            // Tampilkan konfirmasi
+                            const logsHtml = data.logs.map(log => 
+                                `<li>${log.institution} (${log.sent_at})</li>`
+                            ).join('');
+
+                            Swal.fire({
+                                title: 'Laporan Sudah Pernah Diteruskan!',
+                                html: `Laporan ini <strong>sudah berhasil</strong> diteruskan sebelumnya.
+                                        <br><br>
+                                        <strong>Riwayat Penerusan Terakhir:</strong>
+                                        <ul style="text-align: left; margin: 10px auto; max-width: 80%;">${logsHtml}</ul>
+                                        Apakah Anda yakin ingin <strong>meneruskan ulang</strong> laporan ini?`,
+                                icon: 'warning',
+                                showCancelButton: true,
+                                confirmButtonText: 'Ya, Teruskan Ulang!',
+                                cancelButtonText: 'Batal',
+                                reverseButtons: true
+                            }).then((result) => {
+                                if (result.isConfirmed) {
+                                    showForwardModal();
+                                    forwardForm.reset(); 
+                                }
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        window.appLoader.hide();
+                        Swal.fire('Error', 'Gagal memuat status penerusan.', 'error');
+                        console.error('Forward check error:', error);
+                    });
+            });
+        }
+
+
+        // --- Logika Loader dan Form Submit Utama (Handle Submit) ---
         if (forwardModal && forwardForm) {
-            // 1. Inisialisasi TomSelect saat modal dibuka
+            
+            // 1. Inisialisasi TomSelect saat modal dibuka (Ini adalah event Bootstrap, jadi pastikan Bootstrap modal event fires)
             forwardModal.addEventListener('shown.bs.modal', function () {
                 initializeTomSelect();
             });
-
+            
             // 2. Handle Submit Form
             forwardForm.addEventListener('submit', function (e) {
-                // a. PENTING: Mencegah aksi default form (redirect langsung)
                 e.preventDefault();
 
-                // b. Sembunyikan modal secara manual
+                // Sembunyikan modal secara manual 
                 hideForwardModal();
 
-                // c. Tampilkan Loader
-                // Pastikan window.appLoader sudah dimuat dari loader-util.js
+                // Tampilkan Loader
                 window.appLoader.show('Meneruskan laporan ke Instansi tujuan melalui LAPOR!. Mohon tunggu...');
                 
-                // d. Kirim form secara paksa setelah jeda singkat (50ms)
-                // Jeda ini memberi waktu browser untuk menampilkan overlay loading sebelum redirect.
+                // Kirim form secara paksa
                 setTimeout(() => {
                     forwardForm.submit(); 
                 }, 50); 

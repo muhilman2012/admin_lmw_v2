@@ -953,9 +953,33 @@
                     labels: { style: { colors: '#666' } }
                 },
                 tooltip: {
-                    x: { format: 'dd/MM/YYYY' },
-                    y: {
-                        formatter: (val) => `${val} laporan`
+                    enabled: true,
+                    shared: true, // Wajib untuk stacked chart
+                    intersect: false, // Wajib untuk stacked chart
+                    custom: function ({ series, seriesIndex, dataPointIndex, w }) {
+                        
+                        // 1. Akses Nilai dari SEMUA series pada dataPointIndex
+                        const waCount = w.globals.series[0][dataPointIndex] || 0;
+                        const tatapMukaCount = w.globals.series[1][dataPointIndex] || 0;
+                        const suratCount = w.globals.series[2][dataPointIndex] || 0;
+                        const totalHarian = waCount + tatapMukaCount + suratCount;
+                        
+                        const date = w.globals.categoryLabels[dataPointIndex];
+
+                        // 2. Format Output HTML
+                        return `
+                            <div class="apexcharts-tooltip-box" style="padding: 10px; background: #333; color: white; border-radius: 5px;">
+                                <div class="fw-bold">${date}</div>
+                                <hr style="margin: 5px 0; border-top: 1px solid rgba(255,255,255,0.3);">
+                                <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">
+                                    <li><span style="display:inline-block; width: 10px; height: 10px; background: #16a34a; border-radius: 50%; margin-right: 5px;"></span>Whatsapp: ${waCount} Laporan</li>
+                                    <li><span style="display:inline-block; width: 10px; height: 10px; background: #3b82f6; border-radius: 50%; margin-right: 5px;"></span>Tatap Muka: ${tatapMukaCount} Laporan</li>
+                                    <li><span style="display:inline-block; width: 10px; height: 10px; background: #facc15; border-radius: 50%; margin-right: 5px;"></span>Surat Fisik: ${suratCount} Laporan</li>
+                                </ul>
+                                <hr style="margin: 5px 0; border-top: 1px solid rgba(255,255,255,0.3);">
+                                <strong>Total Hari ini: ${totalHarian} Laporan</strong>
+                            </div>
+                        `;
                     }
                 }
             };

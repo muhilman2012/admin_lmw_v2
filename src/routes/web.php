@@ -88,6 +88,7 @@ Route::middleware(['auth', CheckPasswordReset::class])->prefix('admin')->group(f
         Route::patch('/{uuid}/update-response', [ReportsController::class, 'updateResponse'])->name('update-response');
         Route::post('/{uuid}/approve', [ReportsController::class, 'approveAnalysis'])->name('approve');
         Route::post('/{uuid}/forward', [ReportsController::class, 'forwardToLapor'])->name('forward');
+        Route::get('/{uuid}/forward-status', [ReportsController::class, 'checkForwardingStatus'])->name('forward-status');
         Route::get('/{uuid}/download/user', [ReceiptPdfController::class, 'downloadReceiptUser'])->name('download.user');
         Route::get('/{uuid}/download/government', [ReceiptPdfController::class, 'downloadReceiptGovernment'])->name('download.government');
     });
@@ -124,7 +125,6 @@ Route::middleware(['auth', CheckPasswordReset::class])->prefix('admin')->group(f
     Route::prefix('settings')->name('settings.')->group(function () {
         
         // 1. ROUTE UTAMA (settings.index)
-        // 🔥 PERBAIKAN: Mengarahkan /settings ke method index() yang sudah digabungkan
         Route::get('/', [SettingsController::class, 'index'])->name('index'); 
 
         // 2. KATEGORI (CREATE, STORE, DELETE, TOGGLE)
@@ -143,7 +143,7 @@ Route::middleware(['auth', CheckPasswordReset::class])->prefix('admin')->group(f
         Route::post('/retry-lapor', [SettingsController::class, 'retryLaporForwarding'])->name('retry.lapor'); // Catatan: Route ini sudah diubah ke POST di Controller
         Route::get('/gemini-status', [SettingsController::class, 'getGeminiStatus'])->name('gemini.status');
 
-        // 5. 🔥 TEMPLATES (CRUD)
+        // 5. TEMPLATES (CRUD)
         Route::post('/templates/status', [SettingsController::class, 'storeStatusTemplate'])->name('templates.status.store');
         Route::post('/templates/document', [SettingsController::class, 'storeDocumentTemplate'])->name('templates.document.store');
         Route::delete('/templates/destroy/{id}', [SettingsController::class, 'destroyTemplate'])->name('templates.destroy');
