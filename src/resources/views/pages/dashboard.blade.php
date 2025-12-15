@@ -290,7 +290,6 @@
                                     </div>
                                     
                                     {{-- 2. Tatap Muka --}}
-                                    {{-- Menggunakan col-4 --}}
                                     <div class="col-4 text-center">
                                         <div class="subheader">Tatap Muka</div>
                                         <div class="d-flex flex-column align-items-center">
@@ -299,14 +298,25 @@
                                     </div>
                                     
                                     {{-- 3. Surat --}}
-                                    {{-- Menggunakan col-4 --}}
                                     <div class="col-4 text-center">
                                         <div class="subheader">Surat</div>
                                         <div class="d-flex flex-column align-items-center">
                                             <div class="h3 text-secondary">{{ number_format($deputy['counts']['surat fisik'] ?? 0, 0, ',', '.') }}</div>
                                         </div>
                                     </div>
-                                    
+                                </div>
+                                @php
+                                    $total = ($deputy['counts']['whatsapp'] ?? 0) + 
+                                            ($deputy['counts']['tatap muka'] ?? 0) + 
+                                            ($deputy['counts']['surat fisik'] ?? 0);
+                                @endphp
+
+                                <div class="row pt-3 mt-3 border-top"> 
+                                    <div class="col-12 text-center">
+                                        <div class="subheader">Total Semua Sumber</div>
+                                        {{-- Menggunakan text-primary/text-success untuk menonjolkan Total --}}
+                                        <div class="h2 text-success">{{ number_format($total, 0, ',', '.') }}</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -925,14 +935,58 @@
             currentMapInstance = null;
         }
         
-        // --- 1. CHART UTAMA (DAILY TREND) ---
         const renderDailyTrendChart = () => {
             const mainChartElement = document.getElementById('chart-data-laporan');
-            if (!mainChartElement || !dailyChartData.series || dailyChartData.series.length === 0) {
+            
+            // Pastikan data dan elemen tersedia
+            if (typeof dailyChartData === 'undefined' || !mainChartElement || !dailyChartData.series || dailyChartData.series.length === 0) {
                 return;
             }
 
-            mainChartElement.innerHTML = ''
+            mainChartElement.innerHTML = '';
+            
+            const totalDataSeries = dailyChartData.series.length;
+
+            // 1. Buat data untuk Series Label Individual (Whatsapp, Tatap Muka, Surat)
+            const individualSeries = dailyChartData.series.map((series) => {
+                return {
+                    ...series,
+                    dataLabels: {
+                        enabled: true,
+                        formatter: function(val) {
+                            return val > 0 ? val : ''; // Tampilkan nilai individual saja
+                        },
+                        style: {
+                            fontSize: '11px',
+                            colors: ['#000'],
+                        },
+                        // Offset POSITIF: Menempatkan label INDIVIDUAL di tengah area tumpukan
+                        offsetY: 20, 
+                        background: {
+                            enabled: true,
+                            borderRadius: 2,
+                            padding: 4,
+                            opacity: 0.9,
+                            borderWidth: 0,
+                            foreColor: '#fff'
+                        },
+                    }
+                };
+            });
+
+            // 2. Buat Series Tambahan KHUSUS untuk Label Total di Puncak
+            // Kita buat series duplikat dari series teratas (Surat)
+            // Series ini akan memiliki dataLabels yang berbeda dan offsetY negatif
+            const topSeriesIndex = totalDataSeries - 1;
+            const topSeriesData = dailyChartData.series[topSeriesIndex].data.map((val, dataPointIndex) => {
+                // Series ini harus memiliki data yang sama agar Total Harian dihitung dengan benar
+                return val;
+            });
+
+            // Gunakan series asli, tetapi tambahkan label total sebagai series tambahan 
+            // DENGAN dataLabels.enabled = true, yang akan ditumpuk.
+            // *CATATAN: Ini adalah teknik ApexCharts yang riskan tapi sering berhasil.*
+
             const chartOptions = {
                 chart: {
                     type: 'area',
@@ -940,42 +994,57 @@
                     stacked: true,
                     toolbar: { show: false },
                 },
+                
+                // Nonaktifkan dataLabels GLOBAL (diganti oleh konfigurasi series individual)
                 dataLabels: { 
+                    enabled: false, 
+                },
+                
+                stroke: {
+                    width: 2,
+                    curve: 'smooth'
+                },
+
+                // Gabungkan semua series: Series Individual + Series Khusus Total di Puncak
+                series: individualSeries, 
+                
+                // Kita hanya akan menggunakan dataLabels global untuk satu tujuan:
+                // Memastikan label Total muncul di atas series teratas.
+                // Kita perlu menyertakan konfigurasi dataLabels.
+                dataLabels: {
                     enabled: true,
-                    // Pastikan label ini hanya muncul di series teratas (Surat Fisik)
                     formatter: function (val, { seriesIndex, dataPointIndex, w }) {
-                         // Ambil nilai total akumulasi (total tumpukan) pada hari ini
-                         const totalHarian = w.globals.stackedSeriesTotals[dataPointIndex];
-                         
-                         // Hanya tampilkan label total pada series teratas (misalnya, Series 2: Surat Fisik)
-                         // Ini mencegah label berulang 3 kali
-                         if (seriesIndex === w.globals.series.length - 1) { 
-                             return totalHarian;
-                         } else {
-                             return ''; 
-                         }
+                        // Hanya gunakan formatter ini untuk series yang paling atas.
+                        if (seriesIndex === topSeriesIndex) {
+                            const totalHarian = w.globals.stackedSeriesTotals[dataPointIndex];
+                            if (totalHarian > 0) {
+                                return totalHarian; // Tampilkan Total Harian
+                            }
+                        }
+                        return '';
                     },
+                    
                     style: {
                         fontSize: '12px',
-                        colors: ['#000'] // Warna kontras untuk label total
+                        colors: ['#000'],
                     },
-                    offsetY: -10, // Posisikan sedikit di atas tumpukan
-                    dropShadow: {
-                         enabled: true,
-                         top: 1,
-                         left: 1,
-                         blur: 1,
-                         opacity: 0.5
-                    }
+                    // Offset NEGATIF: Menarik label Total Harian ke ATAS UJUNG CHART
+                    offsetY: -10, 
+                    
+                    background: {
+                        enabled: true,
+                        borderRadius: 2,
+                        padding: 4,
+                        opacity: 0.9,
+                        borderWidth: 0,
+                        foreColor: '#fff'
+                    },
                 },
-                stroke: {
-                     width: 2,
-                     curve: 'smooth'
-                },
-                series: dailyChartData.series,
+
+
                 fill: { opacity: 0.8, type: 'solid' },
                 xaxis: {
-                    type: 'category',
+                    type: 'category', 
                     categories: dailyChartData.labels,
                     labels: { style: { colors: '#666' } }
                 },
@@ -983,26 +1052,19 @@
                     title: { text: 'Jumlah Laporan' },
                     labels: { style: { colors: '#666' } }
                 },
+                
+                // Tooltip Custom (Tidak perlu diubah)
                 tooltip: {
                     enabled: true,
                     shared: true,
-                    intersect: false, // Penting untuk stacked area chart
-                    
-                    // 🔥 SOLUSI: Menggunakan fungsi 'custom' untuk mengontrol seluruh tampilan
+                    intersect: false, 
                     custom: function ({ series, seriesIndex, dataPointIndex, w }) {
-                        
-                        // Mengambil tanggal yang sedang di-hover dari kategori/xaxis
                         const date = w.globals.categoryLabels[dataPointIndex];
-                        
-                        // Mengambil nilai dari setiap series pada titik data yang di-hover
-                        // Diasumsikan urutan series selalu: 0=Whatsapp, 1=Tatap Muka, 2=Surat Fisik
                         const waCount = w.globals.series[0][dataPointIndex] || 0;
                         const tatapMukaCount = w.globals.series[1][dataPointIndex] || 0;
                         const suratCount = w.globals.series[2][dataPointIndex] || 0;
-                        
                         const totalHarian = waCount + tatapMukaCount + suratCount;
-
-                        // Membangun HTML sesuai format yang Anda inginkan (satu kali)
+                        
                         return `
                             <div class="apexcharts-tooltip-box" style="padding: 10px; background: #333; color: white; border-radius: 5px;">
                                 <div class="fw-bold">${date}</div>
