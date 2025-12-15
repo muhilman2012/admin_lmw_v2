@@ -273,7 +273,7 @@
                         <div class="card h-100">
                             <div class="card-body d-flex flex-column">
                                 {{-- Nama Deputi (Fleksibel, bisa membungkus) --}}
-                                <div class="h5 fw-bolder">{{ $deputy['name'] }}</div>
+                                <div class="h5 fw-bolder text-center mb-3">{{ $deputy['name'] }}</div>
                                 
                                 {{-- BARIS ANGKA: Menggunakan GRID TETAP col-4 (4+4+4=12) --}}
                                 {{-- Hapus 'justify-content-between' dan 'gr-2' --}}
@@ -373,7 +373,7 @@
                     {{-- 1. SEBARAN LAPORAN (PETA) untuk ADMIN/SUPERADMIN --}}
                     <div class="card h-100">
                         <div class="card-body">
-                            <h4 class="card-title h4">Sebaran Laporan Berdasarkan Provinsi</h4>
+                            <h4 class="h4">Sebaran Laporan Berdasarkan Provinsi</h4>
                             <div class="ratio ratio-21x9">
                                 <div>
                                     <div id="map-indonesia" class="w-100 h-100"></div> 
