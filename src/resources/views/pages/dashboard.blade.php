@@ -940,11 +940,42 @@
                     stacked: true,
                     toolbar: { show: false },
                 },
-                dataLabels: { enabled: false },
-                stroke: { width: 2 },
+                dataLabels: { 
+                    enabled: true,
+                    // Pastikan label ini hanya muncul di series teratas (Surat Fisik)
+                    formatter: function (val, { seriesIndex, dataPointIndex, w }) {
+                         // Ambil nilai total akumulasi (total tumpukan) pada hari ini
+                         const totalHarian = w.globals.stackedSeriesTotals[dataPointIndex];
+                         
+                         // Hanya tampilkan label total pada series teratas (misalnya, Series 2: Surat Fisik)
+                         // Ini mencegah label berulang 3 kali
+                         if (seriesIndex === w.globals.series.length - 1) { 
+                             return totalHarian;
+                         } else {
+                             return ''; 
+                         }
+                    },
+                    style: {
+                        fontSize: '12px',
+                        colors: ['#000'] // Warna kontras untuk label total
+                    },
+                    offsetY: -10, // Posisikan sedikit di atas tumpukan
+                    dropShadow: {
+                         enabled: true,
+                         top: 1,
+                         left: 1,
+                         blur: 1,
+                         opacity: 0.5
+                    }
+                },
+                stroke: {
+                     width: 2,
+                     curve: 'smooth'
+                },
                 series: dailyChartData.series,
                 fill: { opacity: 0.8, type: 'solid' },
                 xaxis: {
+                    type: 'category',
                     categories: dailyChartData.labels,
                     labels: { style: { colors: '#666' } }
                 },
@@ -954,27 +985,32 @@
                 },
                 tooltip: {
                     enabled: true,
-                    shared: true, // Wajib untuk stacked chart
-                    intersect: false, // Wajib untuk stacked chart
+                    shared: true,
+                    intersect: false, // Penting untuk stacked area chart
+                    
+                    // 🔥 SOLUSI: Menggunakan fungsi 'custom' untuk mengontrol seluruh tampilan
                     custom: function ({ series, seriesIndex, dataPointIndex, w }) {
                         
-                        // 1. Akses Nilai dari SEMUA series pada dataPointIndex
+                        // Mengambil tanggal yang sedang di-hover dari kategori/xaxis
+                        const date = w.globals.categoryLabels[dataPointIndex];
+                        
+                        // Mengambil nilai dari setiap series pada titik data yang di-hover
+                        // Diasumsikan urutan series selalu: 0=Whatsapp, 1=Tatap Muka, 2=Surat Fisik
                         const waCount = w.globals.series[0][dataPointIndex] || 0;
                         const tatapMukaCount = w.globals.series[1][dataPointIndex] || 0;
                         const suratCount = w.globals.series[2][dataPointIndex] || 0;
-                        const totalHarian = waCount + tatapMukaCount + suratCount;
                         
-                        const date = w.globals.categoryLabels[dataPointIndex];
+                        const totalHarian = waCount + tatapMukaCount + suratCount;
 
-                        // 2. Format Output HTML
+                        // Membangun HTML sesuai format yang Anda inginkan (satu kali)
                         return `
                             <div class="apexcharts-tooltip-box" style="padding: 10px; background: #333; color: white; border-radius: 5px;">
                                 <div class="fw-bold">${date}</div>
                                 <hr style="margin: 5px 0; border-top: 1px solid rgba(255,255,255,0.3);">
                                 <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">
-                                    <li><span style="display:inline-block; width: 10px; height: 10px; background: #16a34a; border-radius: 50%; margin-right: 5px;"></span>Whatsapp: ${waCount} Laporan</li>
-                                    <li><span style="display:inline-block; width: 10px; height: 10px; background: #3b82f6; border-radius: 50%; margin-right: 5px;"></span>Tatap Muka: ${tatapMukaCount} Laporan</li>
-                                    <li><span style="display:inline-block; width: 10px; height: 10px; background: #facc15; border-radius: 50%; margin-right: 5px;"></span>Surat Fisik: ${suratCount} Laporan</li>
+                                    <li>Whatsapp: ${waCount} Laporan</li>
+                                    <li>Tatap Muka: ${tatapMukaCount} Laporan</li>
+                                    <li>Surat: ${suratCount} Laporan</li>
                                 </ul>
                                 <hr style="margin: 5px 0; border-top: 1px solid rgba(255,255,255,0.3);">
                                 <strong>Total Hari ini: ${totalHarian} Laporan</strong>

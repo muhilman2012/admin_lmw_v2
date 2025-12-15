@@ -551,19 +551,34 @@ class DashboardController extends Controller
         $seriesData = [];
         $dataMap = [];
         
+        // 1. Map data dari query ke array multidimensi
         foreach ($trendData as $item) {
             $dateKey = Carbon::parse($item->date)->format('Y-m-d');
             $dataMap[$dateKey][$item->source] = (int)$item->count;
         }
 
+        // 2. Tentukan Tanggal yang Akan Digunakan (Hanya Hari Kerja)
+        $workingDates = [];
+        $currentDate = $range['startDate']->copy();
+        
+        while ($currentDate->lte($range['endDate'])) {
+            // 🔥 KRITIS: Cek apakah hari adalah Sabtu (6) atau Minggu (7)
+            $dayOfWeek = $currentDate->dayOfWeek; // 0=Minggu, 6=Sabtu (Laravel Carbon default)
+            
+            if ($dayOfWeek !== 0 && $dayOfWeek !== 6) { 
+                $workingDates[] = $currentDate->copy();
+            }
+            $currentDate->addDay();
+        }
+        
+        // 3. Isi Data Series berdasarkan Hari Kerja yang telah difilter
         foreach ($sources as $source) {
             $data = [];
-            $currentDate = $range['startDate']->copy();
             
-            while ($currentDate->lte($range['endDate'])) {
-                $dateKey = $currentDate->format('Y-m-d');
+            foreach ($workingDates as $dateObject) {
+                $dateKey = $dateObject->format('Y-m-d');
+                // Ambil data, jika tidak ada (Sabtu/Minggu sudah dihilangkan), default ke 0
                 $data[] = $dataMap[$dateKey][$source] ?? 0;
-                $currentDate->addDay();
             }
             
             $seriesData[] = [
@@ -573,11 +588,10 @@ class DashboardController extends Controller
             ];
         }
 
+        // 4. Buat Label Tanggal (Hanya Hari Kerja)
         $chartDates = [];
-        $currentDate = $range['startDate']->copy();
-        while ($currentDate->lte($range['endDate'])) {
-            $chartDates[] = $currentDate->format('d/M'); 
-            $currentDate->addDay();
+        foreach ($workingDates as $dateObject) {
+            $chartDates[] = $dateObject->format('d/M'); 
         }
 
         return [
