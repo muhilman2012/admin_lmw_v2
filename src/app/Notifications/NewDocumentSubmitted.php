@@ -43,6 +43,9 @@ class NewDocumentSubmitted extends Notification
     {
         $message = "Pelapor telah mengirimkan dokumen tambahan ({$this->document->description}) untuk Tiket #{$this->report->ticket_number}. Status laporan diubah ke 'Proses verifikasi dan telaah'.";
         
+        $baseUrl = rtrim(config('app.url'), '/');
+        $reportUrl = $baseUrl . '/admin/reports/' . $this->report->uuid;
+
         return [
             'type' => 'document_submitted',
             'title' => 'Dokumen Tambahan Diunggah Pelapor',
@@ -50,7 +53,7 @@ class NewDocumentSubmitted extends Notification
             'report_id' => $this->report->id,
             'report_uuid' => $this->report->uuid,
             'document_id' => $this->document->id,
-            'url' => route('reports.show', $this->report->uuid), 
+            'url' => $reportUrl,
             'icon' => 'ti ti-file-plus', 
         ];
     }
