@@ -44,7 +44,7 @@ class NewDocumentSubmitted extends Notification
         $message = "Pelapor telah mengirimkan dokumen tambahan ({$this->document->description}) untuk Tiket #{$this->report->ticket_number}. Status laporan diubah ke 'Proses verifikasi dan telaah'.";
         
         $baseUrl = rtrim(config('app.url'), '/');
-        $reportUrl = $baseUrl . '/admin/reports/' . $this->report->uuid . '/detail';
+        $reportUrl = "{$baseUrl}/admin/reports/{$this->report->uuid}/detail";
 
         return [
             'type' => 'document_submitted',
