@@ -18,18 +18,17 @@ class MigrateV1DocumentsQontak extends Command
 {
     /**
      * Nama dan signature command.
-     * Contoh: php artisan migrate:v1-documents-qontak --page=1 --limit=50
      */
     protected $signature = 'migrate:v1-documents-qontak 
                             {--page=1 : Halaman awal API V1} 
                             {--limit=100 : Record per halaman}';
 
-    protected $description = 'Download dokumen dari CDN Qontak V1, simpan ke MinIO, dan catat ke tabel documents V2.';
+    protected $description = 'Download dokumen dari CDN Qontak V1, simpan ke MinIO, dan catat ke tabel documents V2 (Tanpa kolom file_name).';
 
     private $qontakPrefix = 'https://cdn.qontak.com/uploads';
-    private $targetDisk = 'complaints'; // Disk MinIO Anda
+    private $targetDisk = 'complaints'; 
 
-    // Mapping kolom V1 ke Deskripsi Dokumen V2
+    // Pemetaan kolom V1 ke judul deskripsi di V2
     private $docMapping = [
         'dokumen_ktp'       => 'Dokumen KTP',
         'dokumen_kk'        => 'Dokumen KK',
@@ -91,9 +90,11 @@ class MigrateV1DocumentsQontak extends Command
         return 0;
     }
 
+    /**
+     * Memproses setiap laporan dari V1 untuk mencari dokumen.
+     */
     private function processReport($dataV1)
     {
-        // 1. Cari Report di V2 berdasarkan tiket
         $reportV2 = Report::where('ticket_number', $dataV1['nomor_tiket'])->first();
 
         if (!$reportV2) {
@@ -101,31 +102,37 @@ class MigrateV1DocumentsQontak extends Command
             return;
         }
 
-        foreach ($this->docMapping as $v1Col => $description) {
+        foreach ($this->docMapping as $v1Col => $descTitle) {
             $url = $dataV1[$v1Col] ?? null;
 
-            // Validasi: Harus string dan dari Qontak
             if ($url && is_string($url) && str_starts_with($url, $this->qontakPrefix)) {
-                $this->downloadAndSave($url, $reportV2, $description, $v1Col);
+                $this->downloadAndSave($url, $reportV2, $descTitle, $v1Col);
             }
         }
     }
 
-    private function downloadAndSave($url, $report, $description, $v1Col)
+    /**
+     * Mengunduh file dan menyimpannya ke MinIO serta database.
+     */
+    private function downloadAndSave($url, $report, $descTitle, $v1Col)
     {
         try {
-            // 1. Cek apakah dokumen ini sudah pernah dicatat (berdasarkan file_name asli dari URL)
             $originalFileName = basename(parse_url($url, PHP_URL_PATH));
+            
+            // Menggabungkan judul deskripsi dan nama file asli untuk identifikasi unik
+            $fullDescription = "{$descTitle} - {$originalFileName}";
+            
+            // Cek apakah dokumen ini sudah pernah diproses
             $exists = Document::where('report_id', $report->id)
-                              ->where('file_name', $originalFileName)
+                              ->where('description', $fullDescription)
                               ->exists();
 
             if ($exists) {
-                $this->line("     > {$description} sudah ada. Skip.");
+                $this->line("     > {$descTitle} sudah ada. Skip.");
                 return;
             }
 
-            // 2. Download File
+            // Eksekusi pengunduhan file
             $response = Http::timeout(30)->get($url);
             if ($response->failed()) {
                 $this->error("     ! Gagal download: {$url}");
@@ -135,23 +142,23 @@ class MigrateV1DocumentsQontak extends Command
             $content = $response->body();
             $extension = pathinfo($originalFileName, PATHINFO_EXTENSION) ?: 'pdf';
             
-            // 3. Simpan ke MinIO (Gunakan UUID agar aman)
+            // Gunakan UUID untuk nama file fisik di MinIO agar unik
             $hashedName = Str::uuid() . '.' . $extension;
             $targetPath = "documents/{$hashedName}";
 
+            // Simpan ke MinIO
             Storage::disk($this->targetDisk)->put($targetPath, $content);
 
-            // 4. Catat ke Tabel Documents
             DB::beginTransaction();
             
+            // Catat data dokumen ke database V2
             $document = Document::create([
                 'report_id'   => $report->id,
                 'file_path'   => $targetPath,
-                'file_name'   => $originalFileName,
-                'description' => $description,
+                'description' => $fullDescription,
             ]);
 
-            // 5. Jika KTP, tautkan ke tabel Reporters
+            // Jika dokumen adalah KTP, hubungkan ke tabel Reporters
             if ($v1Col === 'dokumen_ktp') {
                 $reporter = Reporter::find($report->reporter_id);
                 if ($reporter && !$reporter->ktp_document_id) {
@@ -161,7 +168,7 @@ class MigrateV1DocumentsQontak extends Command
             }
 
             DB::commit();
-            $this->info("     + Berhasil: {$description} ({$originalFileName})");
+            $this->info("     + Berhasil: {$descTitle} ({$originalFileName})");
 
         } catch (Exception $e) {
             DB::rollBack();
