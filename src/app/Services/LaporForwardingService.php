@@ -247,6 +247,8 @@ class LaporForwardingService
         
         try {
             $response = Http::withHeaders($authHeaders)
+                            ->connectTimeout(30)
+                            ->timeout(90)
                             ->post($this->getApiSetting('base_url') . '/complaints/complaint-lmw', $data);
 
             $responseData = $response->json();
