@@ -93,111 +93,88 @@
                     <span class="badge bg-blue-lt text-blue">Disposisi: {{ $laporData['disposition_name'] ?? 'N/A' }}</span>
                 </div>
 
+                @if(!empty($laporData['status_logs']))
+                    @php $latestNote = collect($laporData['status_logs'])->first(); @endphp
+                    @if(!empty($latestNote['note']))
+                        <div class="card mb-4 border-start border-4 border-warning bg-warning-lt">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h5 class="mb-0 text-warning fw-bold">
+                                        <i class="ti ti-message-dots me-1"></i> Catatan/Alasan Status
+                                    </h5>
+                                </div>
+                                <p class="text-dark mb-1">{{ $latestNote['note'] }}</p>
+                                <small class="text-muted italic">Waktu update: {{ $latestNote['timestamp'] }}</small>
+                            </div>
+                        </div>
+                    @endif
+                @endif
+                
                 <!-- ===== Riwayat Tindak Lanjut (Log) ===== -->
                 <section id="riwayat-tindak-lanjut" class="mt-4">
                     <div class="d-flex align-items-center mb-2">
                         <h5 class="me-auto mb-0">Riwayat Pergerakan Laporan</h5>
                     </div>
+
                     @forelse ($renderedActivities as $log) 
-                    <div class="card mb-2 border-start border-4 border-info">
-                        <div class="card-body position-relative">
-                            <div class="d-flex align-items-start">
-                                <div class="me-auto">
-                                    
-                                    @php
-                                        $institutionFromName = $log['institution_from_name'] ?? 'Lapor Mas Wapres';
-                                        $institutionToName = $log['institution_to_name'] ?? 'Lapor Mas Wapres';
-                                        $attachments = $log['attachments'] ?? [];
-                                        // Ambil konten yang akan disalin
-                                        $contentToCopy = strip_tags($log['rendered_content'] ?? '');
-                                    @endphp
-
-                                    {{-- 1. HEADER: INSTITUTION FROM -> TO --}}
-                                    <div class="fw-bold mb-1">
-                                        {{ $institutionFromName }} 
-                                        <span class="text-secondary">→</span> 
-                                        {{ $institutionToName }}
+                    <div class="card mb-3 border-start border-4 {{ !empty($log['attachments']) ? 'border-primary' : 'border-info' }}">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <div class="fw-bold text-dark">
+                                        {{ $log['institution_from_name'] ?? 'Lapor Mas Wapres' }} 
+                                        <span class="text-secondary mx-1">→</span> 
+                                        {{ $log['institution_to_name'] ?? 'Lapor Mas Wapres' }}
                                     </div>
-                                    
-                                    {{-- 2. CONTENT / DESKRIPSI UTAMA (Menggunakan data yang sudah dirender) --}}
-                                    <div class="text-secondary small mt-1">
-                                        {!! $log['rendered_content'] !!} 
-                                    </div>
-
-                                    {{-- DISPLAY ATTACHMENTS (Bagian ini tidak diubah) --}}
-                                    @if (!empty($attachments))
-                                    <div class="mt-3 border-top pt-2">
-                                        <span class="fw-bold small text-dark d-block mb-1">Lampiran:</span>
-                                        <div class="d-flex flex-wrap gap-2">
-                                            @foreach ($attachments as $attachment)
-                                                @php
-                                                    $fileUrl = $attachment['path'] ?? '#'; 
-                                                    $fileName = $attachment['file_name'] ?? 'Dokumen';
-                                                    $fileExtension = $attachment['extension'] ?? 'file';
-                                                    
-                                                    // Tentukan ikon berdasarkan ekstensi
-                                                    $icon = 'ti-file';
-                                                    if (in_array($fileExtension, ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'png'])) {
-                                                        if ($fileExtension === 'pdf') $icon = 'ti-file-type-pdf';
-                                                        elseif (in_array($fileExtension, ['doc', 'docx'])) $icon = 'ti-file-type-word';
-                                                        elseif (in_array($fileExtension, ['xls', 'xlsx'])) $icon = 'ti-file-type-excel';
-                                                        else $icon = 'ti-file';
-                                                    }
-                                                @endphp
-                                                @if ($fileUrl && $fileUrl !== '#')
-                                                    <a href="{{ $fileUrl }}" 
-                                                    target="_blank" 
-                                                    class="badge bg-light text-dark d-flex align-items-center gap-1 border border-secondary-subtle text-decoration-none" 
-                                                    title="{{ $fileName }}">
-                                                        <i class="ti {{ $icon }} ti-xs me-1"></i>
-                                                        <span class="text-truncate" style="max-width: 150px;">{{ $fileName }}</span>
-                                                        <i class="ti ti-download ti-xs ms-1"></i>
-                                                    </a>
-                                                @endif
-                                            @endforeach
-                                        </div>
-                                    </div>
-                                    @endif
-                                    
-                                    {{-- 3. LOGIC STATUS CHANGE --}}
-                                    @if (!empty($log['status_new']))
-                                        <div class="mt-1 small">
-                                            Status berubah: 
-                                            <span class="badge" style="background-color: {{ $log['status_old']['color'] ?? '#666' }}; color: white;">
-                                                {{ $log['status_old']['name'] ?? 'Awal' }}
-                                            </span> 
-                                            → 
-                                            <span class="badge" style="background-color: {{ $log['status_new']['color'] ?? 'green' }}; color: white;">
-                                                {{ $log['status_new']['name'] ?? 'Terbaru' }}
-                                            </span>
-                                        </div>
-                                    @endif
-                                    
-                                    {{-- TOMBOL Gunakan sebagai Tanggapan (di sisi kiri bawah konten) --}}
-                                    @if (!empty($contentToCopy))
-                                        <div class="mt-3">
-                                            <button 
-                                                type="button" 
-                                                class="btn btn-sm btn-ghost-primary p-0 copy-lapor-content position-absolute bottom-0 end-0 me-3 mb-2" 
-                                                title="Gunakan sebagai Tanggapan"
-                                                data-bs-toggle="modal" 
-                                                data-bs-target="#modal-quick-action" 
-                                                data-content="{{ $contentToCopy }}"
-                                                style="font-size: 0.75rem;">
-                                                <i class="ti ti-text-plus me-1 ti-sm"></i>
-                                                Gunakan sebagai Tanggapan
-                                            </button>
-                                        </div>
-                                    @endif
+                                    <small class="text-muted">
+                                        <i class="ti ti-clock me-1"></i>{{ $log['display_date'] }}
+                                    </small>
                                 </div>
-                                <div class="text-secondary small ms-3 text-nowrap">
-                                    <span title="Waktu Log">{{ $log['created_at'] }}</span>
+                                <span class="badge bg-light text-muted border">Log #{{ $log['id'] ?? $loop->iteration }}</span>
+                            </div>
+
+                            <div class="text-dark mb-3">
+                                {!! $log['rendered_content'] !!}
+                            </div>
+
+                            {{-- Display Lampiran --}}
+                            @if (!empty($log['attachments']))
+                                <div class="mt-2 p-2 bg-light rounded border border-dashed mb-3">
+                                    <div class="fw-bold small mb-2 text-uppercase" style="font-size: 0.65rem;">Lampiran:</div>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        @foreach ($log['attachments'] as $key => $file)
+                                            @if ($key === 'docs' || !isset($file['path'])) @continue @endif
+                                            
+                                            <a href="{{ $file['path'] }}" target="_blank" class="btn btn-sm btn-white shadow-sm border-secondary-subtle">
+                                                <i class="ti {{ ($file['extension'] ?? '') == 'pdf' ? 'ti-file-type-pdf text-danger' : 'ti-file text-primary' }} me-1"></i>
+                                                <span class="text-truncate" style="max-width: 180px;">{{ $file['file_name'] }}</span>
+                                            </a>
+                                        @endforeach
+                                    </div>
                                 </div>
+                            @endif
+                            
+                            {{-- TOMBOL DI SEBELAH KANAN --}}
+                            <div class="d-flex justify-content-end mt-2">
+                                @php
+                                    $contentToCopy = strip_tags($log['rendered_content'] ?? '');
+                                @endphp
+                                @if (!empty($contentToCopy))
+                                    <button type="button" 
+                                        class="btn btn-sm btn-outline-primary copy-lapor-content" 
+                                        data-content="{{ $contentToCopy }}"
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#modal-quick-action">
+                                        <i class="ti ti-copy me-1"></i> Gunakan sebagai Tanggapan
+                                    </button>
+                                @endif
                             </div>
                         </div>
                     </div>
                     @empty
-                    <div class="alert alert-info">Tidak ada riwayat tindak lanjut dari LAPOR! yang tersedia.</div>
+                        <div class="alert alert-info border-0 shadow-sm">
+                            <i class="ti ti-info-circle me-2"></i> Belum ada riwayat aktivitas untuk laporan ini.
+                        </div>
                     @endforelse
                 </section>
                 <!-- Form Kirim Tanggapan Balasan -->

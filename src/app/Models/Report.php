@@ -75,6 +75,11 @@ class Report extends Model
         return $this->hasMany(Assignment::class, 'report_id');
     }
 
+    public function forwarding()
+    {
+        return $this->hasOne(LaporanForwarding::class, 'laporan_id', 'id')->latestOfMany();
+    }
+
     public function getParentCategoryNameAttribute()
     {
         // Cek jika category yang dipilih memiliki parent (berarti dia adalah sub-kategori)

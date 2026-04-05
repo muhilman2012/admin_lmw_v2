@@ -448,17 +448,29 @@ class LaporForwardingService
     {
         $url = $this->getApiSetting('base_url') . "/complaints/followup/add";
 
-        // Data-data yang tidak berupa file
+        // --- LOGIKA DINAMIS BERDASARKAN TABEL laporan_forwardings ---
+        // Cari data di tabel laporan_forwardings berdasarkan complaint_id (ID LAPOR)
+        // Gunakan DB facade atau Model jika sudah ada
+        $forwarding = \Illuminate\Support\Facades\DB::table('laporan_forwardings')
+            ->where('complaint_id', $complaintId)
+            ->first();
+
+        // Ambil institution_id dari tabel laporan_forwardings
+        // Jika tidak ditemukan, fallback ke ID LMW (151345)
+        $targetInstitutionId = ($forwarding && $forwarding->institution_id) 
+                                ? $forwarding->institution_id 
+                                : 151345;
+
         $defaultPayload = [
-            'user_id' => 52676,
-            'institution_from_id' => 151345, 
-            'institution_to_id' => 151345, 
-            'complaint_id' => $complaintId,
-            'info_disposition' => null, 
-            'template_code' => $data['template_code'] ?? 'reply_lmw',
-            'rating' => $data['rating'] ?? 0,
-            'is_secret' => isset($data['is_secret']) && $data['is_secret'] === '1' ? 1 : 0,
-            'content' => $data['content'], // Konten balasan
+            'user_id'             => 52676,
+            'institution_from_id' => 151345, // Dari LMW
+            'institution_to_id'   => $targetInstitutionId, // Dinamis dr laporan_forwardings
+            'complaint_id'        => $complaintId,
+            'info_disposition'    => null,
+            'template_code'       => $data['template_code'] ?? 'reply_lmw',
+            'rating'              => $data['rating'] ?? 0,
+            'is_secret'           => isset($data['is_secret']) && $data['is_secret'] === '1' ? 1 : 0,
+            'content'             => $data['content'],
         ];
         
         $authHeaders = $this->getAuthHeaders();

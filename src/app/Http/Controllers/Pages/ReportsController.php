@@ -48,6 +48,9 @@ class ReportsController extends Controller
             'assignments' => function($query) {
                 $query->with(['assignedBy', 'assignedTo']) 
                     ->orderBy('created_at', 'desc');
+            },
+            'forwarding' => function($query) {
+                $query->orderBy('created_at', 'desc');
             }
         ])->where('uuid', $uuid)->firstOrFail();
 
@@ -57,6 +60,7 @@ class ReportsController extends Controller
         
         // 2. Ambil assignment yang relevan
         $currentAssignment = $report->assignments->first();
+        $latestForwarding = $report->forwarding->first();
         
         // 3. Ambil data statis untuk dropdown/modal
         $institutions = Institution::orderBy('name')->get();
@@ -95,7 +99,8 @@ class ReportsController extends Controller
             'availableAnalysts', 
             'canForward',
             'duplicateReportsCount',
-            'relatedReports'
+            'relatedReports',
+            'latestForwarding'
         ));
     }
 
@@ -670,7 +675,7 @@ class ReportsController extends Controller
                     ActivityLog::create([
                         'user_id' => auth()->id(),
                         'action' => 'forward_to_lapor',
-                        'description' => 'Laporan berhasil diteruskan ke instansi (' . $institutionName . ') melalui LAPOR!',
+                        'description' => 'Laporan berhasil diteruskan ke instansi (' . $institutionName . ') melalui LAPOR! dengan ID Tracking : (' . $complaintId . ')',
                         'loggable_id' => $report->id,
                         'loggable_type' => Report::class,
                     ]);

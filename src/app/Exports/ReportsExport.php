@@ -144,7 +144,6 @@ class ReportsExport extends DefaultValueBinder implements
             $q->whereBetween('created_at', [$startDate, $endDate]);
         }
 
-        // Default Sorting dan Eager Loading
         $q->with([
             'reporter', 
             'category', 
@@ -161,10 +160,8 @@ class ReportsExport extends DefaultValueBinder implements
 
     public function bindValue(Cell $cell, $value)
     {
-        // Kolom G = "NIK Pelapor"
         $isNikColumn = ($cell->getColumn() === 'G');
 
-        // (Tambahan pengaman) semua angka sangat panjang juga dipaksa string
         $looksLikeLongNumber = is_numeric($value) && strlen((string)$value) >= 13;
 
         if ($isNikColumn || $looksLikeLongNumber) {
@@ -186,12 +183,13 @@ class ReportsExport extends DefaultValueBinder implements
     {
         return [
             'No. Tiket',
-            'Status',
+            'Status Pengaduan',
+            'Tanggapan Pengaduan',
             'Klasifikasi',
             'Judul Laporan',
             'Detail Pengaduan',
             'Nama Pelapor',
-            'NIK Pelapor',          // <- kolom ini = G
+            'NIK Pelapor',
             'Alamat Pelapor',
             'No HP Pelapor',
             'Sumber',
@@ -204,13 +202,12 @@ class ReportsExport extends DefaultValueBinder implements
         ];
     }
 
-    /** map(): kembalikan NIK biasa (tanpa apostrophe) */
     public function map($report): array
     {
         $details = (string) ($report->details ?? '');
         $short   = mb_strlen($details) > 1000 ? mb_substr($details, 0, 1000) . '...' : $details;
 
-        $nik = (string) ($report->reporter->nik ?? ''); // pastikan string dari sisi PHP
+        $nik = (string) ($report->reporter->nik ?? '');
 
         $creatorLog = $report->activityLogs->first();
         $creatorName = $creatorLog->user->name ?? 'Pelapor Sendiri/N/A';
@@ -218,11 +215,12 @@ class ReportsExport extends DefaultValueBinder implements
         return [
             $report->ticket_number,
             $report->status,
+            $report->response,
             $report->classification ?? 'Belum Diklasifikasi',
             $report->subject,
             $short,
             $report->reporter->name ?? 'N/A',
-            $nik, // biarkan tanpa apostrof
+            $nik,
             $report->reporter->address ?? 'N/A',
             $report->reporter->phone_number ?? 'N/A',
             $report->source,

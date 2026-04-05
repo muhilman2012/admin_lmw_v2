@@ -34,7 +34,7 @@
                             <tr>
                                 <th class="w-1">#</th>
                                 <th class="w-1">
-                                    No. Tiket
+                                    No. Tiket LMW / Lapor
                                 </th>
                                 <th>
                                     <button class="table-sort d-flex justify-content-between" wire:click="sortBy('laporan_id')">
@@ -63,7 +63,7 @@
                                     <td>{{ $forwardings->firstItem() + $index }}</td>
                                     <td>
                                         <a href="{{ route('reports.show', $forward->laporan->uuid) }}" class="text-blue">
-                                            {{ $forward->laporan->ticket_number ?? '-' }}
+                                            {{ $forward->laporan->ticket_number ?? '-' }} / {{ $forward->laporan->lapor_complaint_id ?? '-' }}
                                         </a>
                                     </td>
                                     <td>

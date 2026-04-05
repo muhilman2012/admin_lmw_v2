@@ -28,80 +28,74 @@ class ForwardingController extends Controller
     {
         $report = Report::with('reporter', 'documents')->where('uuid', $uuid)->firstOrFail();
         
-        $laporId = $report->lapor_complaint_id ?? $complaintId; 
+        $detailResp = $this->laporService->getLaporDetail($report->lapor_complaint_id ?? $complaintId);
+        $followUpResp = $this->laporService->getFollowUpLogs($report->lapor_complaint_id ?? $complaintId);
 
-        $detailResponse = $this->laporService->getLaporDetail($laporId); 
-        $logResponse = $this->laporService->getFollowUpLogs($laporId);
-
-        if (!$detailResponse['success']) {
-            return redirect()->back()->with('error', 'Gagal mengambil detail status dari LAPOR!: ' . $detailResponse['error']);
+        if (!$detailResp['success']) {
+            return redirect()->back()->with('error', 'Gagal mengambil data dari API.');
         }
-        if (!$logResponse['success']) {
-            return redirect()->back()->with('error', 'Gagal mengambil riwayat tindak lanjut dari LAPOR!: ' . $logResponse['error']);
-        }
-        
-        $laporData = $detailResponse['results']['data'] ?? [];
-        $logActivities = $logResponse['logs'] ?? []; 
-        
-        $renderedActivities = collect($logActivities)->map(function ($log) {
-            if (isset($log['created_at'])) {
-                try {
-                    $dateTimeString = $log['created_at'];
-                    $format = 'd-m-Y H:i:s';
-                    
-                    $carbonObject = Carbon::createFromFormat($format, $dateTimeString);
-                    
-                    $log['created_at'] = $carbonObject->format($format); 
-                    
-                } catch (\Exception $e) {
-                    Log::warning("Failed to parse created_at for log: " . $log['created_at']);
-                }
-            }
 
-            $sourceField = !empty($log['template_content']) ? 'template_content' : 'content';
+        $laporData = $detailResp['results']['data'] ?? [];
+        $internalLogs = $detailResp['results']['data_logs'] ?? [];
+        $externalLogs = $followUpResp['success'] ? $followUpResp['logs'] : [];
+
+        $allLogs = collect($internalLogs)->merge($externalLogs)->sortBy(function ($log) {
+            return $log['date'] ?? $log['created_at'] ?? '';
+        });
+
+        $renderedActivities = $allLogs->map(function ($log) {
+            // Normalisasi field waktu
+            $log['display_date'] = $log['date'] ?? $log['created_at'] ?? '-';
             
-            // Panggil method render dari service instance
-            $log['rendered_content'] = $this->laporService->renderLogContent($log, $sourceField);
-            
-            // Tambahkan data status yang terurai (jika ada di data field)
-            if (!empty($log['data']) && ($data = json_decode($log['data'], true))) {
-                // Asumsi status_old/new mungkin ada di root JSON data
-                $log['status_old'] = $data['status_old'] ?? null;
-                $log['status_new'] = $data['status_new'] ?? null;
-            }
+            // PENTING: renderLogContent akan mengisi key 'institution_from_name', dll.
+            // Karena $log di sini adalah array, kita tangkap kembali hasil perubahannya.
+            $log['rendered_content'] = $this->renderLogContent($log, 'content');
             
             return $log;
-        })->all();
-        
-        return view('pages.reports.forwarding.detail', compact('report', 'complaintId', 'laporData', 'renderedActivities'));
+        })->values()->all();
+
+        return view('pages.reports.forwarding.detail', compact(
+            'report', 
+            'complaintId', 
+            'laporData', 
+            'renderedActivities'
+        ));
     }
 
-    /**
-     * Helper: Mengganti placeholder template dengan nama instansi yang sebenarnya.
-     * @param array $log Item log dari API followups
-     * @param string $contentField Field yang berisi template string (cth: 'template_content' atau 'content')
-     * @return string
-     */
-    public function renderLogContent(array $log, string $contentField): string
+    public function renderLogContent(array &$log, string $contentField): string
     {
         $template = $log[$contentField] ?? $log['content'] ?? 'Pembaruan status/disposisi.';
         
-        // Ambil nama dari kolom yang sudah terurai oleh API
-        $institutionFromName = $log['institution_from_name'] ?? 'Sistem';
-        $institutionToName = $log['institution_to_name'] ?? 'Sistem';
-        
-        // 1. Ganti placeholders umum {{institution_from}} dan {{institution_to}}
-        $content = str_replace('{{institution_from}}', $institutionFromName, $template);
-        $content = str_replace('{{institution_to}}', $institutionToName, $content);
+        // 1. Handling Institusi (Prioritas: Flat Key > Nested Object > Default)
+        $from = $log['institution_from_name'] ?? $log['institution_from_id']['name'] ?? 'Lapor Mas Wapres';
+        $to   = $log['institution_to_name']   ?? $log['institution_to_id']['name']   ?? 'Lapor Mas Wapres';
+        $inst = $log['institution']['name']   ?? $log['institution']                 ?? 'Lapor Mas Wapres';
 
-        // 2. Jika template menggunakan link, ganti juga link placeholder-nya (jika tidak ada data link, biarkan kosong)
-        $content = str_replace('{{institution_from_link}}', '#', $content);
-        $content = str_replace('{{institution_to_link}}', '#', $content);
-        
-        // 3. (Opsional) Hapus tag HTML <a> jika link tidak diperlukan, atau biarkan.
-        // Kita biarkan karena template content biasanya sudah mengandung tag <b> dan <a> yang berguna.
-        
-        return $content;
+        // 2. Handling Status
+        $stOld = $log['status_old']['name'] ?? 'Status Awal';
+        $stNew = $log['status_new']['name'] ?? 'Status Baru';
+
+        // 3. Simpan balik ke array $log agar bisa dibaca di Blade
+        $log['institution_from_name'] = $from;
+        $log['institution_to_name']   = $to;
+        $log['status_old_name']       = $stOld;
+        $log['status_new_name']       = $stNew;
+
+        // 4. Lengkapi Mapping Placeholder
+        $map = [
+            '{{institution_from}}'   => "<b>$from</b>",
+            '{{ institution_from }}'  => "<b>$from</b>",
+            '{{institution_to}}'     => "<b>$to</b>",
+            '{{ institution_to }}'    => "<b>$to</b>",
+            '{{institution}}'        => "<b>$inst</b>",
+            '{{ institution }}'       => "<b>$inst</b>",
+            '{{status_old}}'         => "<span class='badge bg-secondary-lt'>$stOld</span>",
+            '{{ status_old }}'        => "<span class='badge bg-secondary-lt'>$stOld</span>",
+            '{{status_new}}'         => "<span class='badge bg-primary-lt'>$stNew</span>",
+            '{{ status_new }}'        => "<span class='badge bg-primary-lt'>$stNew</span>",
+        ];
+
+        return strtr($template, $map);
     }
 
     /**
@@ -109,23 +103,35 @@ class ForwardingController extends Controller
      */
     public function sendFollowUp(Request $request, $complaintId)
     {
+        // 1. Validasi input dari form
         $request->validate([
             'content' => 'required|string|max:1000',
             'template_code' => 'nullable|string',
-            // Tambahkan validasi lain sesuai kebutuhan API (rating, dll)
+            'attachment.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx|max:5120', // Validasi file jika ada
         ]);
 
         try {
+            // 2. Kirim ke Service. 
+            // Logic pencarian institution_id dari tabel laporan_forwardings 
+            // sebaiknya tetap berada di dalam Service agar Controller tetap ramping.
             $response = $this->laporService->sendFollowUpToLapor($complaintId, $request->all());
 
+            // 3. Handle Response
             if ($response['success']) {
                 return redirect()->back()->with('success', 'Tindak lanjut/balasan berhasil dikirim ke LAPOR!.');
-            } else {
-                return redirect()->back()->with('error', 'Gagal mengirim balasan: ' . ($response['error'] ?? 'Kesalahan API.'));
-            }
+            } 
+            
+            // Handle error spesifik dari API
+            $errorMessage = $response['error'] ?? 'Kesalahan API.';
+            return redirect()->back()->with('error', 'Gagal mengirim balasan: ' . $errorMessage);
 
         } catch (\Exception $e) {
-            Log::error('Exception saat kirim follow-up: ' . $e->getMessage());
+            // 4. Log jika terjadi error sistem (coding/koneksi)
+            Log::error('Exception saat kirim follow-up: ' . $e->getMessage(), [
+                'complaint_id' => $complaintId,
+                'user' => auth()->id()
+            ]);
+            
             return redirect()->back()->with('error', 'Kesalahan sistem saat mengirim balasan.');
         }
     }
