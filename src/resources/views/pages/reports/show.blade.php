@@ -305,14 +305,6 @@
                     <div class="text-end fw-bolder" style="max-width: 70%">{{ $report->ticket_number }}</div>
                 </div>
                 </div>
-                {{-- <div class="list-group-item">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div class="label me-4">ID Tracking LAPOR!:</div>
-                    <div class="text-end fw-bolder" style="max-width: 70%">
-                        {{ optional($report->forwarding)->pluck('complaint_id')->filter()->implode(', ') ?: '#' }}
-                    </div>
-                </div>
-                </div> --}}
                 <div class="list-group-item">
                     <div class="label me-4 mb-2">Kategori Laporan:</div>
                     <div class="d-flex flex-column gap-1 mt-1"> 
