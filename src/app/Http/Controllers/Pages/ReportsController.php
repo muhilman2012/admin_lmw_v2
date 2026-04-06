@@ -49,9 +49,7 @@ class ReportsController extends Controller
                 $query->with(['assignedBy', 'assignedTo']) 
                     ->orderBy('created_at', 'desc');
             },
-            'forwarding' => function($query) {
-                $query->orderBy('created_at', 'desc');
-            }
+            'forwarding',
         ])->where('uuid', $uuid)->firstOrFail();
 
         if (request()->has('read')) {
@@ -60,7 +58,6 @@ class ReportsController extends Controller
         
         // 2. Ambil assignment yang relevan
         $currentAssignment = $report->assignments->first();
-        $latestForwarding = $report->forwarding->first();
         
         // 3. Ambil data statis untuk dropdown/modal
         $institutions = Institution::orderBy('name')->get();
@@ -81,6 +78,7 @@ class ReportsController extends Controller
         // Hitungan ini termasuk laporan yang sedang dilihat. Count > 1 menunjukkan duplikasi.
         $duplicateReportsCount = $report->reporter->reports->count();
         $relatedReports = $report->reporter->reports;
+        $latestForwarding = $report->forwarding ? $report->forwarding->first() : null;
 
         // 6. Logika Tombol Teruskan (dibiarkan sama)
         $targetDate = Carbon::create(2025, 11, 28, 0, 0, 0, 'Asia/Jakarta');
@@ -99,8 +97,7 @@ class ReportsController extends Controller
             'availableAnalysts', 
             'canForward',
             'duplicateReportsCount',
-            'relatedReports',
-            'latestForwarding'
+            'relatedReports'
         ));
     }
 
@@ -675,7 +672,7 @@ class ReportsController extends Controller
                     ActivityLog::create([
                         'user_id' => auth()->id(),
                         'action' => 'forward_to_lapor',
-                        'description' => 'Laporan berhasil diteruskan ke instansi (' . $institutionName . ') melalui LAPOR! dengan ID Tracking : (' . $complaintId . ')',
+                        'description' => 'Laporan berhasil diteruskan ke instansi (' . $institutionName . ') melalui LAPOR!',
                         'loggable_id' => $report->id,
                         'loggable_type' => Report::class,
                     ]);
