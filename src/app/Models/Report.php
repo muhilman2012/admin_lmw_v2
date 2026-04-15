@@ -106,12 +106,13 @@ class Report extends Model
      * Accessor untuk mendapatkan ID pengguna yang ditugaskan (assigned_to_user_id)
      * dari assignment terbaru.
      */
-    public function getAssignedToUserIdAttribute()
+    public function getAssignedToUserNameAttribute()
     {
         $latestAssignment = $this->assignments()
+                                ->with('assignedTo') // Eager load user agar tidak berat
                                 ->latest('id')
                                 ->first();
 
-        return $latestAssignment->assigned_to_id ?? null;
+        return $latestAssignment->assignedTo->name ?? 'Tidak Ada Analis';
     }
 }
