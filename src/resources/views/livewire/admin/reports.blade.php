@@ -30,7 +30,7 @@
                         data-bs-toggle="modal" 
                         data-bs-target="#modal-mass-category" 
                         title="Ubah Kategori & Batalkan Tugas">
-                    <i class="ti ti-tag me-1"></i> Ubah Kategori Massal
+                    <i class="ti ti-tag me-1"></i> Ubah Kategori
                 </button>
 
                 {{-- Tombol Disposisi Massal --}}
