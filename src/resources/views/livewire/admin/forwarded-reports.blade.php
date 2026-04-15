@@ -54,6 +54,7 @@
                                         Waktu Diteruskan
                                     </button>
                                 </th>
+                                <th class="w-1">Analis</th>
                                 <th class="w-1">Aksi</th>
                             </tr>
                         </thead>
@@ -63,11 +64,15 @@
                                     <td>{{ $forwardings->firstItem() + $index }}</td>
                                     <td>
                                         <a href="{{ route('reports.show', $forward->laporan->uuid) }}" class="text-blue">
-                                            {{ $forward->laporan->ticket_number ?? '-' }} / {{ $forward->laporan->lapor_complaint_id ?? '-' }}
+                                            {{-- Ticket Number tetap ambil dari laporan --}}
+                                            {{ $forward->laporan->ticket_number ?? '-' }} / 
+                                            
+                                            {{-- AMBIL DARI $forward, BUKAN $forward->laporan --}}
+                                            {{ $forward->complaint_id ?? '-' }}
                                         </a>
                                     </td>
                                     <td>
-                                        <span class="text-wrap" style="max-width: 100px;">
+                                        <span class="text-wrap" style="max-width: 50px;">
                                             {{ $forward->laporan->reporter->name ?? '-' }}
                                         </span>
                                     </td>
@@ -99,7 +104,16 @@
                                             {{ $statusName }}
                                         </span>
                                     </td>
-                                    <td>{{ $forward->sent_at?->format('d/m/Y H:i') ?? '-' }}</td>
+                                    <td>
+                                        <span class="text-wrap" style="max-width: 50px;">
+                                            {{ $forward->sent_at?->format('d/m/Y H:i') ?? '-' }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="text-wrap" style="max-width: 100px;">
+                                            {{ $forward->laporan->assigned_to_user_name }}
+                                        </span>
+                                    </td>
                                     <td>
                                         <div class="btn-list flex-nowrap">
                                             <a href="{{ route('forwarding.detail', ['uuid' => $forward->laporan->uuid, 'complaintId' => $forward->complaint_id]) }}"
