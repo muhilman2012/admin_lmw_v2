@@ -179,6 +179,7 @@ class DashboardController extends Controller
         $user = Auth::user();
         $filterKey = $request->get('range', 'total');
         $range = $this->getTimeRange($filterKey);
+        $today = now()->toDateString();
 
         $deputyStats = collect();
         $deputyPieChartData = [];
@@ -189,6 +190,15 @@ class DashboardController extends Controller
         $totalStatusSourceRaw = collect();
         $sourceDetailsGlobal = [];
 
+        $countMale = 0;
+        $countFemale = 0;
+
+        $announcement = \App\Models\Announcement::where('is_active', true)
+            ->whereDate('start_date', '<=', $today)
+            ->whereDate('end_date', '>=', $today)
+            ->latest()
+            ->first();
+        
         // Inisialisasi Base Query (untuk Card Statistik & Map)
         $baseQuery = Report::query(); 
         // Filter Waktu KONDISIONAL untuk Card & Map
@@ -197,6 +207,16 @@ class DashboardController extends Controller
         }
         
         $scopedQuery = $this->applyUserScope($baseQuery->clone(), $user);
+
+        $genderCounts = $scopedQuery->clone()
+            ->join('reporters', 'reports.reporter_id', '=', 'reporters.id')
+            ->select('reporters.gender', DB::raw('count(*) as total'))
+            ->groupBy('reporters.gender')
+            ->pluck('total', 'gender')
+            ->toArray();
+
+        $countMale = $genderCounts['L'] ?? ($genderCounts['Laki-laki'] ?? 0);
+        $countFemale = $genderCounts['P'] ?? ($genderCounts['Perempuan'] ?? 0);
 
         // --- Logika Source Counts, Map Stats, dan Report Stats ---
         $sourceCounts = $scopedQuery->clone()
@@ -302,7 +322,7 @@ class DashboardController extends Controller
         }
 
         if ($user->hasRole('analyst')) {
-            // 🔥 Status Report yang diizinkan untuk Assignment 'approved'
+            // Status Report yang diizinkan untuk Assignment 'approved'
             $targetReportStatus = 'Proses verifikasi dan telaah';
             
             // Status Assignment yang SELALU memerlukan tindakan Analis
@@ -522,7 +542,8 @@ class DashboardController extends Controller
         }
 
         return view('pages.dashboard', [
-            'reportStats' => $reportStats, 
+            'announcement' => $announcement,
+            'reportStats' => $reportStats,
             'chartDataJson' => json_encode($chartData),
             'currentRange' => $range['label'],
             'currentRangeKey' => $range['key'],
@@ -539,6 +560,8 @@ class DashboardController extends Controller
             'submittedReports' => $submittedReports,
             'pendingAssignments' => $pendingAssignments,
             'analystMonitoringData' => $analystMonitoringData,
+            'countMale' => $countMale,
+            'countFemale' => $countFemale,
         ]);
     }
     
@@ -551,33 +574,38 @@ class DashboardController extends Controller
         $seriesData = [];
         $dataMap = [];
         
-        // 1. Map data dari query ke array multidimensi
+        // 1. Ambil data hari libur dari database dalam range yang dipilih
+        $holidays = \App\Models\HolidaySetting::whereBetween('holiday_date', [$range['startDate'], $range['endDate']])
+            ->pluck('holiday_date')
+            ->map(fn($date) => \Carbon\Carbon::parse($date)->format('Y-m-d')) // Tambahkan parse di sini
+            ->toArray();
+
+        // 2. Map data query ke array multidimensi
         foreach ($trendData as $item) {
             $dateKey = Carbon::parse($item->date)->format('Y-m-d');
             $dataMap[$dateKey][$item->source] = (int)$item->count;
         }
 
-        // 2. Tentukan Tanggal yang Akan Digunakan (Hanya Hari Kerja)
-        $workingDates = [];
+        // 3. Tentukan Tanggal Valid (Bukan Weekend & Bukan Libur Setting)
+        $validDates = [];
         $currentDate = $range['startDate']->copy();
         
         while ($currentDate->lte($range['endDate'])) {
-            // 🔥 KRITIS: Cek apakah hari adalah Sabtu (6) atau Minggu (7)
-            $dayOfWeek = $currentDate->dayOfWeek; // 0=Minggu, 6=Sabtu (Laravel Carbon default)
-            
-            if ($dayOfWeek !== 0 && $dayOfWeek !== 6) { 
-                $workingDates[] = $currentDate->copy();
+            $dateKey = $currentDate->format('Y-m-d');
+            $dayOfWeek = $currentDate->dayOfWeek; // 0=Minggu, 6=Sabtu
+
+            // Syarat: Bukan Minggu (0), Bukan Sabtu (6), dan TIDAK ada di array holidays
+            if ($dayOfWeek !== 0 && $dayOfWeek !== 6 && !in_array($dateKey, $holidays)) { 
+                $validDates[] = $currentDate->copy();
             }
             $currentDate->addDay();
         }
         
-        // 3. Isi Data Series berdasarkan Hari Kerja yang telah difilter
+        // 4. Isi Data Series berdasarkan Tanggal Valid saja
         foreach ($sources as $source) {
             $data = [];
-            
-            foreach ($workingDates as $dateObject) {
+            foreach ($validDates as $dateObject) {
                 $dateKey = $dateObject->format('Y-m-d');
-                // Ambil data, jika tidak ada (Sabtu/Minggu sudah dihilangkan), default ke 0
                 $data[] = $dataMap[$dateKey][$source] ?? 0;
             }
             
@@ -588,9 +616,9 @@ class DashboardController extends Controller
             ];
         }
 
-        // 4. Buat Label Tanggal (Hanya Hari Kerja)
+        // 5. Buat Label Tanggal untuk sumbu X
         $chartDates = [];
-        foreach ($workingDates as $dateObject) {
+        foreach ($validDates as $dateObject) {
             $chartDates[] = $dateObject->format('d/M'); 
         }
 

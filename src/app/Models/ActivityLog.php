@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ActivityLog extends Model
 {
-    use HasFactory;
+    public function loggable(): MorphTo
+    {
+        return $this->morphTo();
+    }
 
     protected $fillable = [
         'user_id',
@@ -15,8 +18,6 @@ class ActivityLog extends Model
         'description',
         'loggable_id',
         'loggable_type',
-        'created_at',
-        'updated_at',
     ];
 
     public function user()

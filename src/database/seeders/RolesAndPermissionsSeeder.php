@@ -49,6 +49,9 @@ class RolesAndPermissionsSeeder extends Seeder
 
             // KATEGORI: KMS
             'create kms article',
+
+            //LOGS
+            'view activity logs',
         ];
 
         foreach ($permissions as $permission) {

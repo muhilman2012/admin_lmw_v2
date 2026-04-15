@@ -42,7 +42,13 @@ class SettingsController extends Controller
         // 3. Muat data TEMPLATES (untuk Tab baru)
         $statusTemplates = StatusTemplate::orderBy('name')->get();
         $documentTemplates = DocumentTemplate::orderBy('name')->get();
+
+        // 4. Muat data Hari Libur
+        $holidays = \App\Models\HolidaySetting::orderBy('holiday_date', 'asc')->get();
         
+        // 5. Muat data Pengumuman
+        $announcements = \App\Models\Announcement::orderBy('created_at', 'desc')->get();
+
         // Mengirimkan semua variabel yang dibutuhkan oleh SEMUA TAB
         return view('pages.settings.index', compact(
             'groupedUnits', 
@@ -50,16 +56,13 @@ class SettingsController extends Controller
             'allCategories', 
             'deputies',
             'statusTemplates',
-            'documentTemplates'
+            'documentTemplates',
+            'holidays',
+            'announcements'
         ))
         ->with('lastActiveDeputyId', $lastActiveDeputyId);
     }
-    
-    // 🔥 METHOD manageTemplates LAMA DIHAPUS (diganti index())
 
-    /**
-     * Tampilkan form untuk membuat kategori baru. (Tidak digunakan di View)
-     */
     public function create()
     {
         $mainCategories = Category::mainCategories()->orderBy('name')->get();
@@ -67,9 +70,6 @@ class SettingsController extends Controller
         return view('pages.settings.create', compact('mainCategories', 'allCategories'));
     }
 
-    /**
-     * Simpan kategori baru ke database.
-     */
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -85,9 +85,6 @@ class SettingsController extends Controller
             ->with('success', 'Kategori/Sub-Kategori berhasil ditambahkan.');
     }
 
-    /**
-     * Hapus kategori dari database.
-     */
     public function destroy(Category $category)
     {
         if ($category->children()->exists()) {
@@ -101,9 +98,6 @@ class SettingsController extends Controller
             ->with('success', 'Kategori berhasil dihapus.');
     }
 
-    /**
-     * Toggle status is_active kategori melalui AJAX.
-     */
     public function toggleCategoryActive(Request $request, Category $category)
     {
         if (!$request->ajax()) {
@@ -122,9 +116,6 @@ class SettingsController extends Controller
         ]);
     }
     
-    /**
-     * Simpan/Update Status Template (Digunakan oleh modal CRUD)
-     */
     public function storeStatusTemplate(Request $request)
     {
         $validated = $request->validate([
@@ -143,9 +134,6 @@ class SettingsController extends Controller
         return redirect()->to(route('settings.index') . $redirectTarget)->with('success', $message);
     }
     
-    /**
-     * Simpan/Update Document Template (Digunakan oleh modal CRUD)
-     */
     public function storeDocumentTemplate(Request $request)
     {
         $validated = $request->validate([
@@ -162,9 +150,6 @@ class SettingsController extends Controller
         return redirect()->to(route('settings.index') . $redirectTarget)->with('success', $message);
     }
 
-    /**
-     * Hapus Status/Document Template
-     */
     public function destroyTemplate(Request $request, $id)
     {
         $validated = $request->validate([
@@ -488,5 +473,70 @@ class SettingsController extends Controller
             \Log::error('Error executing Lapor Retry Command via Web: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Terjadi kesalahan sistem saat menjalankan perintah.');
         }
+    }
+
+    public function storeHoliday(Request $request)
+    {
+        $request->validate([
+            'holiday_date' => 'required|date|unique:holiday_settings,holiday_date',
+            'note' => 'nullable|string|max:255'
+        ]);
+
+        \App\Models\HolidaySetting::create($request->only(['holiday_date', 'note']));
+
+        return redirect()->to(route('settings.index') . '#tab-holidays')
+                        ->with('success', 'Hari libur berhasil ditambahkan.');
+    }
+
+    public function destroyHoliday($id)
+    {
+        \App\Models\HolidaySetting::findOrFail($id)->delete();
+        return redirect()->back()->with('success', 'Hari libur berhasil dihapus.');
+    }
+
+    public function storeAnnouncement(Request $request)
+    {
+        $request->validate([
+            'title'      => 'required|string|max:255',
+            'content'    => 'nullable|string',
+            'image'      => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048', // pastikan ini 'image'
+            'start_date' => 'required|date',
+            'end_date'   => 'required|date|after_or_equal:start_date',
+        ]);
+
+        $data = $request->only(['title', 'content', 'start_date', 'end_date']);
+
+        if ($request->hasFile('image')) {
+            // 1. Ambil file
+            $file = $request->file('image');
+            
+            // 2. Buat nama file unik
+            $fileName = time() . '_' . $file->getClientOriginalName();
+            
+            // 3. Simpan ke MinIO (disk 'uploads') di folder 'announcements'
+            $path = $file->storeAs('announcements', $fileName, 'uploads');
+            
+            $data['image_path'] = $path;
+        }
+
+        \App\Models\Announcement::create($data);
+
+        return redirect()->to(route('settings.index') . '#tab-announcements')
+                        ->with('success', 'Pengumuman berhasil disimpan.');
+    }
+
+    public function destroyAnnouncement($id)
+    {
+        $announcement = \App\Models\Announcement::findOrFail($id);
+
+        // Hapus gambar dari MinIO jika ada
+        if ($announcement->image_path) {
+            Storage::disk('uploads')->delete($announcement->image_path);
+        }
+
+        $announcement->delete();
+
+        return redirect()->to(route('settings.index') . '#tab-announcements')
+                        ->with('success', 'Pengumuman berhasil dihapus.');
     }
 }

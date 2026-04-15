@@ -136,7 +136,6 @@
             <div class="col-sm-6 col-md-12 col-lg-12 col-xl-3">
                 @hasanyrole(['superadmin', 'admin', 'deputy', 'asdep_karo'])
                     <div class="row row-cards g-3">
-                        
                         {{-- 1. CARD STATUS (DISPOSISI/DISTRIBUSI) --}}
                         @if ($card1Title || $card2Title)
                         <div class="col-12">
@@ -173,6 +172,44 @@
                                     </div>
                                 </div>
                                 @endif
+                                <div class="col-12">
+                                    <div class="card card-sm h-100">
+                                        <div class="card-body">
+                                            <div class="row align-items-center">
+                                                <div class="col-auto">
+                                                    <span class="avatar avatar-md bg-purple-lt me-3">
+                                                        <i class="ti ti-users text-purple"></i>
+                                                    </span>
+                                                </div>
+                                                <div class="col">
+                                                    <div class="font-weight-medium mb-1">Jumlah Laporan Berdasarkan Gender</div>
+                                                    <div class="row g-2">
+                                                        {{-- Laki-laki --}}
+                                                        <div class="col-6 border-end">
+                                                            <div class="d-flex align-items-center justify-content-center">
+                                                                <i class="ti ti-man me-1 text-blue"></i>
+                                                                <div>
+                                                                    <div class="text-secondary small">Laki-laki</div>
+                                                                    <div class="fw-bold">{{ number_format($countMale ?? 0, 0, ',', '.') }}</div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        {{-- Perempuan --}}
+                                                        <div class="col-6">
+                                                            <div class="d-flex align-items-center justify-content-center">
+                                                                <i class="ti ti-woman me-1 text-pink"></i>
+                                                                <div>
+                                                                    <div class="text-secondary small">Perempuan</div>
+                                                                    <div class="fw-bold">{{ number_format($countFemale ?? 0, 0, ',', '.') }}</div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         @endif
@@ -812,6 +849,8 @@
             </div>
         </div>
     </div>
+
+    @include('layouts.partials.announcement-popup')
 @endsection
 
 @push('scripts')

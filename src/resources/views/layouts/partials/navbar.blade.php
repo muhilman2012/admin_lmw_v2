@@ -110,10 +110,13 @@
                 <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow z-3">
                     <a href="{{ route('users.profile.index') }}" class="dropdown-item">Profil</a>
                     <a href="{{ route('kms.index') }}" target="_blank" class="dropdown-item">KMS</a>
+                    @can('view activity logs')
+                        <a href="{{ route('logs.activity') }}" class="dropdown-item">Lihat Log</a>
+                    @endcan
+                    <div class="dropdown-divider"></div>
                     @can('manage structure')
                         <a href="{{ route('settings.index') }}" class="dropdown-item">Pengaturan</a>
                     @endcan
-                    <div class="dropdown-divider"></div>
                     <a class="dropdown-item" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
                         Logout
                     </a>

@@ -148,11 +148,24 @@ Route::middleware(['auth', CheckPasswordReset::class])->prefix('admin')->group(f
         Route::post('/templates/document', [SettingsController::class, 'storeDocumentTemplate'])->name('templates.document.store');
         Route::delete('/templates/destroy/{id}', [SettingsController::class, 'destroyTemplate'])->name('templates.destroy');
 
-        // 6. UNIT KERJA (Prefix/Nested Grouping)
+        // 6. HARI LIBUR (HOLIDAY SETTINGS)
+        Route::prefix('holidays')->name('holidays.')->group(function () {
+            Route::post('/', [SettingsController::class, 'storeHoliday'])->name('store');
+            Route::delete('/{id}', [SettingsController::class, 'destroyHoliday'])->name('destroy');
+        });
+        
+        // 7. UNIT KERJA (Prefix/Nested Grouping)
         Route::prefix('unit-kerjas')->name('unitkerjas.')->group(function () {
             Route::post('/', [UnitKerjaController::class, 'store'])->name('store');
             Route::put('/{unitKerja}', [UnitKerjaController::class, 'update'])->name('update');
             Route::delete('/{unitKerja}', [UnitKerjaController::class, 'destroy'])->name('destroy');
+        });
+
+        // 8. PENGUMUMAN (ANNOUNCEMENTS)
+        Route::prefix('announcements')->name('announcements.')->group(function () {
+            Route::post('/', [SettingsController::class, 'storeAnnouncement'])->name('store');
+            Route::delete('/{id}', [SettingsController::class, 'destroyAnnouncement'])->name('destroy');
+            Route::patch('/{id}/toggle', [SettingsController::class, 'toggleAnnouncement'])->name('toggle');
         });
     });
 
@@ -163,9 +176,9 @@ Route::middleware(['auth', CheckPasswordReset::class])->prefix('admin')->group(f
         Route::put('/{deputy}', [DeputiesController::class, 'update'])->name('update');
     });
 
-    // --- Pengelompokan Rute Berdasarkan Peran (Spatie) ---
-    Route::middleware('role:superadmin')->group(function () {
+    Route::middleware('permission:view activity logs')->group(function () {
         Route::get('/logs/activity', [\App\Http\Controllers\Pages\ActivityLogController::class, 'index'])->name('logs.activity');
+        // Route::get('/logs/system', \Opcodes\LogViewer\Http\Controllers\LogViewerController::class)->name('logs.system');
     });
     
     Route::middleware('role:asdep_karo|deputy')->group(function () {

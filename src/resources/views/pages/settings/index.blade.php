@@ -65,6 +65,16 @@
                             <i class="ti ti-template me-2"></i> Status & Dokumen Templates
                         </a>
                     </li>
+                    <li class="nav-item" role="presentation">
+                        <a href="#tab-holidays" class="nav-link" data-bs-toggle="tab" aria-selected="false" tabindex="-1" role="tab">
+                            <i class="ti ti-calendar-event me-2"></i> Hari Libur
+                        </a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a href="#tab-announcements" class="nav-link" data-bs-toggle="tab" aria-selected="false" tabindex="-1" role="tab">
+                            <i class="ti ti-megaphone me-2"></i> Pengumuman
+                        </a>
+                    </li>
                 </ul>
             </div>
             
@@ -534,6 +544,115 @@
                             
                         </div>
                     </div>
+                    {{-- TAB 8: MANAJEMEN HARI LIBUR --}}
+                    <div class="tab-pane" id="tab-holidays" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <h4 class="mb-1">Pengaturan Hari Libur & Cuti Bersama</h4>
+                                <p class="text-muted small mb-0">Tanggal yang terdaftar akan diabaikan dalam perhitungan grafik statistik harian.</p>
+                            </div>
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-holiday">
+                                <i class="ti ti-calendar-plus me-2"></i> Tambah Hari Libur
+                            </button>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-vcenter card-table">
+                                <thead>
+                                    <tr>
+                                        <th>Tanggal</th>
+                                        <th>Keterangan</th>
+                                        <th class="w-1">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($holidays ?? [] as $holiday)
+                                    <tr>
+                                        <td class="fw-bold">{{ \Carbon\Carbon::parse($holiday->holiday_date)->format('d F Y') }}</td>
+                                        <td class="text-secondary">{{ $holiday->note ?? '-' }}</td>
+                                        <td>
+                                            <form action="{{ route('settings.holidays.destroy', $holiday->id) }}" method="POST" class="delete-holiday-form">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-sm btn-icon btn-outline-danger" title="Hapus">
+                                                    <i class="ti ti-trash"></i>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    @empty
+                                    <tr>
+                                        <td colspan="3" class="text-center text-muted py-4">Belum ada hari libur yang diatur.</td>
+                                    </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {{-- TAB 9: MANAJEMEN {PENGUMUMAN} --}}
+                    <div class="tab-pane" id="tab-announcements" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <h4 class="mb-1">Pengaturan Popup Pengumuman</h4>
+                                <p class="text-muted small mb-0">Kelola informasi yang akan muncul saat pengguna pertama kali masuk ke Dashboard.</p>
+                            </div>
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-announcement-create">
+                                <i class="ti ti-plus me-2"></i> Tambah Pengumuman
+                            </button>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-vcenter card-table">
+                                <thead>
+                                    <tr>
+                                        <th>Judul</th>
+                                        <th>Periode</th>
+                                        <th>Gambar</th>
+                                        <th>Status</th>
+                                        <th class="w-1">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($announcements ?? [] as $ann)
+                                    <tr>
+                                        <td>
+                                            <div class="fw-bold">{{ $ann->title }}</div>
+                                            <div class="text-muted small text-truncate" style="max-width: 250px;">{{ $ann->content }}</div>
+                                        </td>
+                                        <td>
+                                            <div class="small">{{ \Carbon\Carbon::parse($ann->start_date)->format('d/m/y') }} - {{ \Carbon\Carbon::parse($ann->end_date)->format('d/m/y') }}</div>
+                                        </td>
+                                        <td>
+                                            @if($ann->image_path)
+                                                <a href="{{ Storage::disk('uploads')->url($ann->image_path) }}" target="_blank" class="badge bg-blue-lt">Lihat Gambar</a>
+                                            @else
+                                                <span class="text-muted">-</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            <span class="badge {{ $ann->is_active ? 'bg-success' : 'bg-secondary' }}">
+                                                {{ $ann->is_active ? 'Aktif' : 'Non-aktif' }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <form action="{{ route('settings.announcements.destroy', $ann->id) }}" method="POST" onsubmit="return confirm('Hapus pengumuman ini?')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-sm btn-icon btn-outline-danger">
+                                                    <i class="ti ti-trash"></i>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    @empty
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted py-4">Belum ada data pengumuman.</td>
+                                    </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -642,6 +761,81 @@
                 <div class="modal-footer">
                     <button type="button" class="btn me-auto" data-bs-dismiss="modal">Batal</button>
                     <button type="submit" class="btn btn-primary" id="deputy-management-submit-btn">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{{-- Modal Tambah Hari Libur --}}
+<div class="modal modal-blur fade" id="modal-holiday" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Tambah Hari Libur Baru</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ route('settings.holidays.store') }}" method="POST">
+                @csrf
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Tanggal Libur</label>
+                        <input type="date" name="holiday_date" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Keterangan / Nama Libur</label>
+                        <input type="text" name="note" class="form-control" placeholder="Contoh: Idul Fitri atau Cuti Bersama">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn me-auto" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal modal-blur fade" id="modal-announcement-create" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Buat Pengumuman Baru</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ route('settings.announcements.store') }}" method="POST" enctype="multipart/form-data">
+                @csrf
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Judul Pengumuman</label>
+                        <input type="text" name="title" class="form-control" placeholder="Contoh: Maintenance Sistem" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Konten / Tulisan (Opsional)</label>
+                        <textarea name="content" class="form-control" rows="3" placeholder="Masukkan detail pengumuman..."></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-lg-6">
+                            <div class="mb-3">
+                                <label class="form-label">Tanggal Mulai</label>
+                                <input type="date" name="start_date" class="form-control" required>
+                            </div>
+                        </div>
+                        <div class="col-lg-6">
+                            <div class="mb-3">
+                                <label class="form-label">Tanggal Berakhir</label>
+                                <input type="date" name="end_date" class="form-control" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Unggah Gambar (Opsional)</label>
+                        <input type="file" name="image" class="form-control" accept="image/*">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn me-auto" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan & Aktifkan</button>
                 </div>
             </form>
         </div>
