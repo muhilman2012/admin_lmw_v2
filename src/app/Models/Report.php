@@ -106,10 +106,18 @@ class Report extends Model
      * Accessor untuk mendapatkan ID pengguna yang ditugaskan (assigned_to_user_id)
      * dari assignment terbaru.
      */
+    // Simpan ini agar logika pengecekan hak akses (ID) tidak rusak
+    public function getAssignedToUserIdAttribute()
+    {
+        $latestAssignment = $this->assignments()->latest('id')->first();
+        return $latestAssignment->assigned_to_id ?? null;
+    }
+
+    // Tambahkan ini khusus untuk kebutuhan tampilan nama di tabel/detail
     public function getAssignedToUserNameAttribute()
     {
         $latestAssignment = $this->assignments()
-                                ->with('assignedTo') // Eager load user agar tidak berat
+                                ->with('assignedTo')
                                 ->latest('id')
                                 ->first();
 
