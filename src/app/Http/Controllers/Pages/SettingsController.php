@@ -531,7 +531,10 @@ class SettingsController extends Controller
 
         // Hapus gambar dari MinIO jika ada
         if ($announcement->image_path) {
-            Storage::disk('uploads')->delete($announcement->image_path);
+            // Pastikan menggunakan disk 'uploads'
+            if (\Storage::disk('uploads')->exists($announcement->image_path)) {
+                \Storage::disk('uploads')->delete($announcement->image_path);
+            }
         }
 
         $announcement->delete();

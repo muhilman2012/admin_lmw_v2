@@ -724,7 +724,7 @@
                     </select>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Catatan Tambahan (Opsional)</label>
+                    <label class="form-label">Catatan Tambahan (Opsional, maks. 1000 kata)</label>
                     <textarea name="additional_notes" class="form-control" rows="3" placeholder="Tambahkan catatan untuk instansi tujuan..."></textarea>
                 </div>
                 <div class="form-check">

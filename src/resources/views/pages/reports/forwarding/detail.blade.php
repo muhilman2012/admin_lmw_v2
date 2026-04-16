@@ -209,7 +209,7 @@
 
                             {{-- 2. KONTEN BALASAN --}}
                             <div class="mb-3">
-                                <label class="form-label">Konten Balasan/Tindak Lanjut</label>
+                                <label class="form-label">Konten Balasan/Tindak Lanjut (maks. 1000 kata)</label>
                                 <textarea id="reply-content" name="content" class="form-control" rows="3" required placeholder="Tulis konten tindak lanjut di sini."></textarea>
                             </div>
 

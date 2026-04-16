@@ -589,7 +589,7 @@
                             </table>
                         </div>
                     </div>
-                    {{-- TAB 9: MANAJEMEN {PENGUMUMAN} --}}
+                    {{-- TAB 9: MANAJEMEN PENGUMUMAN --}}
                     <div class="tab-pane" id="tab-announcements" role="tabpanel">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <div>
@@ -617,14 +617,14 @@
                                     <tr>
                                         <td>
                                             <div class="fw-bold">{{ $ann->title }}</div>
-                                            <div class="text-muted small text-truncate" style="max-width: 250px;">{{ $ann->content }}</div>
+                                            <div class="text-muted small text-truncate" style="max-width: 250px;">{!! strip_tags($ann->content) !!}</div>
                                         </td>
                                         <td>
                                             <div class="small">{{ \Carbon\Carbon::parse($ann->start_date)->format('d/m/y') }} - {{ \Carbon\Carbon::parse($ann->end_date)->format('d/m/y') }}</div>
                                         </td>
                                         <td>
                                             @if($ann->image_path)
-                                                <a href="{{ Storage::disk('uploads')->url($ann->image_path) }}" target="_blank" class="badge bg-blue-lt">Lihat Gambar</a>
+                                                <a href="{{ signMinioUrlSmart(env('AWS_UPLOADS_BUCKET'), ltrim($ann->image_path, '/'), 5) }}" target="_blank" class="badge bg-blue-lt">Lihat Gambar</a>
                                             @else
                                                 <span class="text-muted">-</span>
                                             @endif
@@ -635,13 +635,41 @@
                                             </span>
                                         </td>
                                         <td>
-                                            <form action="{{ route('settings.announcements.destroy', $ann->id) }}" method="POST" onsubmit="return confirm('Hapus pengumuman ini?')">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="btn btn-sm btn-icon btn-outline-danger">
-                                                    <i class="ti ti-trash"></i>
-                                                </button>
-                                            </form>
+                                            {{-- Tombol pemicu modal hapus --}}
+                                            <button type="button" class="btn btn-sm btn-icon btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modal-delete-announcement-{{ $ann->id }}">
+                                                <i class="ti ti-trash"></i>
+                                            </button>
+
+                                            {{-- MODAL KONFIRMASI HAPUS (Unik per ID) --}}
+                                            <div class="modal modal-blur fade" id="modal-delete-announcement-{{ $ann->id }}" tabindex="-1" role="dialog" aria-hidden="true">
+                                                <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+                                                    <div class="modal-content">
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                        <div class="modal-status bg-danger"></div>
+                                                        <div class="modal-body text-center py-4">
+                                                            <i class="ti ti-alert-triangle icon mb-2 text-danger icon-lg" style="font-size: 3rem;"></i>
+                                                            <h3>Apakah Anda yakin?</h3>
+                                                            <div class="text-secondary">Anda akan menghapus pengumuman <strong>"{{ $ann->title }}"</strong>. Tindakan ini tidak dapat dibatalkan.</div>
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <div class="w-100">
+                                                                <div class="row">
+                                                                    <div class="col">
+                                                                        <a href="#" class="btn w-100" data-bs-dismiss="modal">Batal</a>
+                                                                    </div>
+                                                                    <div class="col">
+                                                                        <form action="{{ route('settings.announcements.destroy', $ann->id) }}" method="POST">
+                                                                            @csrf
+                                                                            @method('DELETE')
+                                                                            <button type="submit" class="btn btn-danger w-100">Ya, Hapus</button>
+                                                                        </form>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </td>
                                     </tr>
                                     @empty
