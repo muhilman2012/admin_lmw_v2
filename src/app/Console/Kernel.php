@@ -41,6 +41,10 @@ class Kernel extends ConsoleKernel
         $schedule->command('report:cleanup')
                  ->dailyAt('01:00');
                  ->withoutOverlapping();
+
+        $schedule->call(function () {
+                \DB::table('active_counters')->truncate();
+                })->dailyAt('00:00');
     }
 
     /**

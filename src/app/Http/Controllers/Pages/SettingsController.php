@@ -49,6 +49,9 @@ class SettingsController extends Controller
         // 5. Muat data Pengumuman
         $announcements = \App\Models\Announcement::orderBy('created_at', 'desc')->get();
 
+        // 6. Muat data Slot Kunjungan
+        $visitSlots = \App\Models\VisitSlotSetting::orderBy('time_start', 'asc')->get();
+
         // Mengirimkan semua variabel yang dibutuhkan oleh SEMUA TAB
         return view('pages.settings.index', compact(
             'groupedUnits', 
@@ -58,7 +61,8 @@ class SettingsController extends Controller
             'statusTemplates',
             'documentTemplates',
             'holidays',
-            'announcements'
+            'announcements',
+            'visitSlots'
         ))
         ->with('lastActiveDeputyId', $lastActiveDeputyId);
     }
@@ -482,16 +486,94 @@ class SettingsController extends Controller
             'note' => 'nullable|string|max:255'
         ]);
 
-        \App\Models\HolidaySetting::create($request->only(['holiday_date', 'note']));
+        \App\Models\HolidaySetting::create([
+            'holiday_date' => $request->holiday_date,
+            'note' => $request->note,
+            'block_registration' => $request->has('block_registration'),
+            'block_chart' => $request->has('block_chart'),
+        ]);
 
         return redirect()->to(route('settings.index') . '#tab-holidays')
                         ->with('success', 'Hari libur berhasil ditambahkan.');
     }
 
+    public function updateHoliday(Request $request, $id)
+    {
+        $holiday = \App\Models\HolidaySetting::findOrFail($id);
+
+        $request->validate([
+            'holiday_date' => 'required|date|unique:holiday_settings,holiday_date,' . $id,
+            'note' => 'nullable|string|max:255'
+        ]);
+
+        $holiday->update([
+            'holiday_date' => $request->holiday_date,
+            'note' => $request->note,
+            'block_registration' => $request->has('block_registration'),
+            'block_chart' => $request->has('block_chart'),
+        ]);
+
+        return redirect()->to(route('settings.index') . '#tab-holidays')
+                        ->with('success', 'Hari libur berhasil diperbarui.');
+    }
+
     public function destroyHoliday($id)
     {
         \App\Models\HolidaySetting::findOrFail($id)->delete();
-        return redirect()->back()->with('success', 'Hari libur berhasil dihapus.');
+        
+        return redirect()->to(route('settings.index') . '#tab-holidays')
+                        ->with('success', 'Hari libur berhasil dihapus.');
+    }
+
+    public function storeSlot(Request $request) {
+        $request->validate(['time_start' => 'required', 'quota' => 'required|integer']);
+        \App\Models\VisitSlotSetting::create([
+            'time_start' => $request->time_start,
+            'quota' => $request->quota,
+            'is_active' => $request->has('is_active')
+        ]);
+        return redirect()->to(route('settings.index') . '#tab-slots')->with('success', 'Slot berhasil ditambah');
+    }
+
+    public function updateSlot(Request $request, $id) {
+        $slot = \App\Models\VisitSlotSetting::findOrFail($id);
+        $slot->update([
+            'time_start' => $request->time_start,
+            'quota' => $request->quota,
+            'is_active' => $request->has('is_active')
+        ]);
+        return redirect()->to(route('settings.index') . '#tab-slots')->with('success', 'Slot berhasil diupdate');
+    }
+
+    public function destroySlot($id) {
+        \App\Models\VisitSlotSetting::findOrFail($id)->delete();
+        return redirect()->to(route('settings.index') . '#tab-slots')->with('success', 'Slot dihapus');
+    }
+
+    /**
+     * Update Konfigurasi Global Registrasi (Periode & Kunci NIK)
+     */
+    public function updateRegistrationGlobal(Request $request)
+    {
+        $request->validate([
+            'open_date' => 'required|date',
+            'close_date' => 'required|date|after_or_equal:open_date',
+            'eligibility_days' => 'required|integer|min:1',
+        ]);
+
+        // Menggunakan updateOrCreate untuk jaga-jaga jika data pertama belum ada
+        \App\Models\RegistrationSetting::updateOrCreate(
+            ['id' => 1], // Mengunci hanya pada ID 1 (Singleton)
+            [
+                'open_date' => $request->open_date,
+                'close_date' => $request->close_date,
+                'eligibility_days' => $request->eligibility_days,
+                'is_active' => true,
+            ]
+        );
+
+        return redirect()->to(route('settings.index') . '#tab-slots')
+                        ->with('success', 'Konfigurasi periode pendaftaran berhasil diperbarui.');
     }
 
     public function storeAnnouncement(Request $request)
@@ -523,6 +605,50 @@ class SettingsController extends Controller
 
         return redirect()->to(route('settings.index') . '#tab-announcements')
                         ->with('success', 'Pengumuman berhasil disimpan.');
+    }
+
+    public function updateAnnouncement(Request $request, $id)
+    {
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'content' => 'required',
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'is_active' => 'required|boolean'
+        ]);
+
+        try {
+            $announcement = \App\Models\Announcement::findOrFail($id);
+            
+            $data = [
+                'title' => $request->title,
+                'content' => $request->content,
+                'start_date' => $request->start_date,
+                'end_date' => $request->end_date,
+                'is_active' => $request->is_active,
+            ];
+
+            if ($request->hasFile('image')) {
+                if ($announcement->image_path) {
+                    \Illuminate\Support\Facades\Storage::disk('uploads')->delete($announcement->image_path);
+                }
+
+                $file = $request->file('image');
+                $fileName = 'announcements/' . time() . '_' . $file->getClientOriginalName();
+                
+                \Illuminate\Support\Facades\Storage::disk('uploads')->put($fileName, file_get_contents($file));
+                $data['image_path'] = $fileName;
+            }
+
+            $announcement->update($data);
+
+            return redirect()->to(route('settings.index') . '#tab-announcements')
+                            ->with('success', 'Pengumuman berhasil diperbarui.');
+            
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Gagal memperbarui pengumuman: ' . $e->getMessage());
+        }
     }
 
     public function destroyAnnouncement($id)

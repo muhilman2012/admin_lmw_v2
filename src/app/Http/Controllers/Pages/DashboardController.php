@@ -51,7 +51,7 @@ class DashboardController extends Controller
                     });
 
                 })
-                // 🔥 Kondisi 2: ATAU Laporan yang BELUM terdisposisi (category_id NULL)
+                // Kondisi 2: ATAU Laporan yang BELUM terdisposisi (category_id NULL)
                 ->orWhereNull('category_id');
             });
         }
@@ -576,8 +576,9 @@ class DashboardController extends Controller
         
         // 1. Ambil data hari libur dari database dalam range yang dipilih
         $holidays = \App\Models\HolidaySetting::whereBetween('holiday_date', [$range['startDate'], $range['endDate']])
+            ->where('block_chart', true)
             ->pluck('holiday_date')
-            ->map(fn($date) => \Carbon\Carbon::parse($date)->format('Y-m-d')) // Tambahkan parse di sini
+            ->map(fn($date) => \Carbon\Carbon::parse($date)->format('Y-m-d'))
             ->toArray();
 
         // 2. Map data query ke array multidimensi

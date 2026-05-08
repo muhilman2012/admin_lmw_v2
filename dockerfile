@@ -38,6 +38,8 @@ RUN apk add --no-cache \
   php84-xmlreader \
   php84-xmlwriter \
   php84-zip \
+  php84-pcntl \
+  php84-posix \
   supervisor \
   tzdata \
   postgresql-client
@@ -69,7 +71,7 @@ RUN addgroup -g 1945 -S pplsi && adduser -u 1945 -S pplsi -G pplsi
 RUN chown -R pplsi:pplsi /var/www /run /var/lib/nginx /var/log/nginx /data-setneg-point
 USER pplsi
 
-EXPOSE 8080
+EXPOSE 8080 8001
 
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
 

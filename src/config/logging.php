@@ -127,6 +127,12 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        'kiosk' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/kiosk.log'),
+            'level' => 'info',
+        ],
+
     ],
 
 ];

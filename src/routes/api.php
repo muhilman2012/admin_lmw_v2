@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\SuperadminController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReporterController;
+use App\Http\Controllers\Api\PublicRegistrationController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -37,4 +38,12 @@ Route::middleware(['auth:sanctum', VerifyLmwApiToken::class])->group(function ()
     // API untuk mengecek eligibilitas dokumen tambahan
     Route::get('/reports/{ticketNumber}/document-eligibility', [ReportController::class, 'checkDocumentEligibility']);
     Route::patch('/reports/{ticketNumber}/document-additional', [ReportController::class, 'submitAdditionalDocument']);
+
+    // Registrasi Public (LMW v2)
+    Route::prefix('public')->group(function () {
+        Route::get('/disabled-dates', [PublicRegistrationController::class, 'getDisabledDates']);
+        Route::get('/time-slots', [PublicRegistrationController::class, 'getTimeSlots']);
+        Route::post('/registration', [PublicRegistrationController::class, 'store']);
+        Route::get('/calendar-meta', [PublicRegistrationController::class, 'getCalendarMeta']);
+    });
 });

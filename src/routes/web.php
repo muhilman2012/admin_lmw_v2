@@ -17,6 +17,7 @@ use App\Http\Controllers\Pages\UnitKerjaController;
 use App\Http\Controllers\Pages\DeputiesController;
 use App\Http\Controllers\Pages\NotificationController;
 use App\Http\Controllers\Pages\KmsController;
+use App\Http\Controllers\Pages\KioskController;
 use App\Http\Controllers\ReceiptPdfController;
 use Illuminate\Support\Facades\Route;
 
@@ -151,6 +152,7 @@ Route::middleware(['auth', CheckPasswordReset::class])->prefix('admin')->group(f
         // 6. HARI LIBUR (HOLIDAY SETTINGS)
         Route::prefix('holidays')->name('holidays.')->group(function () {
             Route::post('/', [SettingsController::class, 'storeHoliday'])->name('store');
+            Route::put('/{id}', [SettingsController::class, 'updateHoliday'])->name('update');
             Route::delete('/{id}', [SettingsController::class, 'destroyHoliday'])->name('destroy');
         });
         
@@ -161,9 +163,21 @@ Route::middleware(['auth', CheckPasswordReset::class])->prefix('admin')->group(f
             Route::delete('/{unitKerja}', [UnitKerjaController::class, 'destroy'])->name('destroy');
         });
 
-        // 8. PENGUMUMAN (ANNOUNCEMENTS)
+        // 8. SLOT KUNJUNGAN
+        Route::prefix('slots')->name('slots.')->group(function () {
+            Route::post('/', [SettingsController::class, 'storeSlot'])->name('store');
+            Route::put('/{id}', [SettingsController::class, 'updateSlot'])->name('update');
+            Route::delete('/{id}', [SettingsController::class, 'destroySlot'])->name('destroy');
+        });
+
+        // 9. KONFIGURASI REGISTRASI GLOBAL (Periode & Kunci NIK)
+        Route::put('/registration/global', [SettingsController::class, 'updateRegistrationGlobal'])
+            ->name('registration.update-global');
+
+        // 10. PENGUMUMAN (ANNOUNCEMENTS)
         Route::prefix('announcements')->name('announcements.')->group(function () {
             Route::post('/', [SettingsController::class, 'storeAnnouncement'])->name('store');
+            Route::put('/{id}', [SettingsController::class, 'updateAnnouncement'])->name('update');
             Route::delete('/{id}', [SettingsController::class, 'destroyAnnouncement'])->name('destroy');
             Route::patch('/{id}/toggle', [SettingsController::class, 'toggleAnnouncement'])->name('toggle');
         });
@@ -197,8 +211,24 @@ Route::middleware(['auth', CheckPasswordReset::class])->prefix('admin')->group(f
         Route::get('/', [KmsController::class, 'index'])->name('index'); 
         Route::get('/{article}', [KmsController::class, 'show'])->name('show');
     });
+
+    Route::prefix('operator')->name('operator.')->group(function () {
+        Route::get('/workspace', [KioskController::class, 'operatorIndex'])->name('workspace');
+        Route::post('/set-counter', [KioskController::class, 'setCounter'])->name('set-counter');
+        Route::post('/unset-counter', [KioskController::class, 'unsetCounter'])->name('unset-counter');
+        Route::post('/call-next', [KioskController::class, 'callNext'])->name('call-next');
+        Route::post('/start-serving', [KioskController::class, 'startServing'])->name('start-serving');
+        Route::post('/recall-trigger', [KioskController::class, 'recall'])->name('recall-trigger');
+        Route::post('/cancel-queue', [KioskController::class, 'cancelQueue'])->name('cancel-queue');
+    });
 });
 
 Route::get('/changelog/v2', function () {
     return view('changelogs.v2'); 
 })->name('changelog.v2');
+
+// Rute Kiosk Check-in (Public/PC Kiosk)
+Route::get('/kiosk', [KioskController::class, 'index'])->name('kiosk.index');
+Route::post('/kiosk/check-data', [KioskController::class, 'checkData'])->name('kiosk.check-data');
+Route::post('/kiosk/finalize', [KioskController::class, 'finalize'])->name('kiosk.finalize');
+Route::get('/monitor-antrean', [KioskController::class, 'monitor'])->name('monitor.index');

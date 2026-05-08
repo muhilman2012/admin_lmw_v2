@@ -70,6 +70,11 @@
                             <i class="ti ti-calendar-event me-2"></i> Hari Libur
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a href="#tab-slots" class="nav-link" data-bs-toggle="tab">
+                            <i class="ti ti-clock-plus me-2"></i> Slot Kunjungan
+                        </a>
+                    </li>
                     <li class="nav-item" role="presentation">
                         <a href="#tab-announcements" class="nav-link" data-bs-toggle="tab" aria-selected="false" tabindex="-1" role="tab">
                             <i class="ti ti-megaphone me-2"></i> Pengumuman
@@ -549,7 +554,7 @@
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <div>
                                 <h4 class="mb-1">Pengaturan Hari Libur & Cuti Bersama</h4>
-                                <p class="text-muted small mb-0">Tanggal yang terdaftar akan diabaikan dalam perhitungan grafik statistik harian.</p>
+                                <p class="text-muted small mb-0">Kelola pengecualian operasional untuk sistem registrasi dan statistik grafik.</p>
                             </div>
                             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-holiday">
                                 <i class="ti ti-calendar-plus me-2"></i> Tambah Hari Libur
@@ -562,6 +567,7 @@
                                     <tr>
                                         <th>Tanggal</th>
                                         <th>Keterangan</th>
+                                        <th>Tipe Pemblokiran</th>
                                         <th class="w-1">Aksi</th>
                                     </tr>
                                 </thead>
@@ -571,25 +577,201 @@
                                         <td class="fw-bold">{{ \Carbon\Carbon::parse($holiday->holiday_date)->format('d F Y') }}</td>
                                         <td class="text-secondary">{{ $holiday->note ?? '-' }}</td>
                                         <td>
-                                            <form action="{{ route('settings.holidays.destroy', $holiday->id) }}" method="POST" class="delete-holiday-form">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="btn btn-sm btn-icon btn-outline-danger" title="Hapus">
+                                            @if($holiday->block_registration) <span class="badge bg-azure-lt">Registrasi</span> @endif
+                                            @if($holiday->block_chart) <span class="badge bg-green-lt">Chart</span> @endif
+                                        </td>
+                                        <td>
+                                            <div class="btn-list flex-nowrap">
+                                                {{-- Tombol Edit --}}
+                                                <button class="btn btn-sm btn-icon btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modal-edit-holiday-{{ $holiday->id }}">
+                                                    <i class="ti ti-edit"></i>
+                                                </button>
+
+                                                {{-- Tombol Hapus --}}
+                                                <button class="btn btn-sm btn-icon btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modal-delete-holiday-{{ $holiday->id }}">
                                                     <i class="ti ti-trash"></i>
                                                 </button>
-                                            </form>
+                                            </div>
+
+                                            {{-- MODAL EDIT --}}
+                                            <div class="modal modal-blur fade" id="modal-edit-holiday-{{ $holiday->id }}" tabindex="-1" role="dialog" aria-hidden="true">
+                                                <div class="modal-dialog modal-dialog-centered" role="document">
+                                                    <div class="modal-content">
+                                                        <div class="modal-header">
+                                                            <h5 class="modal-title">Edit Hari Libur</h5>
+                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                        </div>
+                                                        <form action="{{ route('settings.holidays.update', $holiday->id) }}" method="POST">
+                                                            @csrf
+                                                            @method('PUT')
+                                                            <div class="modal-body">
+                                                                <div class="mb-3">
+                                                                    <label class="form-label">Tanggal Libur</label>
+                                                                    <input type="date" name="holiday_date" class="form-control" value="{{ $holiday->holiday_date->format('Y-m-d') }}" required>
+                                                                </div>
+                                                                <div class="mb-3">
+                                                                    <label class="form-label">Keterangan</label>
+                                                                    <input type="text" name="note" class="form-control" value="{{ $holiday->note }}">
+                                                                </div>
+                                                                <div class="mb-3">
+                                                                    <label class="form-label">Tipe Pemblokiran</label>
+                                                                    <div class="d-flex gap-3">
+                                                                        <label class="form-check form-check-inline">
+                                                                            <input class="form-check-input" type="checkbox" name="block_registration" value="1" {{ $holiday->block_registration ? 'checked' : '' }}>
+                                                                            <span class="form-check-label">Registrasi</span>
+                                                                        </label>
+                                                                        <label class="form-check form-check-inline">
+                                                                            <input class="form-check-input" type="checkbox" name="block_chart" value="1" {{ $holiday->block_chart ? 'checked' : '' }}>
+                                                                            <span class="form-check-label">Chart Dashboard</span>
+                                                                        </label>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="modal-footer">
+                                                                <button type="button" class="btn me-auto" data-bs-dismiss="modal">Batal</button>
+                                                                <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                                                            </div>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {{-- MODAL KONFIRMASI HAPUS --}}
+                                            <div class="modal modal-blur fade" id="modal-delete-holiday-{{ $holiday->id }}" tabindex="-1" role="dialog" aria-hidden="true">
+                                                <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+                                                    <div class="modal-content">
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                        <div class="modal-status bg-danger"></div>
+                                                        <div class="modal-body text-center py-4">
+                                                            <i class="ti ti-alert-triangle icon mb-2 text-danger icon-lg" style="font-size: 3rem;"></i>
+                                                            <h3>Apakah Anda yakin?</h3>
+                                                            <div class="text-secondary">Anda akan menghapus hari libur <strong>"{{ $holiday->note ?? $holiday->holiday_date->format('d/m/Y') }}"</strong>. Data ini tidak dapat dikembalikan.</div>
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <div class="w-100">
+                                                                <div class="row">
+                                                                    <div class="col"><a href="#" class="btn w-100" data-bs-dismiss="modal">Batal</a></div>
+                                                                    <div class="col">
+                                                                        <form action="{{ route('settings.holidays.destroy', $holiday->id) }}" method="POST">
+                                                                            @csrf
+                                                                            @method('DELETE')
+                                                                            <button type="submit" class="btn btn-danger w-100">Ya, Hapus</button>
+                                                                        </form>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    @empty
+                                    {{-- ... --}}
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {{-- TAB 9: MANAJEMEN SLOT KUNJUNGAN DAN RENTANG TANGGAL --}}
+                    <div class="tab-pane" id="tab-slots" role="tabpanel">
+                        <div class="card mb-3 border-primary shadow-sm">
+                            <div class="card-header bg-primary-lt">
+                                <h3 class="card-title"><i class="ti ti-settings me-2"></i>Konfigurasi Periode Pendaftaran</h3>
+                            </div>
+                            <div class="card-body">
+                                @php $regSetting = \App\Models\RegistrationSetting::first(); @endphp
+                                <form action="{{ route('settings.registration.update-global') }}" method="POST">
+                                    @csrf
+                                    @method('PUT')
+                                    <div class="row g-3">
+                                        <div class="col-md-3">
+                                            <label class="form-label required">Tanggal Mulai Dibuka</label>
+                                            <input type="date" name="open_date" class="form-control" 
+                                                value="{{ optional($regSetting)->open_date ? $regSetting->open_date->format('Y-m-d') : '' }}" required>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label required">Tanggal Penutupan</label>
+                                            <input type="date" name="close_date" class="form-control" 
+                                                value="{{ optional($regSetting)->close_date ? $regSetting->close_date->format('Y-m-d') : '' }}" required>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label required">Kunci NIK (Hari)</label>
+                                            <div class="input-group">
+                                                <input type="number" name="eligibility_days" class="form-control" 
+                                                    value="{{ $regSetting->eligibility_days ?? 20 }}" min="1" required>
+                                                <span class="input-group-text">Hari</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3 d-flex align-items-end">
+                                            <button type="submit" class="btn btn-primary w-100">
+                                                <i class="ti ti-device-floppy me-2"></i>Simpan Konfigurasi
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        {{-- 2. DAFTAR SLOT JAM (KODE SEBELUMNYA) --}}
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <h4 class="mb-1">Daftar Jam & Kuota Sesi</h4>
+                                <p class="text-muted small mb-0">Atur pembagian waktu kunjungan untuk periode di atas.</p>
+                            </div>
+                            <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modal-slot">
+                                <i class="ti ti-plus me-2"></i>Tambah Jam Sesi
+                            </button>
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-vcenter card-table">
+                                <thead>
+                                    <tr>
+                                        <th>Jam Mulai</th>
+                                        <th>Kuota per Sesi</th>
+                                        <th>Status</th>
+                                        <th class="w-1">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($visitSlots ?? [] as $slot)
+                                    <tr>
+                                        <td class="fw-bold">{{ \Carbon\Carbon::parse($slot->time_start)->format('H:i') }} WIB</td>
+                                        <td>{{ $slot->quota }} Orang</td>
+                                        <td>
+                                            @if($slot->is_active)
+                                                <span class="badge bg-success">Aktif</span>
+                                            @else
+                                                <span class="badge bg-secondary">Non-Aktif</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            <div class="btn-list flex-nowrap">
+                                                <button class="btn btn-sm btn-icon btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modal-edit-slot-{{ $slot->id }}">
+                                                    <i class="ti ti-edit"></i>
+                                                </button>
+                                                <form action="{{ route('settings.slots.destroy', $slot->id) }}" method="POST" onsubmit="return confirm('Hapus slot jam ini?')">
+                                                    @csrf @method('DELETE')
+                                                    <button type="submit" class="btn btn-sm btn-icon btn-outline-danger">
+                                                        <i class="ti ti-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
                                         </td>
                                     </tr>
                                     @empty
                                     <tr>
-                                        <td colspan="3" class="text-center text-muted py-4">Belum ada hari libur yang diatur.</td>
+                                        <td colspan="4" class="text-center text-muted py-4">Belum ada slot waktu yang diatur.</td>
                                     </tr>
                                     @endforelse
                                 </tbody>
                             </table>
                         </div>
                     </div>
-                    {{-- TAB 9: MANAJEMEN PENGUMUMAN --}}
+                    {{-- TAB 10: MANAJEMEN PENGUMUMAN --}}
                     <div class="tab-pane" id="tab-announcements" role="tabpanel">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <div>
@@ -635,11 +817,82 @@
                                             </span>
                                         </td>
                                         <td>
-                                            {{-- Tombol pemicu modal hapus --}}
-                                            <button type="button" class="btn btn-sm btn-icon btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modal-delete-announcement-{{ $ann->id }}">
-                                                <i class="ti ti-trash"></i>
-                                            </button>
+                                            <div class="d-flex gap-2">
+                                                {{-- Tombol Edit --}}
+                                                <button type="button" class="btn btn-sm btn-icon btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modal-edit-announcement-{{ $ann->id }}">
+                                                    <i class="ti ti-edit"></i>
+                                                </button>
 
+                                                {{-- Tombol Hapus --}}
+                                                <button type="button" class="btn btn-sm btn-icon btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modal-delete-announcement-{{ $ann->id }}">
+                                                    <i class="ti ti-trash"></i>
+                                                </button>
+                                            </div>
+
+                                            {{-- MODAL EDIT --}}
+                                            <div class="modal modal-blur fade" id="modal-edit-announcement-{{ $ann->id }}" tabindex="-1" role="dialog" aria-hidden="true">
+                                                <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+                                                    <div class="modal-content">
+                                                        <form action="{{ route('settings.announcements.update', $ann->id) }}" method="POST" enctype="multipart/form-data">
+                                                            @csrf
+                                                            @method('PUT')
+                                                            <div class="modal-header">
+                                                                <h5 class="modal-title">Edit Pengumuman</h5>
+                                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                            </div>
+                                                            <div class="modal-body">
+                                                                <div class="row">
+                                                                    <div class="col-lg-12">
+                                                                        <div class="mb-3">
+                                                                            <label class="form-label">Judul</label>
+                                                                            <input type="text" name="title" class="form-control" value="{{ $ann->title }}" required>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="col-lg-6">
+                                                                        <div class="mb-3">
+                                                                            <label class="form-label">Tanggal Mulai</label>
+                                                                            <input type="date" name="start_date" class="form-control" value="{{ $ann->start_date }}" required>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="col-lg-6">
+                                                                        <div class="mb-3">
+                                                                            <label class="form-label">Tanggal Selesai</label>
+                                                                            <input type="date" name="end_date" class="form-control" value="{{ $ann->end_date }}" required>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="col-lg-12">
+                                                                        <div class="mb-3">
+                                                                            <label class="form-label">Konten</label>
+                                                                            <textarea name="content" class="form-control" rows="4" required>{{ $ann->content }}</textarea>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="col-lg-8">
+                                                                        <div class="mb-3">
+                                                                            <label class="form-label">Ganti Gambar (Opsional)</label>
+                                                                            <input type="file" name="image" class="form-control" accept="image/*">
+                                                                            <small class="text-muted">Biarkan kosong jika tidak ingin mengubah gambar.</small>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="col-lg-4">
+                                                                        <div class="mb-3">
+                                                                            <label class="form-label">Status</label>
+                                                                            <select name="is_active" class="form-select">
+                                                                                <option value="1" {{ $ann->is_active ? 'selected' : '' }}>Aktif</option>
+                                                                                <option value="0" {{ !$ann->is_active ? 'selected' : '' }}>Non-aktif</option>
+                                                                            </select>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="modal-footer">
+                                                                <a href="#" class="btn btn-link link-secondary" data-bs-dismiss="modal">Batal</a>
+                                                                <button type="submit" class="btn btn-primary ms-auto">Simpan Perubahan</button>
+                                                            </div>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
                                             {{-- MODAL KONFIRMASI HAPUS (Unik per ID) --}}
                                             <div class="modal modal-blur fade" id="modal-delete-announcement-{{ $ann->id }}" tabindex="-1" role="dialog" aria-hidden="true">
                                                 <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
@@ -814,6 +1067,20 @@
                         <label class="form-label">Keterangan / Nama Libur</label>
                         <input type="text" name="note" class="form-control" placeholder="Contoh: Idul Fitri atau Cuti Bersama">
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tipe Pemblokiran</label>
+                        <div class="d-flex gap-3">
+                            <label class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" name="block_registration" value="1" checked>
+                                <span class="form-check-label">Registrasi</span>
+                            </label>
+                            <label class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" name="block_chart" value="1" checked>
+                                <span class="form-check-label">Chart Dashboard</span>
+                            </label>
+                        </div>
+                        <small class="text-muted">Ceklis jika ingin memblokir akses pada modul tersebut.</small>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn me-auto" data-bs-dismiss="modal">Batal</button>
@@ -824,6 +1091,110 @@
     </div>
 </div>
 
+{{-- MODAL TAMBAH SLOT --}}
+<div class="modal modal-blur fade" id="modal-slot" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Tambah Slot Waktu</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ route('settings.slots.store') }}" method="POST">
+                @csrf
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Jam Mulai</label>
+                        <input type="time" name="time_start" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Kuota (Orang)</label>
+                        <input type="number" name="quota" class="form-control" min="1" placeholder="Contoh: 15" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="is_active" value="1" checked>
+                            <span class="form-check-label">Aktifkan Slot</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn me-auto" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan Slot</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{{-- MODAL EDIT SLOT (LOOP) --}}
+@foreach($visitSlots ?? [] as $slot)
+<div class="modal modal-blur fade" id="modal-edit-slot-{{ $slot->id }}" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <form action="{{ route('settings.slots.update', $slot->id) }}" method="POST">
+                @csrf @method('PUT')
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Slot</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Jam Mulai</label>
+                        <input type="time" name="time_start" class="form-control" value="{{ $slot->time_start }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Kuota</label>
+                        <input type="number" name="quota" class="form-control" value="{{ $slot->quota }}" required>
+                    </div>
+                    <label class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="is_active" value="1" {{ $slot->is_active ? 'checked' : '' }}>
+                        <span class="form-check-label">Aktif</span>
+                    </label>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary w-100">Update Slot</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endforeach
+
+{{-- MODAL EDIT SLOT (LOOP) --}}
+@foreach($visitSlots ?? [] as $slot)
+<div class="modal modal-blur fade" id="modal-edit-slot-{{ $slot->id }}" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <form action="{{ route('settings.slots.update', $slot->id) }}" method="POST">
+                @csrf @method('PUT')
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Slot</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Jam Mulai</label>
+                        <input type="time" name="time_start" class="form-control" value="{{ $slot->time_start }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Kuota</label>
+                        <input type="number" name="quota" class="form-control" value="{{ $slot->quota }}" required>
+                    </div>
+                    <label class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="is_active" value="1" {{ $slot->is_active ? 'checked' : '' }}>
+                        <span class="form-check-label">Aktif</span>
+                    </label>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary w-100">Update Slot</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endforeach
+
+{{-- Modal Tambah Announcement --}}
 <div class="modal modal-blur fade" id="modal-announcement-create" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
         <div class="modal-content">

@@ -193,6 +193,19 @@ class ReportsController extends Controller
 
                 Log::info('Data pengadu berhasil disimpan.', ['reporter_id' => $reporter->id]);
 
+                $queue = \App\Models\RegistrationQueue::where('nik', $validated['nik'])
+                    ->where('status', 'serving')
+                    ->whereDate('visit_date', now()->toDateString())
+                    ->first();
+
+                if ($queue) {
+                    $queue->update([
+                        'status' => 'served',
+                        'completed_at' => now()
+                    ]);
+                    Log::info('Status antrean berhasil diperbarui menjadi served.', ['queue_id' => $queue->id]);
+                }
+
                 // --- LOGIKA PENENTUAN DISTRIBUSI ---
                 $unitKerjaId = null;
                 $deputyId = null;

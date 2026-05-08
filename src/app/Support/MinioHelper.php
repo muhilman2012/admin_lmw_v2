@@ -7,7 +7,6 @@ if (! function_exists('guessMimeFromExtension')) {
     function guessMimeFromExtension(string $path): string
     {
         $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-        // Umum
         return match ($ext) {
             'pdf'            => 'application/pdf',
             'png'            => 'image/png',
@@ -33,7 +32,6 @@ if (! function_exists('guessMimeFromExtension')) {
 }
 
 if (! function_exists('dispositionForMime')) {
-    // Tentukan inline/attachment berdasarkan mime
     function dispositionForMime(string $mime): string
     {
         return str_starts_with($mime, 'image/')
@@ -45,9 +43,6 @@ if (! function_exists('dispositionForMime')) {
 }
 
 if (! function_exists('signMinioUrlSmart')) {
-    /**
-     * Presigned URL dengan header respons yang sesuai jenis file.
-     */
     function signMinioUrlSmart(
         string $bucket,
         string $key,
@@ -58,7 +53,6 @@ if (! function_exists('signMinioUrlSmart')) {
         $client = new S3Client([
             'version' => 'latest',
             'region'  => env('AWS_DEFAULT_REGION', 'us-east-1'),
-            // HOST publik yang diakses browser (bukan "minio:9000")
             'endpoint'=> rtrim(env('AWS_TEMPORARY_URL', 'http://localhost:9000'), '/'),
             'use_path_style_endpoint' => true,
             'signature_version'       => 'v4',
@@ -77,10 +71,9 @@ if (! function_exists('signMinioUrlSmart')) {
             'Bucket' => $bucket,
             'Key'    => $key,
 
-            // Header respons untuk browser
             'ResponseContentType'        => $mime,
             'ResponseContentDisposition' => $disp . '; filename="' . addslashes($filename) . '"',
-            'ResponseCacheControl'       => 'public, max-age=86400', // cache 1 hari
+            'ResponseCacheControl'       => 'public, max-age=86400',
         ]);
 
         $req = $client->createPresignedRequest($cmd, now()->addMinutes($minutes));

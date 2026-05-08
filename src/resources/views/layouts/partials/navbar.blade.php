@@ -142,12 +142,20 @@
                         <span class="nav-link-title">Profil</span>
                     </a>
                 </li>
-                <li class="nav-item {{ Request::is('admin/reporters*') ? 'active' : '' }}">
+                {{-- <li class="nav-item {{ Request::is('admin/reporters*') ? 'active' : '' }}">
                     <a class="nav-link" href="{{ route('reporters.index') }}">
                         <span class="nav-link-icon d-md-none d-lg-inline-block">
                             <i class="ti ti-list"></i>
                         </span>
                         <span class="nav-link-title">Daftar Pengadu</span>
+                    </a>
+                </li> --}}
+                <li class="nav-item {{ Request::is('admin/operator/workspace*') ? 'active' : '' }}">
+                    <a class="nav-link" href="{{ route('operator.workspace') }}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="ti ti-list"></i>
+                        </span>
+                        <span class="nav-link-title">Antrean</span>
                     </a>
                 </li>
                 <li class="nav-item {{ Request::is('admin/reports*') ? 'active' : '' }}">
