@@ -151,6 +151,27 @@ services:
             retries: 3
             timeout: 5s
 
+    reverb:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        container_name: lmw-reverb
+        restart: always
+        volumes:
+            - ./src:/var/www
+            - ./config/.env:/var/www/.env
+        command: php artisan reverb:start --host=0.0.0.0 --port=8081
+        env_file: ./config/.env
+        ports:
+            - "8081:8081"
+        depends_on:
+            mysql:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+        networks:
+            - lmw-network
+
 networks:
     lmw-network:
         driver: bridge
