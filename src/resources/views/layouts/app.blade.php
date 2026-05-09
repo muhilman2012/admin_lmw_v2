@@ -29,21 +29,16 @@
     @stack('scripts')
     @push('scripts')
         <script>
-            // Konfigurasi Timeout (HARUS SAMA dengan SESSION_LIFETIME di .env)
-            // 60 menit * 60 detik * 1000 milidetik = 3,600,000 milidetik
-            const TIMEOUT_IN_MS = 30 * 1000; // 1 Jam
+            const TIMEOUT_IN_MS = 50 * 1000;
 
             let timeoutTimer;
 
-            // Fungsi untuk me-reset timer setiap kali ada aksi
             function resetTimer() {
                 clearTimeout(timeoutTimer);
                 timeoutTimer = setTimeout(autoLogout, TIMEOUT_IN_MS);
             }
 
-            // Fungsi yang dipanggil saat timer habis
             function autoLogout() {
-                // Tampilkan pesan Toaster (asumsi Anda menggunakan Swal/Toast)
                 if (typeof Swal !== 'undefined') {
                     Swal.fire({
                         icon: 'warning',
@@ -55,25 +50,20 @@
                 } else {
                     alert('Sesi Anda telah berakhir karena tidak aktif. Harap login kembali.');
                 }
-                
-                // PERBAIKAN: Gunakan form yang sudah ada di HTML
+
                 const logoutForm = document.getElementById('logout-form');
                 
-                // Tambahkan delay agar user sempat melihat pesan Swal
                 setTimeout(() => {
                     if (logoutForm) {
                         logoutForm.submit();
                     } else {
-                        // Fallback jika form tidak ditemukan
                         window.location.href = '{{ route('login') }}'; 
                     }
-                }, 4500); // 4.5 detik (sedikit lebih lama dari timer Swal)
+                }, 4500);
             }
 
-            // 1. Inisialisasi timer saat halaman dimuat
             resetTimer();
 
-            // 2. Pasang listener untuk event aktivitas: mouse/keyboard
             document.addEventListener('mousemove', resetTimer, true);
             document.addEventListener('keypress', resetTimer, true);
             document.addEventListener('scroll', resetTimer, true); 

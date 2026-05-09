@@ -143,16 +143,35 @@
             console.log('Suara diaktifkan via keyboard/klik');
         }
 
-        if (typeof Echo !== 'undefined') {
-            Echo.channel('kiosk-channel').listen('.AntreanDipanggil', (data) => {
-                // Update UI & Suara
-                document.getElementById('big-number').innerText = data.queueNumber;
-                document.getElementById('big-loket').innerText = 'LOKET ' + data.counterNumber;
-                document.getElementById('big-name').innerText = data.name;
-                if (voiceEnabled) playVoice(data.queueNumber, data.counterNumber);
-                if (window.Livewire) window.Livewire.dispatch('refreshComponent');
-            });
-        }
+        const initEchoListener = setInterval(() => {
+            if (typeof Echo !== 'undefined') {
+                clearInterval(initEchoListener);
+                console.log('Echo Terdeteksi! Menghubungkan ke kiosk-channel...');
+
+                Echo.channel('kiosk-channel')
+                    .listen('.AntreanDipanggil', (data) => {
+                        console.log('Data diterima:', data);
+                        
+                        const numEl = document.getElementById('big-number');
+                        const loketEl = document.getElementById('big-loket');
+                        const nameEl = document.getElementById('big-name');
+
+                        if(numEl) numEl.innerText = data.queueNumber;
+                        if(loketEl) loketEl.innerText = 'LOKET ' + data.counterNumber;
+                        if(nameEl) nameEl.innerText = data.name;
+
+                        if (voiceEnabled) {
+                            playVoice(data.queueNumber, data.counterNumber);
+                        } else {
+                            console.warn('Suara belum diaktifkan oleh pengguna.');
+                        }
+
+                        if (window.Livewire) window.Livewire.dispatch('refreshComponent');
+                    });
+            } else {
+                console.log('Menunggu Echo dimuat oleh Vite...');
+            }
+        }, 500);
     });
 
     function playVoice(queueNumber, counter) {
@@ -162,12 +181,14 @@
             
             if (chime) {
                 chime.currentTime = 0;
-                chime.onended = null; 
                 chime.play().then(() => {
                     chime.onended = function() {
                         setTimeout(() => { startSpeaking(queueNumber, counter); }, 800);
                     };
-                }).catch(e => startSpeaking(queueNumber, counter));
+                }).catch(e => {
+                    console.error("Gagal putar chime:", e);
+                    startSpeaking(queueNumber, counter);
+                });
             } else {
                 startSpeaking(queueNumber, counter);
             }
@@ -180,9 +201,11 @@
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'id-ID';
         utterance.rate = 0.8; 
+        
         const voices = window.speechSynthesis.getVoices();
         const idVoice = voices.find(v => v.lang.includes('id') || v.lang.includes('ID'));
         if (idVoice) utterance.voice = idVoice;
+        
         window.speechSynthesis.speak(utterance);
     }
 </script>

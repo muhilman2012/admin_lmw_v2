@@ -88,13 +88,13 @@
             border-left-color: #2563eb;
         }
     </style>
+    @vite(['resources/js/app.js'])
     @livewireStyles
 </head>
-<body>
+<body> 
     @yield('content')
     <script src="{{ asset('assets/js/axios.min.js') }}"></script>
     <script src="{{ asset('assets/js/sweetalert2.all.min.js') }}"></script>
-    @vite(['resources/js/app.js']) 
     @livewireScripts
     @stack('scripts')
 </body>
