@@ -564,7 +564,7 @@
             <form id="mass-category-form-livewire"> 
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title">Ubah Kategori Massal</h5>
+                        <h5 class="modal-title">Ubah Kategori</h5>
                         <button type="button" class="btn-close" aria-label="Close" data-bs-dismiss="modal" onclick="hideModalPureJS(document.getElementById('modal-mass-category'), 'resetMassActionProperties')"></button>
                     </div>
                     <div class="modal-body">
@@ -621,7 +621,7 @@
         <div class="modal-dialog modal-sm modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title text-danger"><i class="ti ti-alert-triangle me-2"></i>Konfirmasi Ubah Kategori Massal</h5>
+                    <h5 class="modal-title text-danger"><i class="ti ti-alert-triangle me-2"></i>Konfirmasi Ubah Kategori</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="window.hideConfirmationMassCategory()"></button>
                 </div>
                 <div class="modal-body text-start">
@@ -644,7 +644,7 @@
                 <div class="modal-footer justify-content-between">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="window.hideConfirmationMassCategory()">Batal</button>
                     <button type="button" class="btn btn-danger" onclick="window.submitMassCategoryUpdate()">
-                        Ya, Update Massal
+                        Ya, Ubah Kategori
                     </button>
                 </div>
             </div>
@@ -1005,7 +1005,23 @@
                     if (!component) { console.error("Livewire component not found."); return; }
                     
                     const newCategoryId = component.$wire.get('newCategoryId');
-                    if (!newCategoryId) { component.$wire.call('validate', 'newCategoryId'); return; }
+                    if (!newCategoryId || newCategoryId === "") {
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                title: 'Kategori Kosong',
+                                text: 'Silakan pilih kategori baru terlebih dahulu sebelum memperbarui.',
+                                icon: 'warning',
+                                toast: true,
+                                position: 'top-end',
+                                showConfirmButton: false,
+                                timer: 4000,
+                                timerProgressBar: true
+                            });
+                        } else {
+                            alert('Silakan pilih kategori baru terlebih dahulu.');
+                        }
+                        return;
+                    }
                     
                     const selectedReportsCount = component.$wire.get('selectedReports').length;
                     const categorySelect = document.getElementById('mass-category-select');
