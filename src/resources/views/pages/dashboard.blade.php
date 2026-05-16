@@ -7,7 +7,6 @@
 @endsection
 
 @section('page_header')
-    {{-- PAGE HEADER DINAMIS (Mengandung Greetings dan Kartu Statistik) --}}
     @php
         use Illuminate\Support\Facades\Auth;
         
@@ -24,11 +23,9 @@
         $userName = Auth::user()->name ?? 'Pengguna';
         $userRole = Auth::user()->getRoleNames()->first() ?? 'User';
         
-        // --- LOGIKA KARTU STATISTIK (Disederhanakan untuk View) ---
         $isSuperAdminOrAdmin = Auth::user()->hasAnyRole(['superadmin', 'admin']);
         $isDeputyOrAsdep = Auth::user()->hasAnyRole(['deputy', 'asdep_karo']);
         
-        // Kartu 1: Pending/Belum
         if ($isSuperAdminOrAdmin) {
             $card1Title = 'Belum Terdistribusi';
             $card1Value = $reportStats['undistributed_count'] ?? 0;
@@ -41,7 +38,6 @@
             $card1Title = null;
         }
 
-        // Kartu 2: Selesai/Sudah
         if ($isSuperAdminOrAdmin) {
             $card2Title = 'Sudah Terdistribusi';
             $card2Value = $reportStats['distributed_count'] ?? 0;
@@ -80,7 +76,6 @@
                                     <div class="d-flex flex-column">
                                         <h3 class="h2">Total Data Laporan</h3>
                                         <div class="row gr-5 gy-2 mb-6 mt-auto">
-                                            {{-- Data Source (WA, Tatap Muka, Surat, Total) --}}
                                             <div class="col-auto">
                                                 <div class="text-green fw-semibold">WhatsApp</div>
                                                 <div class="d-flex align-items-baseline">
@@ -107,7 +102,6 @@
                                             </div>
                                         </div>
                                     </div>
-                                    {{-- Dropdown Filter Waktu Dinamis --}}
                                     <div class="dropdown">
                                         <a class="dropdown-toggle text-secondary" id="sales-dropdown" href="#" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Select time range for sales data">
                                             {{ $currentRange ?? 'Last 7 days' }}
@@ -136,12 +130,10 @@
             <div class="col-sm-6 col-md-12 col-lg-12 col-xl-3">
                 @hasanyrole(['superadmin', 'admin', 'deputy', 'asdep_karo'])
                     <div class="row row-cards g-3">
-                        {{-- 1. CARD STATUS (DISPOSISI/DISTRIBUSI) --}}
                         @if ($card1Title || $card2Title)
                         <div class="col-12">
                             <div class="row row-cards g-3">
                                 @if ($card1Title)
-                                {{-- MENGUBAH LEBAR DARI col-lg-6 MENJADI col-12 --}}
                                 <div class="col-12"> 
                                     <div class="card card-sm h-100">
                                         <div class="card-body">
@@ -157,7 +149,6 @@
                                 </div>
                                 @endif
                                 @if ($card2Title)
-                                {{-- MENGUBAH LEBAR DARI col-lg-6 MENJADI col-12 --}}
                                 <div class="col-12">
                                     <div class="card card-sm h-100">
                                         <div class="card-body">
@@ -184,7 +175,6 @@
                                                 <div class="col">
                                                     <div class="font-weight-medium mb-1">Jumlah Laporan Berdasarkan Gender</div>
                                                     <div class="row g-2">
-                                                        {{-- Laki-laki --}}
                                                         <div class="col-6 border-end">
                                                             <div class="d-flex align-items-center justify-content-center">
                                                                 <i class="ti ti-man me-1 text-blue"></i>
@@ -194,7 +184,6 @@
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        {{-- Perempuan --}}
                                                         <div class="col-6">
                                                             <div class="d-flex align-items-center justify-content-center">
                                                                 <i class="ti ti-woman me-1 text-pink"></i>
@@ -215,8 +204,7 @@
                         @endif
 
                         @hasanyrole(['superadmin', 'admin'])
-                            {{-- KONDISI 1: SUPERADMIN / ADMIN (Melihat Total Semua Deputi) --}}
-                            <div class="col-12 mt-3"> {{-- Tambahkan margin-top agar tidak menempel pada card di atasnya --}}
+                            <div class="col-12 mt-3">
                                 <div class="card h-100">
                                     <div class="card-body">
                                         <div class="h5 fw-bolder">Status Pengaduan (Total Semua Deputi)</div>
@@ -237,7 +225,6 @@
                                         <div class="d-flex justify-content-center align-items-center" style="min-height: 250px;">
                                             <div id="chart-pie-deputy-status" style="width: 100%;">
                                                 @if (isset($userDeputyPieChartDataJson) && strlen($userDeputyPieChartDataJson) > 20)
-                                                    {{-- Placeholder akan diisi JS --}}
                                                 @else
                                                     <div class="alert alert-info text-center">Data status laporan untuk Divisi Anda tidak ditemukan.</div>
                                                 @endif
@@ -250,7 +237,6 @@
                     </div>
                 @endhasanyrole
 
-                {{-- MINI-DATATABLE: MONITORING (ANALYST) --}}
                 @hasrole('analyst')
                     <div class="card card-body-scrollable h-100 mt-0"> {{-- Hapus margin top 3 dan set mt-0 (atau hapus mt-3) --}}
                         <div class="card-header border-0">
@@ -300,41 +286,27 @@
         </div>
     </div>
     
-    {{-- BARIS 2: CARD DEPUTI (SEMUA CARD DEPUTI DI BAWAH CHART UTAMA) --}}
     <div class="col-12 mt-3">
         @hasanyrole(['superadmin', 'admin'])
             <div class="row row-cards g-3">
-                {{-- LIST CARD STATISTIK PER DEPUTI (Menggunakan Loop yang Membagi Kolom) --}}
                 @forelse ($deputyStats as $deputy)
                     <div class="col-sm-6 col-md-6 col-lg-3">
                         <div class="card h-100">
                             <div class="card-body d-flex flex-column">
-                                {{-- Nama Deputi (Fleksibel, bisa membungkus) --}}
                                 <div class="h5 fw-bolder text-center mb-3">{{ $deputy['name'] }}</div>
-                                
-                                {{-- BARIS ANGKA: Menggunakan GRID TETAP col-4 (4+4+4=12) --}}
-                                {{-- Hapus 'justify-content-between' dan 'gr-2' --}}
-                                <div class="row mt-auto"> 
-                                    
-                                    {{-- 1. WhatsApp --}}
-                                    {{-- Menggunakan col-4 --}}
+                                <div class="row mt-auto">
                                     <div class="col-4 text-center"> 
                                         <div class="subheader">WhatsApp</div>
                                         <div class="d-flex flex-column align-items-center">
-                                            {{-- Tambahkan text-center/align-items-center jika Anda ingin angka benar-benar di tengah --}}
                                             <div class="h3 text-secondary">{{ number_format($deputy['counts']['whatsapp'] ?? 0, 0, ',', '.') }}</div>
                                         </div>
                                     </div>
-                                    
-                                    {{-- 2. Tatap Muka --}}
                                     <div class="col-4 text-center">
                                         <div class="subheader">Tatap Muka</div>
                                         <div class="d-flex flex-column align-items-center">
                                             <div class="h3 text-secondary">{{ number_format($deputy['counts']['tatap muka'] ?? 0, 0, ',', '.') }}</div>
                                         </div>
                                     </div>
-                                    
-                                    {{-- 3. Surat --}}
                                     <div class="col-4 text-center">
                                         <div class="subheader">Surat</div>
                                         <div class="d-flex flex-column align-items-center">
@@ -351,7 +323,6 @@
                                 <div class="row pt-3 mt-3 border-top"> 
                                     <div class="col-12 text-center">
                                         <div class="subheader">Total Semua Sumber</div>
-                                        {{-- Menggunakan text-primary/text-success untuk menonjolkan Total --}}
                                         <div class="h2 text-success">{{ number_format($total, 0, ',', '.') }}</div>
                                     </div>
                                 </div>
@@ -405,9 +376,7 @@
     <div class="col-12 mt-3">
         <div class="row row-deck row-cards g-3">
             <div class="col-lg-6">
-                
                 @hasanyrole(['superadmin', 'admin'])
-                    {{-- 1. SEBARAN LAPORAN (PETA) untuk ADMIN/SUPERADMIN --}}
                     <div class="card h-100">
                         <div class="card-body">
                             <h4 class="h4">Sebaran Laporan Berdasarkan Provinsi</h4>
@@ -421,7 +390,6 @@
                 @endhasanyrole
 
                 @hasanyrole(['deputy', 'asdep_karo'])
-                    {{-- 2. MINI-DATATABLE: TINJAUAN LAPORAN DISERAHKAN (SUBMITTED) untuk DEPUTY/ASDEP --}}
                     <div class="card card-body-scrollable h-100">
                         <div class="card-header border-0">
                             <h3 class="card-title h4">Tinjauan Cepat Laporan Diserahkan ({{ $reportStats['submitted'] ?? 0 }})</h3>
@@ -468,7 +436,6 @@
                 @endhasanyrole
 
                 @hasrole('analyst')
-                    {{-- 3. MATRIX JUMLAH LAPORAN BERDASARKAN KATEGORI untuk ANALYST --}}
                     <div class="card h-100">
                         <div class="card-header">
                             <h3 class="card-title">Matrix Jumlah Laporan Berdasarkan Kategori</h3>
@@ -521,11 +488,8 @@
                 @endhasrole
             </div>
             
-            {{-- BLOK KANAN (col-lg-6) --}}
             @hasanyrole(['superadmin', 'admin', 'deputy', 'asdep_karo', 'analyst'])
-                <div class="col-lg-6"> 
-                    
-                    {{-- 4. CHART KATEGORI (Top 10 Category) untuk SEMUA ROLE (Kiri Atas) --}}
+                <div class="col-lg-6">
                     <div class="card h-100">
                         <div class="card-body mb-4">
                             <div class="row gy-3">
@@ -556,13 +520,56 @@
                 </div>
             @endhasanyrole
             
-            {{-- FALLBACK / OTHER ROLE --}}
             @if (!Auth::user()->hasAnyRole(['superadmin', 'admin', 'deputy', 'asdep_karo', 'analyst']))
                 <div class="col-12"><div class="card h-100"><div class="card-body text-center text-muted">Akses informasi tambahan tidak tersedia untuk peran Anda.</div></div></div>
             @endif
             
         </div>
     </div>
+    @hasanyrole(['superadmin', 'admin'])
+    <div class="col-12 mt-3">
+        <div class="card">
+            <div class="card-header bg-surface d-flex justify-content-between align-items-center py-3">
+                <h3 class="card-title font-weight-bold m-0 d-flex align-items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon me-2 text-primary" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21l18 0"></path><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16"></path><path d="M9 21v-4a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4"></path><path d="M10 5l4 0"></path><path d="M10 8l4 0"></path><path d="M10 11l4 0"></path></svg>
+                    Top 10 Instansi Diteruskan Melalui LAPOR!
+                </h3>
+                <span class="badge bg-primary-lt">Rentang: {{ $currentRange }}</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th class="w-1 text-center">No</th>
+                            <th>Nama Instansi / Kementerian / Lembaga</th>
+                            <th class="text-end w-2">Jumlah Aduan Berhasil Diteruskan</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($top10Institutions as $index => $instansi)
+                            <tr>
+                                <td class="text-center font-weight-bold text-muted">{{ $index + 1 }}</td>
+                                <td>
+                                    <span class="font-weight-medium text-body">{{ $instansi->institution_name }}</span>
+                                </td>
+                                <td class="text-end font-weight-bold text-primary">
+                                    {{ number_format($instansi->total_forwarded, 0, ',', '.') }} Laporan
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="3" class="text-center text-muted py-5">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon mb-2 text-muted icon-lg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"></path><path d="M12 10l0 4"></path><path d="M12 14l.01 0"></path></svg>
+                                    <div class="mt-2">Tidak ada data laporan yang diteruskan pada periode ini.</div>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    @endhasanyrole
     @hasanyrole(['superadmin', 'admin', 'deputy', 'asdep_karo'])
     <div class="col-md-6 col-lg-12">
         <div class="card">
@@ -570,7 +577,6 @@
                 <h3 class="card-title">Matrix Jumlah Laporan Berdasarkan Kategori</h3>
             </div>
             <div class="row row-cards card-body">
-                {{-- TILE 11 TERATAS DAN 1 TOMBOL 'LIHAT SEMUA' --}}
                 @php
                     $maxDisplay = min(count($categoryStats), 11);
                     $tilesToShow = array_slice($categoryStats, 0, $maxDisplay);
@@ -694,7 +700,6 @@
     </div>
 </div>
 
-{{-- MODAL: RINCIAN STATUS PER ANALIS --}}
 @parent
 <div class="modal modal-blur fade" id="modal-analyst-status-detail" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-sm modal-dialog-centered" role="document">

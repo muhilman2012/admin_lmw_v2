@@ -541,6 +541,26 @@ class DashboardController extends Controller
             }
         }
 
+        // --- LOGIKA TOP 10 INSTANSI TERUSAN LAPOR ---
+        $topInstitutions = DB::table('laporan_forwardings')
+            ->join('institutions', 'laporan_forwardings.institution_id', '=', 'institutions.id')
+            ->join('reports', 'laporan_forwardings.laporan_id', '=', 'reports.id') 
+            ->select(
+                'institutions.name as institution_name',
+                DB::raw('COUNT(laporan_forwardings.id) as total_forwarded')
+            );
+
+        if ($filterKey !== 'total') {
+            $topInstitutions->whereBetween('reports.created_at', [$range['startDate'], $range['endDate']]);
+        }
+
+        $topInstitutions->where('laporan_forwardings.status', 'terkirim');
+
+        $top10Institutions = $topInstitutions->groupBy('institutions.id', 'institutions.name')
+            ->orderBy('total_forwarded', 'desc')
+            ->limit(10)
+            ->get();
+
         return view('pages.dashboard', [
             'announcement' => $announcement,
             'reportStats' => $reportStats,
@@ -551,6 +571,7 @@ class DashboardController extends Controller
             'deputyPieChartDataJson' => json_encode($deputyPieChartData),
             'userDeputyPieChartDataJson' => json_encode($userDeputyPieChartData),
             'totalStatusPieDataJson' => json_encode($totalComplaintStatusPieData),
+            'top10Institutions' => $top10Institutions,
             'categoryStats' => $categoryStats,
             'currentSubjectRangeLabel' => $range['label'],
             'mapDataJson' => $mapDataJson,
