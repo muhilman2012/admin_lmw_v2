@@ -60,7 +60,7 @@ COPY src/ /var/www
 COPY ./config/.env /var/www
 
 RUN ln -s /usr/bin/php84 /usr/bin/php
-RUN composer install --optimize-autoloader --no-dev
+RUN composer install
 RUN php artisan storage:link
 #RUN php artisan migrate --seed
 
