@@ -109,6 +109,7 @@
 <script>
     let voiceEnabled = false;
 
+    // Fungsi Jam Real-time
     function updateClock() {
         const now = new Date();
         const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
@@ -118,12 +119,13 @@
     setInterval(updateClock, 1000);
 
     document.addEventListener('DOMContentLoaded', function () {
+        // Modal Aktivasi Suara (Bypass Autoplay Policy)
         Swal.fire({
-            title: 'SISTEM SIAP',
-            text: 'Tekan ENTER atau SPACE pada keyboard untuk mengaktifkan suara monitor.',
+            title: 'SISTEM ANTREAN SIAP',
+            text: 'Tekan ENTER atau SPACE pada keyboard untuk mengaktifkan suara panggilan monitor.',
             icon: 'success',
             showConfirmButton: true,
-            confirmButtonText: 'AKTIFKAN (ENTER)',
+            confirmButtonText: 'AKTIFKAN SUARA (ENTER)',
             allowOutsideClick: false
         }).then((result) => {
             if (result.isConfirmed) { activateVoice(); }
@@ -138,19 +140,23 @@
 
         function activateVoice() {
             voiceEnabled = true;
-            const msg = new SpeechSynthesisUtterance('');
-            window.speechSynthesis.speak(msg);
-            console.log('Suara diaktifkan via keyboard/klik');
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const msg = new SpeechSynthesisUtterance('');
+                window.speechSynthesis.speak(msg);
+                console.log('✔ Web Audio & Speech API diaktifkan untuk monitor.');
+            }
         }
 
-        const initEchoListener = setInterval(() => {
-            if (typeof Echo !== 'undefined') {
-                clearInterval(initEchoListener);
-                console.log('Echo Terdeteksi! Menghubungkan ke kiosk-channel...');
+        function registerEchoListener() {
+            const echoInstance = window.Echo || Echo;
 
-                Echo.channel('kiosk-channel')
+            if (typeof echoInstance !== 'undefined') {
+                console.log('Laravel Echo Terdeteksi! Menghubungkan ke kiosk-channel...');
+
+                echoInstance.channel('kiosk-channel')
                     .listen('.AntreanDipanggil', (data) => {
-                        console.log('Data diterima:', data);
+                        console.log('Event AntreanDipanggil Diterima:', data);
                         
                         const numEl = document.getElementById('big-number');
                         const loketEl = document.getElementById('big-loket');
@@ -160,34 +166,43 @@
                         if(loketEl) loketEl.innerText = 'LOKET ' + data.counterNumber;
                         if(nameEl) nameEl.innerText = data.name;
 
+                        // Eksekusi Panggilan Suara
                         if (voiceEnabled) {
                             playVoice(data.queueNumber, data.counterNumber);
                         } else {
-                            console.warn('Suara belum diaktifkan oleh pengguna.');
+                            console.warn('⚠ Suara dilewati: Pengguna belum berinteraksi dengan monitor.');
                         }
 
-                        if (window.Livewire) window.Livewire.dispatch('refreshComponent');
+                        // Refresh komponen Livewire pendukung jika ada
+                        if (window.Livewire) {
+                            window.Livewire.dispatch('refreshComponent');
+                        }
                     });
             } else {
-                console.log('Menunggu Echo dimuat oleh Vite...');
+                console.log('⏳ Menunggu window.Echo dimuat oleh bundle Vite...');
+                setTimeout(registerEchoListener, 300); // Polling rekursif yang lebih aman
             }
-        }, 500);
+        }
+
+        // Jalankan pendaftaran listener
+        registerEchoListener();
     });
 
+    // Jalankan Chime Bell Bell sebelum text-to-speech dimulai
     function playVoice(queueNumber, counter) {
         if ('speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
+            window.speechSynthesis.cancel(); // Potong antrean suara lama jika menumpuk
             const chime = document.getElementById('chime-sound');
             
             if (chime) {
                 chime.currentTime = 0;
                 chime.play().then(() => {
                     chime.onended = function() {
-                        setTimeout(() => { startSpeaking(queueNumber, counter); }, 800);
+                        setTimeout(() => { startSpeaking(queueNumber, counter); }, 500);
                     };
                 }).catch(e => {
-                    console.error("Gagal putar chime:", e);
-                    startSpeaking(queueNumber, counter);
+                    console.error("Gagal memutar chime audio file:", e);
+                    startSpeaking(queueNumber, counter); // Tetap panggil suara jika file mp3 rusak
                 });
             } else {
                 startSpeaking(queueNumber, counter);
@@ -195,13 +210,18 @@
         }
     }
 
+    // Fungsi Text-To-Speech Bahasa Indonesia
     function startSpeaking(queueNumber, counter) {
-        const spelled = queueNumber.toString().split('').join(' ');
-        const text = `Nomor antrean, ${spelled}, silakan menuju loket, ${counter}`;
+        // Gabungkan nomor agar dieja satu per satu dengan jeda natural (Contoh: A 0 0 1)
+        const spelled = queueNumber.toString().toUpperCase().split('').join(' ');
+        const text = `Nomor antrean, ${spelled}, silakan menuju, loket, ${counter}`;
+        
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'id-ID';
-        utterance.rate = 0.8; 
+        utterance.rate = 0.85; // Sedikit lebih cepat dari 0.8 agar intonasinya tegas
+        utterance.pitch = 1.0;
         
+        // Pilih engine Google Suara Bahasa Indonesia jika tersedia di browser host
         const voices = window.speechSynthesis.getVoices();
         const idVoice = voices.find(v => v.lang.includes('id') || v.lang.includes('ID'));
         if (idVoice) utterance.voice = idVoice;
