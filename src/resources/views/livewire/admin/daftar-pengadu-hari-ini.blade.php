@@ -31,7 +31,7 @@
                                 @elseif($q->status == 'calling')
                                     <span class="badge bg-blue-lt">Dipanggil</span>
                                 @elseif($q->status == 'serving')
-                                    <span class="badge bg-purple-lt">Sedang Melayani</span>
+                                    <span class="badge bg-purple-lt">Sedang Dilayani</span>
                                 @elseif($q->status == 'served')
                                     <span class="badge bg-green-lt">Selesai</span>
                                 @elseif($q->status == 'skipped')
