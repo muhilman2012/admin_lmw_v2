@@ -7,3 +7,4 @@ src/storage/framework/cache/data/*
 *.zip
 *.tar.gz
 .env
+src/storage/app/public/*
