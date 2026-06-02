@@ -252,7 +252,6 @@
                         <div class="info">
                             Waktu : ${p.time}<br>
                             Nama  : ${p.name.substring(0, 25)}<br>
-                            Topik : ${p.subject.substring(0, 25)}
                         </div>
                         <div class="hr-dashed"></div>
                         <p style="font-size: 8pt; margin-top: 10px;">Harap tunggu panggilan petugas.</p>
@@ -302,7 +301,7 @@
                             margin: 0;
                         }
                         img { 
-                            filter: grayscale(100%); /* Thermal printer hanya dukung hitam putih */
+                            filter: grayscale(100%);
                             max-width: 100%;
                         }
                         .hr-dashed { border-top: 1px dashed #000; margin: 8px 0; }
@@ -353,8 +352,6 @@
     function showScreen(id) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById(id).classList.add('active');
-        
-        // Hapus logika qrScanner.clear() karena sudah tidak dipakai
 
         if(id === 'screen-photo') { 
             initCamera(); 
@@ -364,8 +361,8 @@
 
         if(id === 'screen-checkin') { 
             const inputField = document.getElementById('input_booking');
-            inputField.value = ''; // Reset input
-            setTimeout(() => inputField.focus(), 500); // Auto-focus agar scanner langsung masuk
+            inputField.value = '';
+            setTimeout(() => inputField.focus(), 500);
         }
     }
 
@@ -434,8 +431,8 @@
 
     function startOffline() {
         isOfflineMode = true;
-        base64Photo = null; // Reset foto
-        currentData = null; // Reset data reservasi
+        base64Photo = null;
+        currentData = null;
         
         // Reset visual form
         resetForm();
