@@ -5,7 +5,7 @@
     </div>
     <div class="modal-body">
         <div class="mb-3">
-            <input type="text" class="form-control" placeholder="Cari Nama, NIK, atau No. Antrean..." wire:model.live="search">
+            <input type="text" class="form-control" placeholder="Cari Nama, No. Antrean..." wire:model.live="search">
         </div>
 
         <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
@@ -22,8 +22,11 @@
                         <tr>
                             <td class="fw-bold text-blue">{{ $q->queue_number }}</td>
                             <td>
-                                <div class="fw-bold">{{ $q->name }}</div>
-                                <div class="text-muted small">{{ $q->nik }}</div>
+                                <div class="fw-bold text-dark">{{ $q->name }}</div>
+                                
+                                <div class="text-muted small text-truncate" style="max-width: 300px;" title="{{ $q->subject }}">
+                                    <i class="ti ti-file-text me-1"></i>{{ $q->subject }}
+                                </div>
                             </td>
                             <td>
                                 @if($q->status == 'checked_in')
@@ -41,7 +44,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="4" class="text-center text-muted py-4">Tidak ada data pengadu hari ini.</td>
+                            <td colspan="3" class="text-center text-muted py-4">Tidak ada data pengadu hari ini.</td>
                         </tr>
                     @endforelse
                 </tbody>

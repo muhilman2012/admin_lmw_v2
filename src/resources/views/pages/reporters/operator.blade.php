@@ -69,7 +69,7 @@
                         </div>
                         <div class="col-12">
                             <button id="btn-cancel" class="btn btn-outline-danger w-100 py-2" onclick="batalkanAntrean()" {{ !$activeQueue ? 'disabled' : '' }}>
-                                <i class="ti ti-x me-2"></i> Batalkan Antrean
+                                <i class="ti ti-x me-2"></i> Batalkan Pengaduan
                             </button>
                         </div>
                     </div>

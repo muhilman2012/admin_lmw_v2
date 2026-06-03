@@ -19,7 +19,7 @@ return new class extends Migration
             $table->text('address');
             $table->string('subject');
             $table->boolean('is_disabled')->default(false);
-            $table->string('companion_name');
+            $table->string('companion_name')->nullable();
             $table->date('visit_date');
             $table->time('visit_time');
             $table->string('qr_path')->nullable();
