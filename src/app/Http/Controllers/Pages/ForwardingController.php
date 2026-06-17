@@ -28,8 +28,8 @@ class ForwardingController extends Controller
     {
         $report = Report::with('reporter', 'documents')->where('uuid', $uuid)->firstOrFail();
         
-        $detailResp = $this->laporService->getLaporDetail($report->lapor_complaint_id ?? $complaintId);
-        $followUpResp = $this->laporService->getFollowUpLogs($report->lapor_complaint_id ?? $complaintId);
+        $detailResp = $this->laporService->getLaporDetail($complaintId);
+        $followUpResp = $this->laporService->getFollowUpLogs($complaintId);
 
         if (!$detailResp['success']) {
             return redirect()->back()->with('error', 'Gagal mengambil data dari API.');
@@ -44,13 +44,8 @@ class ForwardingController extends Controller
         });
 
         $renderedActivities = $allLogs->map(function ($log) {
-            // Normalisasi field waktu
             $log['display_date'] = $log['date'] ?? $log['created_at'] ?? '-';
-            
-            // PENTING: renderLogContent akan mengisi key 'institution_from_name', dll.
-            // Karena $log di sini adalah array, kita tangkap kembali hasil perubahannya.
             $log['rendered_content'] = $this->renderLogContent($log, 'content');
-            
             return $log;
         })->values()->all();
 

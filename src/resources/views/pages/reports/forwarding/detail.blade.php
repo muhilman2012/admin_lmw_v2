@@ -34,7 +34,7 @@
                 {{-- 2. Tracking ID LAPOR! --}}
                 <div class="mb-3">
                     <h5 class="fw-bold mb-1">Tracking ID LAPOR!:</h5>
-                    <span class="text-secondary fs-4 fw-bold">{{ $report->lapor_complaint_id ?? 'Belum Terkirim' }}</span>
+                    <span class="text-secondary fs-4 fw-bold text-primary">{{ $complaintId ?? 'Belum Terkirim' }}</span>
                 </div>
 
                 <div class="card card-sm mb-3 border-start border-3 border-danger-subtle">
