@@ -875,13 +875,16 @@
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label required">Nama Petugas Bertugas</label>
+                        <label class="form-label required">Petugas MOD</label>
                         <select name="actual_user_id" id="petugas-select" class="form-select" required>
-                            <option value="" disabled selected>Pilih Petugas</option>
+                            <option value="" disabled selected>Pilih Petugas...</option>
                             @foreach($allUsers as $user)
                                 <option value="{{ $user->id }}">{{ $user->name }}</option>
                             @endforeach
                         </select>
+                        <small class="text-muted d-block mt-2">
+                            <i class="ti ti-info-circle me-1"></i> Pilih nama Anda untuk rekam jejak riwayat sistem. Jika nama tidak terdapat dalam daftar, mohon segera hubungi <strong>Tim IT</strong>.
+                        </small>
                     </div>
                     <div class="mb-3">
                         <label class="form-label required">Isi Catatan / Hasil Koordinasi</label>
