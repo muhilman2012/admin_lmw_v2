@@ -458,7 +458,7 @@
                 <div class="card card-border border-primary-subtle">
                     <div class="card-header d-flex justify-content-between align-items-center bg-primary-lt">
                         <h4 class="mb-0 text-primary"><i class="ti ti-notebook me-2"></i>Catatan MOD</h4>
-                        @if(auth()->user()->email === 'superadmin@set.wapresri.go.id')
+                        @if(auth()->user()->email === 'mod@set.wapresri.go.id')
                             <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modal-tambah-catatan-mod">
                                 <i class="ti ti-plus me-2"></i>Tambah Catatan
                             </button>
