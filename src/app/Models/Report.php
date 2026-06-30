@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Models\UnitKerja;
 use App\Models\Deputy;
+use App\Models\MasterFreeSchool;
 
 class Report extends Model
 {
@@ -34,6 +35,8 @@ class Report extends Model
         'is_benefit_provided',
         'classification',
         'category_id',
+        'free_school_id',
+        'custom_school_name',
         'unit_kerja_id',
         'deputy_id', 
         'created_at',
@@ -102,18 +105,12 @@ class Report extends Model
         return $latestAssignment->status ?? 'pending';
     }
 
-    /**
-     * Accessor untuk mendapatkan ID pengguna yang ditugaskan (assigned_to_user_id)
-     * dari assignment terbaru.
-     */
-    // Simpan ini agar logika pengecekan hak akses (ID) tidak rusak
     public function getAssignedToUserIdAttribute()
     {
         $latestAssignment = $this->assignments()->latest('id')->first();
         return $latestAssignment->assigned_to_id ?? null;
     }
 
-    // Tambahkan ini khusus untuk kebutuhan tampilan nama di tabel/detail
     public function getAssignedToUserNameAttribute()
     {
         $latestAssignment = $this->assignments()
@@ -122,5 +119,15 @@ class Report extends Model
                                 ->first();
 
         return $latestAssignment->assignedTo->name ?? 'Tidak Ada Analis';
+    }
+
+    public function modNotes()
+    {
+        return $this->hasMany(ModNote::class, 'report_id')->orderBy('created_at', 'desc');
+    }
+
+    public function freeSchool()
+    {
+        return $this->belongsTo(MasterFreeSchool::class, 'free_school_id');
     }
 }

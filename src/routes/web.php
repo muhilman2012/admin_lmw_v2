@@ -7,6 +7,7 @@ use App\Http\Controllers\Pages\UsersController;
 use App\Http\Controllers\Pages\ProfileController;
 use App\Http\Controllers\Pages\ReportersController;
 use App\Http\Controllers\Pages\ReportsController;
+use App\Http\Controllers\Pages\ModNoteController;
 use App\Http\Controllers\Pages\ForwardingController;
 use App\Http\Controllers\Pages\SearchController;
 use App\Http\Controllers\Pages\ReportExportController;
@@ -92,6 +93,7 @@ Route::middleware(['auth', CheckPasswordReset::class])->prefix('admin')->group(f
         Route::get('/{uuid}/forward-status', [ReportsController::class, 'checkForwardingStatus'])->name('forward-status');
         Route::get('/{uuid}/download/user', [ReceiptPdfController::class, 'downloadReceiptUser'])->name('download.user');
         Route::get('/{uuid}/download/government', [ReceiptPdfController::class, 'downloadReceiptGovernment'])->name('download.government');
+        Route::post('/{uuid}/mod-notes', [ModNoteController::class, 'store'])->name('mod-notes.store');
     });
 
     Route::prefix('forwarding')->name('forwarding.')->group(function () {

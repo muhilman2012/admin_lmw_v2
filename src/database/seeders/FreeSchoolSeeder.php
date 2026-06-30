@@ -1,0 +1,127 @@
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\MasterFreeSchool;
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Schema;
+
+class FreeSchoolSeeder extends Seeder
+{
+    public function run(): void
+    {
+        Schema::disableForeignKeyConstraints();
+        MasterFreeSchool::truncate();
+        Schema::enableForeignKeyConstraints();
+
+        $schools = [
+            ['school_name' => 'SD Bhakti Luhur', 'region' => 'JAKARTA SELATAN'],
+            ['school_name' => 'SDS Bina Pusaka', 'region' => 'JAKARTA UTARA'],
+            ['school_name' => 'SMP Muhammadiyah 32', 'region' => 'JAKARTA BARAT'],
+            ['school_name' => 'SMP Triwibawa', 'region' => 'JAKARTA PUSAT'],
+            ['school_name' => 'SMP Trisula Perwari I Jakarta', 'region' => 'JAKARTA SELATAN'],
+            ['school_name' => 'SMP Al Washliyah', 'region' => 'JAKARTA TIMUR'],
+            ['school_name' => 'SMP Jayakarta', 'region' => 'JAKARTA UTARA'],
+            ['school_name' => 'SMP Al Inayah', 'region' => 'JAKARTA BARAT'],
+            ['school_name' => 'SMP Trisula Perwari 2', 'region' => 'JAKARTA PUSAT'],
+            ['school_name' => 'SMP Yayasan Pendidikan Mulia', 'region' => 'JAKARTA SELATAN'],
+            ['school_name' => 'SMP Pembangunan', 'region' => 'JAKARTA TIMUR'],
+            ['school_name' => 'SMP Darul Maarif', 'region' => 'JAKARTA UTARA'],
+            ['school_name' => 'SMP Al Hasanah', 'region' => 'JAKARTA BARAT'],
+            ['school_name' => 'SMP At Taqwa', 'region' => 'JAKARTA PUSAT'],
+            ['school_name' => 'SMP Teladan', 'region' => 'JAKARTA SELATAN'],
+            ['school_name' => 'SMP Taman Harapan', 'region' => 'JAKARTA TIMUR'],
+            ['school_name' => 'SMP Sejahtera', 'region' => 'JAKARTA UTARA'],
+            ['school_name' => 'SMP Cidera Mata Indah', 'region' => 'JAKARTA BARAT'],
+            ['school_name' => 'SMP Strada Pelita Pejompongan', 'region' => 'JAKARTA PUSAT'],
+            ['school_name' => 'SMP Plus Khadijah Islamic School', 'region' => 'JAKARTA SELATAN'],
+            ['school_name' => 'SMP Yaspia', 'region' => 'JAKARTA TIMUR'],
+            ['school_name' => 'SMP Yakpi I DKI Jaya', 'region' => 'JAKARTA UTARA'],
+            ['school_name' => 'SMP Garuda', 'region' => 'JAKARTA BARAT'],
+            ['school_name' => 'SMP Islam Al-Ihsan', 'region' => 'JAKARTA PUSAT'],
+            ['school_name' => 'SMP Putra Satria', 'region' => 'JAKARTA SELATAN'],
+            ['school_name' => 'SMP Era Pembangunan Umat', 'region' => 'JAKARTA TIMUR'],
+            ['school_name' => 'SMP Plus Al-Fudhola', 'region' => 'JAKARTA UTARA'],
+            ['school_name' => 'SMP Melania 1', 'region' => 'JAKARTA BARAT'],
+            ['school_name' => 'SMP Paskalis 1', 'region' => 'JAKARTA PUSAT'],
+            ['school_name' => 'SMP Al Falah', 'region' => 'JAKARTA SELATAN'],
+            ['school_name' => 'SMP Tugu Bhakti', 'region' => 'JAKARTA UTARA'],
+            ['school_name' => 'SMP Kembangan', 'region' => 'JAKARTA BARAT'],
+            ['school_name' => 'SMP Islam Meranti', 'region' => 'JAKARTA PUSAT'],
+            ['school_name' => 'SMP Perguruan Rakyat 02', 'region' => 'JAKARTA SELATAN'],
+            ['school_name' => 'SMP Al-Irsyad Al-Islamiyyah', 'region' => 'JAKARTA UTARA'],
+            ['school_name' => 'SMP YWPM', 'region' => 'JAKARTA PUSAT'],
+            ['school_name' => 'SMP Islam Terpadu Arrahman', 'region' => 'JAKARTA SELATAN'],
+            ['school_name' => 'SMP Sari Putra', 'region' => 'JAKARTA UTARA'],
+            ['school_name' => 'SMP PSKD IV Bulungan', 'region' => 'JAKARTA SELATAN'],
+            ['school_name' => 'SMP Fatahilah Jaya', 'region' => 'JAKARTA UTARA'],
+            ['school_name' => 'SMP Muhammadiyah 16', 'region' => 'JAKARTA PUSAT'],
+            ['school_name' => 'SMP Yapimda Jakarta', 'region' => 'JAKARTA SELATAN'],
+            ['school_name' => 'SMAS Lamaholot', 'region' => 'JAKARTA BARAT'],
+            ['school_name' => 'SMAS At Taqwa Jakarta', 'region' => 'JAKARTA PUSAT'],
+            ['school_name' => 'SMA Plus Khadijah Islamic School', 'region' => 'JAKARTA SELATAN'],
+            ['school_name' => 'SMA Budi Mulia Utama', 'region' => 'JAKARTA TIMUR'],
+            ['school_name' => 'SMAS Gita Kirti 2', 'region' => 'JAKARTA UTARA'],
+            ['school_name' => 'SMAS Budi Murni 2', 'region' => 'JAKARTA BARAT'],
+            ['school_name' => 'SMAS Taman Madya I Jakarta', 'region' => 'JAKARTA PUSAT'],
+            ['school_name' => 'SMKS PGRI 15 Jakarta', 'region' => 'JAKARTA SELATAN'],
+            ['school_name' => 'SMA Teladan 1 Jakarta', 'region' => 'JAKARTA TIMUR'],
+            ['school_name' => 'SMAS Katolik Diakonia Jakarta', 'region' => 'JAKARTA UTARA'],
+            ['school_name' => 'SMAS YP BDN', 'region' => 'JAKARTA BARAT'],
+            ['school_name' => 'SMKS YP IPPI Petojo', 'region' => 'JAKARTA PUSAT'],
+            ['school_name' => 'SMKS YKPP-Kesatuan', 'region' => 'JAKARTA SELATAN'],
+            ['school_name' => 'SMAS Wijaya Kusuma', 'region' => 'JAKARTA TIMUR'],
+            ['school_name' => 'SMAS Bunga Hati Bangsa', 'region' => 'JAKARTA UTARA'],
+            ['school_name' => 'SMKS Citra Utama', 'region' => 'JAKARTA BARAT'],
+            ['school_name' => 'SMKS Cyber Media', 'region' => 'JAKARTA SELATAN'],
+            ['school_name' => 'SMAS Muhammadiyah 12 Jakarta', 'region' => 'JAKARTA TIMUR'],
+            ['school_name' => 'SMAS Al Khairiyah Jakarta', 'region' => 'JAKARTA UTARA'],
+            ['school_name' => 'SMKS Maarif Jakarta', 'region' => 'JAKARTA BARAT'],
+            ['school_name' => 'SMKS Taman Siswa 2', 'region' => 'JAKARTA PUSAT'],
+            ['school_name' => 'SMKS Bina Putra Jakarta', 'region' => 'JAKARTA SELATAN'],
+            ['school_name' => 'SMKS Cahaya Sakti Jakarta', 'region' => 'JAKARTA TIMUR'],
+            ['school_name' => 'SMKS Raudhatul Jannatunnaim', 'region' => 'JAKARTA UTARA'],
+            ['school_name' => 'SMKS Permata Bunda', 'region' => 'JAKARTA BARAT'],
+            ['school_name' => 'SMK Katolik Sint Joseph', 'region' => 'JAKARTA PUSAT'],
+            ['school_name' => 'SMK Gapura Merah Putih', 'region' => 'JAKARTA SELATAN'],
+            ['school_name' => 'SMKS Laboratorium Jakarta', 'region' => 'JAKARTA TIMUR'],
+            ['school_name' => 'SMKS Al-Khairiyah Bahari', 'region' => 'JAKARTA UTARA'],
+            ['school_name' => 'SMKS Benteng Gading Jakarta', 'region' => 'JAKARTA BARAT'],
+            ['school_name' => 'SMK Al-Ikhsan', 'region' => 'JAKARTA PUSAT'],
+            ['school_name' => 'SMK Jagakarsa', 'region' => 'JAKARTA SELATAN'],
+            ['school_name' => 'SMKS Bina Medika Jakarta', 'region' => 'JAKARTA TIMUR'],
+            ['school_name' => 'SMKS Sari Putra', 'region' => 'JAKARTA UTARA'],
+            ['school_name' => 'SMKS Prima Wisata', 'region' => 'JAKARTA BARAT'],
+            ['school_name' => 'SMKS Cipta Karya Jakarta', 'region' => 'JAKARTA TIMUR'],
+            ['school_name' => 'SMKS Fajar Indah', 'region' => 'JAKARTA UTARA'],
+            ['school_name' => 'SMKS Al Hamidiyah', 'region' => 'JAKARTA BARAT'],
+            ['school_name' => 'SMK Bina Nusa Mandiri', 'region' => 'JAKARTA TIMUR'],
+            ['school_name' => 'SMK Al-Muttaqin', 'region' => 'JAKARTA UTARA'],
+            ['school_name' => 'SMKS Kebon Jeruk Jakarta', 'region' => 'JAKARTA BARAT'],
+            ['school_name' => 'SMK PGRI 16 Jakarta', 'region' => 'JAKARTA TIMUR'],
+            ['school_name' => 'SLB B-C Alfiany', 'region' => 'JAKARTA BARAT'],
+            ['school_name' => 'SLB BC Harapan Ibu', 'region' => 'JAKARTA PUSAT'],
+            ['school_name' => 'SLB B-C Prima Mandiri', 'region' => 'JAKARTA SELATAN'],
+            ['school_name' => 'SLB ABC Kembar Karya', 'region' => 'JAKARTA TIMUR'],
+            ['school_name' => 'SLB Negeri 9 Jakarta', 'region' => 'JAKARTA UTARA'],
+            ['school_name' => 'SLB BC Nusantara', 'region' => 'JAKARTA BARAT'],
+            ['school_name' => 'SLB B-C Islam At Taqwa', 'region' => 'JAKARTA PUSAT'],
+            ['school_name' => 'SLB B-C-D Yayasan Elsafan', 'region' => 'JAKARTA TIMUR'],
+            ['school_name' => 'SLB C Kasih Bunda', 'region' => 'JAKARTA BARAT'],
+            ['school_name' => 'SLB B-C Tri Asih', 'region' => 'JAKARTA BARAT'],
+            ['school_name' => 'SLB C Dian Grahita', 'region' => 'JAKARTA PUSAT'],
+            ['school_name' => 'SLB BC Rumah Kita', 'region' => 'JAKARTA SELATAN'],
+            ['school_name' => 'SLB C Asih Budi 1', 'region' => 'JAKARTA TIMUR'],
+            ['school_name' => 'SLB C Asih Budi II', 'region' => 'JAKARTA TIMUR'],
+            ['school_name' => 'SLB G-Abadi', 'region' => 'JAKARTA BARAT'],
+            ['school_name' => 'SLB Santa Anna', 'region' => 'JAKARTA TIMUR'],
+            ['school_name' => 'SLB C-G Yayasan Dwituna Harapan Baru', 'region' => 'JAKARTA BARAT'],
+            ['school_name' => 'SLB Kemala Bhayangkari 02', 'region' => 'JAKARTA SELATAN'],
+            ['school_name' => 'SLB BC Abdi Kasih', 'region' => 'JAKARTA TIMUR'],
+        ];
+
+        foreach ($schools as $school) {
+            MasterFreeSchool::create($school);
+        }
+    }
+}

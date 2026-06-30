@@ -246,8 +246,28 @@
                 </div>
             </div>
             <div class="card card-border mb-3">
-                <div class="card-header"><strong>Detail Laporan Lengkap </strong></div>
-                <div class="p-3 text-start">{{ $report->details ?? '-' }}</div>
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <strong>Detail Laporan Lengkap</strong>
+                        
+                        @if(isset($report) && $report->free_school_id !== null)
+                            <span class="badge bg-green text-green-fg badge-pill fw-bold animate__animated animate__fadeIn">
+                                <i class="ti ti-school me-1"></i> TERDAFTAR DI SEKOLAH GRATIS
+                            </span>
+                        @endif
+                    </div>
+                    <div class="p-3 text-start">
+                        {{ $report->details ?? '-' }}
+                        
+                        @if(isset($report) && $report->free_school_id !== null && $report->freeSchool)
+                            <div class="mt-3 pt-2 border-top text-muted small">
+                                <i class="ti ti-info-circle me-1"></i> Lokasi Sekolah: <strong>{{ $report->freeSchool->school_name }} - {{ strtoupper($report->freeSchool->region) }}</strong>
+                            </div>
+                        @elseif(isset($report) && !empty($report->custom_school_name))
+                            <div class="mt-3 pt-2 border-top text-muted small">
+                                <i class="ti ti-info-circle me-1"></i> Lokasi Sekolah (Manual): <strong>{{ $report->custom_school_name }}</strong>
+                            </div>
+                        @endif
+                    </div>
                 </div>
                 <div class="card card-border mb-3">
                 <div class="card-header"><strong>Detail Tanggapan Aduan</strong></div>
@@ -430,6 +450,67 @@
                 </table>
                 </div>
             </div>
+            </div>
+        </div>
+        <hr class="my-4">
+        <div class="row">
+            <div class="col-12 mt-4">
+                <div class="card card-border border-primary-subtle">
+                    <div class="card-header d-flex justify-content-between align-items-center bg-primary-lt">
+                        <h4 class="mb-0 text-primary"><i class="ti ti-notebook me-2"></i>Catatan MOD</h4>
+                        @if(auth()->user()->email === 'superadmin@set.wapresri.go.id')
+                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modal-tambah-catatan-mod">
+                                <i class="ti ti-plus me-2"></i>Tambah Catatan
+                            </button>
+                        @endif
+                    </div>
+                    <div class="card-body">
+                        <div class="timeline">
+                            @forelse($report->modNotes as $note)
+                                <div class="timeline-item mb-3">
+                                    <div class="timeline-item-marker bg-primary"></div>
+                                    <div class="timeline-item-content">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <strong>
+                                                MOD {{ \Carbon\Carbon::parse($note->created_at)->locale('id')->translatedFormat('d F Y') }} - {{ $note->actualUser->name ?? 'Petugas Tidak Diketahui' }}
+                                            </strong>
+                                            <small class="text-muted">{{ \Carbon\Carbon::parse($note->created_at)->format('H:i') }} WIB</small>
+                                        </div>
+                                        <div class="bg-light p-3 rounded border">
+                                            <p class="mb-0">{!! nl2br(e($note->note)) !!}</p>
+                                            @if($note->attachment_path)
+                                                @php
+                                                    $key = ltrim($note->attachment_path, '/');
+                                                    $fileUrl = signMinioUrlSmart(env('AWS_COMPLAINT_BUCKET'), $key, 10);
+                                                    
+                                                    $ext = pathinfo($note->attachment_name, PATHINFO_EXTENSION);
+                                                    $icon = match(strtolower($ext)) {
+                                                        'pdf' => 'ti-file-description',
+                                                        'xls', 'xlsx' => 'ti-file-spreadsheet',
+                                                        'doc', 'docx' => 'ti-file-text',
+                                                        'jpg', 'jpeg', 'png' => 'ti-photo',
+                                                        default => 'ti-paperclip'
+                                                    };
+                                                @endphp
+                                                <div class="mt-3 pt-2 border-top">
+                                                    <a href="{{ $fileUrl }}" target="_blank" class="btn btn-sm btn-outline-info">
+                                                        <i class="ti {{ $icon }} me-1"></i> Lihat Lampiran: {{ $note->attachment_name }}
+                                                    </a>
+                                                </div>
+                                            @endif
+                                            
+                                        </div>
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="text-center text-muted py-4">
+                                    <i class="ti ti-notes fs-2 d-block mb-2"></i>
+                                    Belum ada catatan MOD untuk laporan ini.
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         </div>
@@ -782,6 +863,44 @@
         </div>
     </div>
 </div>
+{{-- MODAL TAMBAH CATATAN MOD --}}
+<div class="modal fade" id="modal-tambah-catatan-mod" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form action="{{ route('reports.mod-notes.store', $report->uuid) }}" method="POST" enctype="multipart/form-data">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title">Tambah Catatan MOD Baru</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label required">Nama Petugas Bertugas</label>
+                        <select name="actual_user_id" id="petugas-select" class="form-select" required>
+                            <option value="" disabled selected>Pilih Petugas</option>
+                            @foreach($allUsers as $user)
+                                <option value="{{ $user->id }}">{{ $user->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label required">Isi Catatan / Hasil Koordinasi</label>
+                        <textarea name="note" class="form-control" rows="5" placeholder="Ketik update progress harian..." required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Dokumen / Lampiran Pendukung <span class="text-muted small">(Opsional)</span></label>
+                        <input type="file" name="attachment" class="form-control" accept=".doc,.docx,.xls,.xlsx,.pdf,image/*">
+                        <small class="text-muted d-block mt-1">Format yang diizinkan: Word, Excel, PDF, atau Gambar (Maks. 10MB).</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan Catatan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('script')
@@ -1057,6 +1176,13 @@
 
         // Inisialisasi TomSelect untuk Teruskan Lapor (Institusi)
         initTomSelect('select-institution', {
+            plugins: { dropdown_input: {} },
+            create: false,
+            sortField: { field: "text", direction: "asc" },
+        });
+
+        // Inisialisasi TomSelect untuk Catatan MOD (Petugas)
+        initTomSelect('petugas-select', {
             plugins: { dropdown_input: {} },
             create: false,
             sortField: { field: "text", direction: "asc" },

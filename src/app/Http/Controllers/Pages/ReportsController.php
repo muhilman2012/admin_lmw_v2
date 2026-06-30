@@ -87,8 +87,10 @@ class ReportsController extends Controller
         $isSuperAdmin = $user->hasRole('superadmin');
         $canForward = $isSuperAdmin || ($isRecentEnough && $isAnalysisApproved);
 
+        $allUsers = \App\Models\User::orderBy('name', 'asc')->get();
+
         return view('pages.reports.show', compact(
-            'report', 
+            'report',
             'reportLogs', 
             'institutions', 
             'currentAssignment', 
@@ -97,7 +99,8 @@ class ReportsController extends Controller
             'availableAnalysts', 
             'canForward',
             'duplicateReportsCount',
-            'relatedReports'
+            'relatedReports',
+            'allUsers'
         ));
     }
 
@@ -155,6 +158,8 @@ class ReportsController extends Controller
                 'attachments.*' => 'file|mimes:jpg,jpeg,png,pdf,doc,docx|max:20480',
                 'status' => 'nullable|string',
                 'response' => 'nullable|string',
+                'free_school_id' => 'nullable',
+                'custom_school_name' => 'nullable|string',
             ], [
                 'name.required' => 'Kolom Nama Lengkap wajib diisi.',
                 'nik.required' => 'Kolom NIK wajib diisi.',
@@ -242,6 +247,14 @@ class ReportsController extends Controller
                     $validated['event_date'] = \Carbon\Carbon::createFromFormat('d/m/Y', $validated['event_date'])->format('Y-m-d');
                 }
 
+                if ($request->input('free_school_id') === 'lainnya') {
+                    $validated['free_school_id'] = null; 
+                    $validated['custom_school_name'] = $request->input('custom_school_name');
+                } else {
+                    $validated['free_school_id'] = $request->input('free_school_id');
+                    $validated['custom_school_name'] = null;
+                }
+
                 $report = Report::create([
                     'reporter_id' => $reporter->id,
                     'ticket_number' => $this->generateTicketNumber(),
@@ -256,6 +269,8 @@ class ReportsController extends Controller
                     'category_id' => $validated['category_id'],
                     'unit_kerja_id' => $unitKerjaId,
                     'deputy_id' => $deputyId,
+                    'free_school_id' => $validated['free_school_id'],
+                    'custom_school_name' => $validated['custom_school_name'],
                 ]);
                 Log::info('Laporan utama berhasil dibuat.', ['report_id' => $report->id, 'uuid' => $report->uuid, 'unit_kerja_id' => $unitKerjaId]);
 

@@ -37,81 +37,74 @@
         </form>
 
         {{-- HASIL PENCARIAN --}}
+        <style>
+            @keyframes pulse-soft {
+                0% { opacity: 1; transform: scale(1); }
+                50% { opacity: 0.7; transform: scale(1.05); }
+                100% { opacity: 1; transform: scale(1); }
+            }
+            .badge-baru-pulse {
+                animation: pulse-soft 2s infinite;
+                font-size: 0.65rem;
+                vertical-align: middle;
+            }
+        </style>
+
         @forelse ($articles as $article)
-        <div class="card mb-3">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <h3 class="card-title mb-1">
-                            <a href="{{ route('kms.show', $article) }}" class="text-body">{{ $article->title }}</a>
-                        </h3>
-                        <p class="text-muted mb-2">
-                            {{ Str::limit(strip_tags($article->content), 200) }}
-                        </p>
-                    </div>
-                    <div class="dropdown">
-                        @hasanyrole(['superadmin', 'admin'])
-                        <button class="btn btn-icon btn-sm" data-bs-toggle="dropdown">
-                            <i class="ti ti-dots-vertical"></i>
-                        </button>
-                        <div class="dropdown-menu dropdown-menu-end">
-                            <a class="dropdown-item" href="{{ route('kms.edit', $article) }}">Edit</a>
-                            <div class="dropdown-divider"></div>
-                            <a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#modal-delete-{{ $article->id }}">
-                                <i class="ti ti-trash me-2"></i> Hapus
-                            </a> 
-                        </div>
-                        @endhasanyrole
-                    </div>
-                </div>
-                
-                <div class="text-secondary small">
-                    Kategori: <span class="badge bg-blue-lt me-2">{{ $article->category }}</span>
-                    @if ($article->tags)
-                        | Tags:
-                        @foreach (explode(',', $article->tags) as $tagItem)
-                        <a href="{{ route('kms.index', ['tag' => trim($tagItem)]) }}" class="badge bg-secondary-lt">{{ trim($tagItem) }}</a>
-                        @endforeach
-                    @endif
-                </div>
-            </div>
-        </div>
+            @php
+                $isNew = $article->created_at && $article->created_at->diffInDays(\Carbon\Carbon::now()) <= 14;
+            @endphp
 
-        {{-- MODAL DELETE ARTICLE (Disisipkan dalam loop untuk setiap artikel) --}}
-        @hasanyrole(['superadmin', 'admin'])
-        <div class="modal modal-blur fade" id="modal-delete-{{ $article->id }}" tabindex="-1" role="dialog" aria-hidden="true">
-            <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
-                <div class="modal-content">
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    <div class="modal-status bg-danger"></div>
-                    <div class="modal-body text-center py-4">
-                        <i class="ti ti-alert-triangle icon mb-2 text-danger icon-lg"></i>
-                        <h3>Hapus Artikel?</h3>
-                        <div class="text-muted">Anda yakin ingin menghapus artikel "{{ Str::limit($article->title, 50) }}"? Tindakan ini tidak dapat dibatalkan.</div>
-                    </div>
-                    <div class="modal-footer">
-                        <div class="w-100">
-                            <div class="row">
-                                <div class="col"><a href="#" class="btn w-100" data-bs-dismiss="modal">Batal</a></div>
-                                <div class="col">
-                                    <form action="{{ route('kms.destroy', $article) }}" method="POST">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-danger w-100">Ya, Hapus</button>
-                                    </form>
-                                </div>
+            <div class="card mb-3 {{ $isNew ? 'border-start border-primary border-4' : '' }}">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h3 class="card-title mb-1 d-flex align-items-center flex-wrap gap-2">
+                                <a href="{{ route('kms.show', $article) }}" class="text-body">{{ $article->title }}</a>
+                                @if($isNew)
+                                    <span class="badge bg-primary text-white badge-baru-pulse">
+                                        <i class="ti ti-star me-1"></i> BARU
+                                    </span>
+                                @endif
+                            </h3>
+                            <p class="text-muted mb-2">
+                                {{ Str::limit(strip_tags($article->content), 200) }}
+                            </p>
+                        </div>
+                        <div class="dropdown">
+                            @hasanyrole(['superadmin', 'admin'])
+                            <button class="btn btn-icon btn-sm" data-bs-toggle="dropdown">
+                                <i class="ti ti-dots-vertical"></i>
+                            </button>
+                            <div class="dropdown-menu dropdown-menu-end">
+                                <a class="dropdown-item" href="{{ route('kms.edit', $article) }}">Edit</a>
+                                <div class="dropdown-divider"></div>
+                                <a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#modal-delete-{{ $article->id }}">
+                                    <i class="ti ti-trash me-2"></i> Hapus
+                                </a> 
                             </div>
+                            @endhasanyrole
                         </div>
+                    </div>
+                    
+                    <div class="text-secondary small mt-2 d-flex align-items-center">
+                        <span class="me-3">
+                            <i class="ti ti-calendar me-1"></i> {{ $article->created_at->format('d M Y') }}
+                        </span>
+                        <span>
+                            Kategori: <span class="badge bg-blue-lt me-2">{{ $article->category }}</span>
+                        </span>
+                        @if ($article->tags)
+                            <span class="ms-1">| Tags:</span>
+                            @foreach (explode(',', $article->tags) as $tagItem)
+                            <a href="{{ route('kms.index', ['tag' => trim($tagItem)]) }}" class="badge bg-secondary-lt ms-1">{{ trim($tagItem) }}</a>
+                            @endforeach
+                        @endif
                     </div>
                 </div>
             </div>
-        </div>
-        @endhasanyrole
-
         @empty
-        <div class="alert alert-info text-center p-5">
-            Tidak ada artikel Knowledge Base yang ditemukan.
-        </div>
+            <div class="alert alert-info">Belum ada dokumen KMS yang tersedia.</div>
         @endforelse
 
         {{ $articles->links() }}

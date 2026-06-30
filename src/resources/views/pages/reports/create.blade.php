@@ -117,7 +117,35 @@
                     <div class="invalid-feedback">Harap pilih Kategori.</div>
                 </div>
             </div>
-            
+            <div class="row g-4 mb-4 d-none" id="wrapper-bantuan-pendidikan">
+                <div class="col-12 col-md-6">
+                    <label class="form-label">Daftar Sekolah Swasta Gratis <small>(pilih Lainnya jika tidak ada dalam list)</small><span class="text-danger">*</span></label>
+                    <select id="select-free-school" name="free_school_id" class="form-control" placeholder="Cari nama sekolah...">
+                        <option value="">-- Cari atau Pilih Sekolah --</option>
+                        
+                        @php
+                            $groupedSchools = \App\Models\MasterFreeSchool::all()->groupBy('region');
+                        @endphp
+
+                        @foreach($groupedSchools as $region => $schools)
+                            <optgroup label="🏢 WILAYAH {{ strtoupper($region) }}">
+                                @foreach($schools as $school)
+                                    <option value="{{ $school->id }}">
+                                        {{ $school->school_name }} - {{ strtoupper($school->region) }}
+                                    </option>
+                                @endforeach
+                            </optgroup>
+                        @endforeach
+                        <option value="lainnya" class="fw-bold text-primary">➕ LAINNYA (Tidak terdaftar di list)</option>
+                    </select>
+                </div>
+                
+                <div class="col-12 col-md-6 d-none" id="wrapper-sekolah-manual">
+                    <label class="form-label">Masukkan Nama Sekolah Secara Manual<span class="text-danger">*</span></label>
+                    <input type="text" name="custom_school_name" id="custom-school-name" placeholder="Tulis nama sekolah lengkap beserta daerahnya" class="form-control" autocomplete="off"/>
+                    <small class="text-muted">Gunakan opsi ini jika nama sekolah tidak ditemukan pada list gratis DKI.</small>
+                </div>
+            </div>
             <div class="col-12 mb-4">
                 <label class="form-label">Detail Laporan<span class="text-danger">*</span></label>
                 <textarea name="details" placeholder="Isi Detail Laporan" rows="6" class="form-control" required>{{ $reporter->details ?? '' }}</textarea>
@@ -192,6 +220,85 @@
 @endsection
 
 @push('scripts')
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const selectKategori = document.getElementById("select-optgroups");
+        const wrapperBantuan = document.getElementById("wrapper-bantuan-pendidikan");
+        const selectSchool = document.getElementById("select-free-school");
+        const wrapperManual = document.getElementById("wrapper-sekolah-manual");
+        const inputManual = document.getElementById("custom-school-name");
+
+        // Inisialisasi TomSelect untuk Dropdown Sekolah agar bisa di-search
+        let schoolTomSelect = null;
+        if (typeof TomSelect !== 'undefined' && selectSchool) {
+            schoolTomSelect = new TomSelect(selectSchool, {
+                copyClassesToDropdown: false,
+                dropdownParent: 'body',
+                controlInput: '<input>',
+                render:{
+                    item: function(data, escape) {
+                        if(data.value === 'lainnya'){
+                            return '<div><span class="badge bg-blue-lt me-2">Pilihan</span>' + escape(data.text) + '</div>';
+                        }
+                        return '<div>' + escape(data.text) + '</div>';
+                    },
+                    option: function(data, escape) {
+                        return '<div>' + escape(data.text) + '</div>';
+                    }
+                }
+            });
+        }
+
+        // Fungsi Deteksi Perubahan Kategori
+        function handleCategoryChange() {
+            const selectedOption = selectKategori.options[selectKategori.selectedIndex];
+            if (!selectedOption) return;
+
+            // Membaca attribute data-name yang diclean
+            const categoryName = selectedOption.getAttribute('data-name') || selectedOption.text;
+            
+            // Cek apakah mengandung frasa "Bantuan Masyarakat"
+            if (categoryName.toLowerCase().includes("bantuan masyarakat")) {
+                wrapperBantuan.classList.remove("d-none");
+                if(schoolTomSelect) schoolTomSelect.require = true;
+                selectSchool.setAttribute("required", "required");
+            } else {
+                wrapperBantuan.classList.add("d-none");
+                selectSchool.removeAttribute("required");
+                if(schoolTomSelect) {
+                    schoolTomSelect.clear();
+                    schoolTomSelect.require = false;
+                }
+                // Ikut sembunyikan input manual jika kategori dibatalkan
+                wrapperManual.classList.add("d-none");
+                inputManual.removeAttribute("required");
+                inputManual.value = "";
+            }
+        }
+
+        // Fungsi Deteksi Pilihan Sekolah "Lainnya"
+        function handleSchoolChange() {
+            if (selectSchool.value === "lainnya") {
+                wrapperManual.classList.remove("d-none");
+                inputManual.setAttribute("required", "required");
+                setTimeout(() => { inputManual.focus(); }, 100);
+            } else {
+                wrapperManual.classList.add("d-none");
+                inputManual.removeAttribute("required");
+                inputManual.value = "";
+            }
+        }
+
+        // Daftarkan Event Listener
+        selectKategori.addEventListener("change", handleCategoryChange);
+        if(selectSchool) {
+            selectSchool.addEventListener("change", handleSchoolChange);
+        }
+
+        // Eksekusi trigger awal (jika mode edit data lama)
+        handleCategoryChange();
+    });
+</script>
 <script>
     document.addEventListener("DOMContentLoaded", () => {
         // Mendapatkan referensi ke tombol submit
