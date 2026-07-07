@@ -7,19 +7,19 @@
     <tr>
         <th style="background-color: #f3f4f6; font-weight: bold;">NO</th>
         <th style="background-color: #f3f4f6; font-weight: bold;">NAMA PELAPOR</th>
-        <th style="background-color: #f3f4f6; font-weight: bold;">NO REGISTER LAPOR</th>
+        <th style="background-color: #f3f4f6; font-weight: bold;">NO TIKET LMW</th>
         <th style="background-color: #f3f4f6; font-weight: bold;">INTI PENGADUAN</th>
         <th style="background-color: #f3f4f6; font-weight: bold;">KEPERLUAN</th>
-        <th style="background-color: #f3f4f6; font-weight: bold;">UNIT/ JF YANG MENANGANI</th>
+        <th style="background-color: #f3f4f6; font-weight: bold;">PETUGAS MOD</th>
         <th style="background-color: #f3f4f6; font-weight: bold;">KETERANGAN</th>
     </tr>
     
     @forelse($notes as $index => $note)
     <tr>
         <td>{{ $index + 1 }}</td>
-        <td>{{ $note->report->reporter_name ?? '-' }}</td>
+        <td>{{ $note->report->reporter->name ?? '-' }}</td>
         <td>{{ $note->report->ticket_number ?? '-' }}</td>
-        <td>{{ $note->report->title ?? 'Judul Tidak Tersedia' }}</td> 
+        <td>{{ $note->report->subject ?? 'Judul Tidak Tersedia' }}</td> 
         <td>Konfirmasi Tindak Lanjut dari Aduan</td>
         <td>{{ $note->actualUser->name ?? 'Petugas Tidak Diketahui' }}</td>
         <td>{{ $note->note }}</td>

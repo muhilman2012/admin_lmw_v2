@@ -21,7 +21,7 @@ class ModDetailSheet implements FromView, WithTitle, ShouldAutoSize, WithStyles
 
     public function view(): View
     {
-        $notes = ModNote::with(['report', 'actualUser'])
+        $notes = ModNote::with(['report.reporter', 'actualUser'])
             ->whereDate('created_at', $this->date)
             ->orderBy('created_at', 'asc')
             ->get();

@@ -10,7 +10,7 @@
         <td>Total Pengadu Masuk</td>
         <td>{{ $totalReports }} Orang</td>
     </tr>
-    <tr><td colspan="2"></td></tr> <!-- Baris kosong -->
+    <tr><td colspan="2"></td></tr>
     
     <tr>
         <th colspan="2" style="font-weight: bold;">Distribusi Antrean Loket</th>
