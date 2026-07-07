@@ -8,6 +8,7 @@ use App\Http\Controllers\Pages\ProfileController;
 use App\Http\Controllers\Pages\ReportersController;
 use App\Http\Controllers\Pages\ReportsController;
 use App\Http\Controllers\Pages\ModNoteController;
+use App\Http\Controllers\Pages\ModReportController;
 use App\Http\Controllers\Pages\ForwardingController;
 use App\Http\Controllers\Pages\SearchController;
 use App\Http\Controllers\Pages\ReportExportController;
@@ -115,6 +116,7 @@ Route::middleware(['auth', CheckPasswordReset::class])->prefix('admin')->group(f
         Route::get('/status', [ReportExportController::class, 'checkStatus'])->name('status');
         Route::get('/download', [ReportExportController::class, 'download'])->name('download');
         Route::get('/template', [ReportImportController::class, 'downloadTemplate'])->name('template');
+        Route::get('/mod-daily', [ModReportController::class, 'exportDailyReport'])->name('mod-daily');
     });
 
     Route::prefix('import')->name('import.')->group(function () {

@@ -16,108 +16,140 @@
 @endsection
 
 @section('content')
-<div class="card">
-    <div class="card-body">
-        <h3 class="card-title">Pilih Filter Data</h3>
-        <p class="card-subtitle">Pilih kriteria untuk data yang akan diexport. Untuk data yang sangat besar, disarankan menggunakan format Excel.</p>
+<div class="container-xl">
+    <div class="row row-cards">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title">Pilih Filter Data</h3>
+                    <p class="card-subtitle">Pilih kriteria untuk data yang akan diexport. Untuk data yang sangat besar, disarankan menggunakan format Excel.</p>
 
-        <form id="export-form" method="POST">
-            @csrf
-            <div class="row g-4 mt-1">
-                {{-- Kategori --}}
-                <div class="col-md-4">
-                    <label class="form-label">Kategori</label>
-                    <select class="form-select" name="filterKategori[]" id="filter-export-kategori" multiple> 
-                        @foreach ($categories as $category)
-                            <option value="{{ $category->name }}">{{ $category->name }}</option> 
-                        @endforeach
-                    </select>
-                </div>
-                
-                {{-- Status Laporan --}}
-                <div class="col-md-4">
-                    <label class="form-label">Status Laporan</label>
-                    <select class="form-select" name="filterStatus" id="filter-export-status">
-                        <option value="">Semua Status</option>
-                        @foreach ($statuses as $status)
-                            <option value="{{ $status }}">{{ $status }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                
-                {{-- Klasifikasi --}}
-                <div class="col-md-4">
-                    <label class="form-label">Klasifikasi</label>
-                    <select class="form-select" name="filterKlasifikasi" id="filter-export-klasifikasi">
-                         <option value="">Semua Klasifikasi</option>
-                         @foreach ($classifications as $classification)
-                             <option value="{{ $classification }}">{{ $classification }}</option>
-                         @endforeach
-                    </select>
-                </div>
+                    <form id="export-form" method="POST">
+                        @csrf
+                        <div class="row g-4 mt-1">
+                            {{-- Kategori --}}
+                            <div class="col-md-4">
+                                <label class="form-label">Kategori</label>
+                                <select class="form-select" name="filterKategori[]" id="filter-export-kategori" multiple> 
+                                    @foreach ($categories as $category)
+                                        <option value="{{ $category->name }}">{{ $category->name }}</option> 
+                                    @endforeach
+                                </select>
+                            </div>
+                            
+                            {{-- Status Laporan --}}
+                            <div class="col-md-4">
+                                <label class="form-label">Status Laporan</label>
+                                <select class="form-select" name="filterStatus" id="filter-export-status">
+                                    <option value="">Semua Status</option>
+                                    @foreach ($statuses as $status)
+                                        <option value="{{ $status }}">{{ $status }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            
+                            {{-- Klasifikasi --}}
+                            <div class="col-md-4">
+                                <label class="form-label">Klasifikasi</label>
+                                <select class="form-select" name="filterKlasifikasi" id="filter-export-klasifikasi">
+                                     <option value="">Semua Klasifikasi</option>
+                                     @foreach ($classifications as $classification)
+                                         <option value="{{ $classification }}">{{ $classification }}</option>
+                                     @endforeach
+                                </select>
+                            </div>
 
-                {{-- Distribusi (Deputi / Unit Kerja) --}}
-                <div class="col-md-4">
-                    <label class="form-label">Distribusi</label>
-                    <select class="form-select" name="filterDistribusi" id="filter-export-distribusi">
-                        <option value="">Semua Distribusi</option>
-                        <optgroup label="Deputi">
-                            @foreach ($deputies as $deputy)
-                                <option value="deputy_{{ $deputy->id }}">{{ $deputy->name }}</option>
-                            @endforeach
-                        </optgroup>
-                        <optgroup label="Unit Kerja">
-                            @foreach ($unitKerjas as $unit)
-                                <option value="unit_{{ $unit->id }}">{{ $unit->name }}</option>
-                            @endforeach
-                        </optgroup>
-                    </select>
-                </div>
-                
-                {{-- Status Analisis --}}
-                <div class="col-md-4">
-                    <label class="form-label">Status Analisis</label>
-                    <select class="form-select" name="filterStatusAnalisis" id="filter-export-status-analisis">
-                        <option value="">Semua Status Analisis</option>
-                        @foreach ($analysisStatuses as $statusAnalisis)
-                            <option>{{ $statusAnalisis }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                            {{-- Distribusi (Deputi / Unit Kerja) --}}
+                            <div class="col-md-4">
+                                <label class="form-label">Distribusi</label>
+                                <select class="form-select" name="filterDistribusi" id="filter-export-distribusi">
+                                    <option value="">Semua Distribusi</option>
+                                    <optgroup label="Deputi">
+                                        @foreach ($deputies as $deputy)
+                                            <option value="deputy_{{ $deputy->id }}">{{ $deputy->name }}</option>
+                                        @endforeach
+                                    </optgroup>
+                                    <optgroup label="Unit Kerja">
+                                        @foreach ($unitKerjas as $unit)
+                                            <option value="unit_{{ $unit->id }}">{{ $unit->name }}</option>
+                                        @endforeach
+                                    </optgroup>
+                                </select>
+                            </div>
+                            
+                            {{-- Status Analisis --}}
+                            <div class="col-md-4">
+                                <label class="form-label">Status Analisis</label>
+                                <select class="form-select" name="filterStatusAnalisis" id="filter-export-status-analisis">
+                                    <option value="">Semua Status Analisis</option>
+                                    @foreach ($analysisStatuses as $statusAnalisis)
+                                        <option>{{ $statusAnalisis }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
 
-                {{-- Sumber --}}
-                <div class="col-md-4">
-                    <label class="form-label">Sumber Pengaduan</label>
-                    <select class="form-select" name="filterSource" id="filter-export-sumber"> 
-                        <option value="">Semua Sumber</option>
-                        @foreach ($sources as $source)
-                            <option>{{ $source }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                            {{-- Sumber --}}
+                            <div class="col-md-4">
+                                <label class="form-label">Sumber Pengaduan</label>
+                                <select class="form-select" name="filterSource" id="filter-export-sumber"> 
+                                    <option value="">Semua Sumber</option>
+                                    @foreach ($sources as $source)
+                                        <option>{{ $source }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
 
-                {{-- Tanggal Range --}}
-                <div class="col-md-4">
-                    <label class="form-label">Periode Tanggal Dibuat</label>
-                    <input type="text" class="form-control" name="filterDateRange" id="tanggal-range-export" placeholder="dd/mm/yyyy - dd/mm/yyyy" />
-                </div>
-                
-                {{-- Pencarian Universal --}}
-                <div class="col-md-8">
-                    <label class="form-label">Pencarian Kata Kunci</label>
-                    <input type="text" class="form-control" name="q" placeholder="Cari Judul, NIK, atau Nomor Tiket" />
+                            {{-- Tanggal Range --}}
+                            <div class="col-md-4">
+                                <label class="form-label">Periode Tanggal Dibuat</label>
+                                <input type="text" class="form-control" name="filterDateRange" id="tanggal-range-export" placeholder="dd/mm/yyyy - dd/mm/yyyy" />
+                            </div>
+                            
+                            {{-- Pencarian Universal --}}
+                            <div class="col-md-8">
+                                <label class="form-label">Pencarian Kata Kunci</label>
+                                <input type="text" class="form-control" name="q" placeholder="Cari Judul, NIK, atau Nomor Tiket" />
+                            </div>
+                        </div>
+
+                        <div class="card-footer bg-white mt-4 pt-4 px-0 pb-0">
+                            <button type="button" class="btn btn-primary me-2" onclick="startExport('excel')">
+                                <i class="ti ti-file-spreadsheet me-1"></i> Export ke Excel
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="startExport('pdf')">
+                                <i class="ti ti-file-text me-1"></i> Export ke PDF
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
+        </div>
 
-            <div class="card-footer bg-white mt-4 pt-4">
-                <button type="button" class="btn btn-primary me-2" onclick="startExport('excel')">
-                    <i class="ti ti-file-spreadsheet me-1"></i> Export ke Excel
-                </button>
-                <button type="button" class="btn btn-secondary" onclick="startExport('pdf')">
-                    <i class="ti ti-file-text me-1"></i> Export ke PDF
-                </button>
+        @if(auth()->user()->email === 'mod@set.wapresri.go.id' || auth()->user()->hasRole('superadmin'))
+        <div class="col-12 mt-2">
+            <div class="card border-primary" style="border-left: 4px solid #206bc4;">
+                <div class="card-body">
+                    <h3 class="card-title text-primary"><i class="ti ti-notebook me-2"></i>Export Laporan Harian MOD</h3>
+                    <p class="card-subtitle mb-4">Unduh rekapitulasi jumlah pengadu dan log aktivitas Manager on Duty (MOD) berdasarkan tanggal tertentu. Fitur ini menggunakan format Excel.</p>
+                    
+                    <form action="{{ route('export.mod-daily') }}" method="GET">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label required">Pilih Tanggal Laporan</label>
+                                <input type="date" name="date" class="form-control" value="{{ \Carbon\Carbon::today()->toDateString() }}" required>
+                            </div>
+                            <div class="col-md-4">
+                                <button type="submit" class="btn btn-outline-primary">
+                                    <i class="ti ti-download me-2"></i> Unduh Laporan MOD
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
             </div>
-        </form>
+        </div>
+        @endif
+        
     </div>
 </div>
 @endsection
