@@ -26,7 +26,7 @@ class ModSummarySheet implements FromView, WithTitle, ShouldAutoSize
             ->count();
         
         $queueData = RegistrationQueue::selectRaw('counter_number, count(*) as total')
-            ->whereDate('created_at', $this->date)
+            ->whereDate('served_at', $this->date)
             ->groupBy('counter_number')
             ->pluck('total', 'counter_number')
             ->toArray();
