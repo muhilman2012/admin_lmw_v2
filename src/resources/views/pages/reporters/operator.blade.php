@@ -56,7 +56,8 @@
                 
                 <div class="d-grid gap-2">
                     <button id="btn-call-next" class="btn btn-primary btn-lg py-3 shadow" 
-                        onclick="panggilBerikutnya()" {{ $activeQueue ? 'disabled' : '' }}>
+                        onclick="panggilBerikutnya()" 
+                        {{ ($activeQueue || !$sessionCounter) ? 'disabled' : '' }}>
                         <i class="ti ti-player-play-filled me-2"></i> PANGGIL BERIKUTNYA
                     </button>
                     
@@ -191,7 +192,7 @@
             const token = document.querySelector('meta[name="csrf-token"]');
             if (token) axios.defaults.headers.common['X-CSRF-TOKEN'] = token.content;
 
-            @if(!$sessionCounter)
+            @if(!$sessionCounter && !auth()->user()->hasRole(['superadmin', 'admin']))
                 const modalEl = document.getElementById('modal-select-counter');
                 const modalInstance = new bootstrap.Modal(modalEl);
                 modalInstance.show();
