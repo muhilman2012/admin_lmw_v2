@@ -151,43 +151,36 @@ class ForwardedReports extends Component
         return $query->paginate($this->perPage);
     }
 
-    // === METODE SCOPE BERBASIS PERAN (RBAC) ===
     private function applyForwardingScope(Builder $query, $user): Builder
     {
+        // 1. Superadmin & Admin melihat semua data
         if ($user->hasRole(['superadmin', 'admin'])) {
-            return $query; // Lihat semua
+            return $query; 
         }
         
-        // Analis hanya melihat laporan yang dia teruskan
+        // 2. Analis hanya melihat laporan yang dia teruskan sendiri
         if ($user->hasRole('analyst')) {
             return $query->where('user_id', $user->id);
         }
         
-        // Logika untuk Deputy/Asdep/Karo/Unit
-        // Dapatkan unit/deputi ID yang relevan untuk user ini
-        
+        // 3. Logika untuk Deputy/Asdep/Karo/Unit
         $unitIds = [];
         $isDeputy = $user->hasRole('deputy');
         
         if ($isDeputy && $user->deputy_id) {
-            // Jika Deputi, ambil semua unit di bawahnya
-            $unitIds = UnitKerja::where('deputy_id', $user->deputy_id)->pluck('id');
+            // Jika Deputi, ambil ID semua unit (Asdep/Karo) yang ada di bawah kedeputiannya
+            $unitIds = UnitKerja::where('deputy_id', $user->deputy_id)->pluck('id')->toArray();
         } elseif (!$isDeputy && $user->unit_kerja_id) {
-             // Jika User Unit Biasa (Asdep/Karo), ambil unitnya sendiri
-             $unitIds = [$user->unit_kerja_id];
+            // Jika pimpinan unit biasa (Asdep/Karo), ambil ID unitnya sendiri
+            $unitIds = [$user->unit_kerja_id];
         }
 
-        if ($unitIds) {
-            // Ambil semua category_id yang ditugaskan ke Unit Ids ini
-            $categoryIds = DB::table('category_unit')->whereIn('unit_kerja_id', $unitIds)->pluck('category_id');
+        if (!empty($unitIds)) {
+            $analystIds = \App\Models\User::whereIn('unit_kerja_id', $unitIds)->pluck('id')->toArray();
             
-            // Filter LaporanForwarding berdasarkan category_id laporan terkait
-            return $query->whereHas('laporan', function ($qReport) use ($categoryIds) {
-                $qReport->whereIn('category_id', $categoryIds);
-            });
+            return $query->whereIn('user_id', $analystIds);
         }
 
-        // Jika tidak ada peran atau unit yang relevan
         return $query->where('id', 0);
     }
 
