@@ -23,9 +23,10 @@ class KioskController extends Controller
 
     public function checkData(Request $request)
     {
-        \Illuminate\Support\Facades\Log::channel('kiosk')->info('KIOSK_CHECK_REQUEST_IN', ['search' => $request->search]);
+        $search = trim($request->search);
+    
+        \Illuminate\Support\Facades\Log::channel('kiosk')->info('KIOSK_CHECK_REQUEST_IN', ['search' => $search]);
 
-        $search = $request->search;
         if (!$search) {
             return response()->json(['status' => 'error', 'message' => 'Input tidak boleh kosong.'], 400);
         }
@@ -204,6 +205,10 @@ class KioskController extends Controller
 
     public function operatorIndex()
     {
+        \DB::table('active_counters')
+            ->whereDate('updated_at', '<', now()->toDateString())
+            ->delete();
+
         $sessionCounter = session('kiosk_counter_number');
         
         if ($sessionCounter) {

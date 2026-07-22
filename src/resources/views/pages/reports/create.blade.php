@@ -344,7 +344,6 @@
                         e.preventDefault();
                         e.stopPropagation();
                         
-                        // 🔥 1. DISABLE TOMBOL SEBELUM FETCH DIMULAI
                         toggleSubmitButton(true);
 
                         document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
@@ -365,7 +364,7 @@
                             body: formData,
                             headers: {
                                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                                'Accept': 'application/json' // 🔥 MENERIMA RESPONSE JSON
+                                'Accept': 'application/json'
                             }
                         })
                         .then(response => {
@@ -601,4 +600,9 @@
             sortField: { field: "text", direction: "asc" },
         });
     });
+</script>
+<script>
+    setInterval(function() {
+        fetch("{{ url('admin/keep-alive') }}").catch(console.error);
+    }, 900000);
 </script>

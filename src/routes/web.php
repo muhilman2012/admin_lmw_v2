@@ -42,6 +42,11 @@ Route::post('/forgot-password', [LoginController::class, 'handleForgotPassword']
 Route::middleware(['auth', CheckPasswordReset::class])->prefix('admin')->group(function () {
     // Rute Logout
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+
+    // Route Keep Alive
+    Route::get('/keep-alive', function () {
+        return response()->json(['status' => 'alive']);
+    });
     
     // Halaman Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
