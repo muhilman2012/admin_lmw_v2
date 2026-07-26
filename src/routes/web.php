@@ -101,6 +101,7 @@ Route::middleware(['auth', CheckPasswordReset::class])->prefix('admin')->group(f
         Route::get('/{uuid}/download/government', [ReceiptPdfController::class, 'downloadReceiptGovernment'])->name('download.government');
         Route::post('/{uuid}/mod-notes', [ModNoteController::class, 'store'])->name('mod-notes.store');
     });
+    Route::put('/mod-notes/{id}', [ModNoteController::class, 'update'])->name('mod-notes.update');
 
     Route::prefix('forwarding')->name('forwarding.')->group(function () {
         Route::get('/', [ForwardingController::class, 'index'])->name('index');

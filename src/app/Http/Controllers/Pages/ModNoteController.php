@@ -39,4 +39,33 @@ class ModNoteController extends Controller
 
         return redirect()->back()->with('success', 'Catatan MOD berhasil ditambahkan.');
     }
+
+    public function update(Request $request, $id)
+    {
+        try {
+            $modNote = \App\Models\ModNote::findOrFail($id);
+            if ($modNote->actual_user_id != auth()->id()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Akses ditolak! Anda hanya dapat mengubah catatan atas nama Anda sendiri.'
+                ], 403);
+            }
+
+            $request->validate([
+                'note' => 'required|string'
+            ]);
+
+            $modNote->update([
+                'note' => $request->note,
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Catatan MOD berhasil diperbarui.'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
 }

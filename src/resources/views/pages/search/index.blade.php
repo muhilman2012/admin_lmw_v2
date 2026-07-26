@@ -25,6 +25,7 @@
                     <option value="reporter_name">Nama Pengadu</option>
                     <option value="reporter_nik">NIK Pengadu</option>
                     <option value="subject">Judul Laporan</option>
+                    <option value="details">Isi Laporan / Detail</option>
                 </select>
             </div>
 

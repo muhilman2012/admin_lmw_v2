@@ -477,28 +477,53 @@
                                             <small class="text-muted">{{ \Carbon\Carbon::parse($note->created_at)->format('H:i') }} WIB</small>
                                         </div>
                                         <div class="bg-light p-3 rounded border">
-                                            <p class="mb-0">{!! nl2br(e($note->note)) !!}</p>
-                                            @if($note->attachment_path)
-                                                @php
-                                                    $key = ltrim($note->attachment_path, '/');
-                                                    $fileUrl = signMinioUrlSmart(env('AWS_COMPLAINT_BUCKET'), $key, 10);
+                                            <p class="mb-0" id="note-text-{{ $note->id }}">{!! nl2br(e($note->note)) !!}</p>
+
+                                            @php
+                                                // Cek apakah user yang login adalah pemilik catatan (menggunakan ID agar akurat)
+                                                $isEditable = false;
+                                                if (isset($note->actual_user_id) && $note->actual_user_id == auth()->id()) {
+                                                    $isEditable = true;
+                                                } elseif (isset($note->actualUser) && $note->actualUser->id == auth()->id()) {
+                                                    $isEditable = true;
+                                                }
+                                            @endphp
+
+                                            <!-- Footer Kotak: Lampiran (Kiri) & Tombol Edit (Kanan) -->
+                                            @if($note->attachment_path || $isEditable)
+                                                <div class="mt-3 pt-2 border-top d-flex justify-content-between align-items-center">
                                                     
-                                                    $ext = pathinfo($note->attachment_name, PATHINFO_EXTENSION);
-                                                    $icon = match(strtolower($ext)) {
-                                                        'pdf' => 'ti-file-description',
-                                                        'xls', 'xlsx' => 'ti-file-spreadsheet',
-                                                        'doc', 'docx' => 'ti-file-text',
-                                                        'jpg', 'jpeg', 'png' => 'ti-photo',
-                                                        default => 'ti-paperclip'
-                                                    };
-                                                @endphp
-                                                <div class="mt-3 pt-2 border-top">
-                                                    <a href="{{ $fileUrl }}" target="_blank" class="btn btn-sm btn-outline-info">
-                                                        <i class="ti {{ $icon }} me-1"></i> Lihat Lampiran: {{ $note->attachment_name }}
-                                                    </a>
+                                                    <!-- Sisi Kiri: Tombol Lampiran -->
+                                                    <div>
+                                                        @if($note->attachment_path)
+                                                            @php
+                                                                $key = ltrim($note->attachment_path, '/');
+                                                                $fileUrl = signMinioUrlSmart(env('AWS_COMPLAINT_BUCKET'), $key, 10);
+                                                                
+                                                                $ext = pathinfo($note->attachment_name, PATHINFO_EXTENSION);
+                                                                $icon = match(strtolower($ext)) {
+                                                                    'pdf' => 'ti-file-description',
+                                                                    'xls', 'xlsx' => 'ti-file-spreadsheet',
+                                                                    'doc', 'docx' => 'ti-file-text',
+                                                                    'jpg', 'jpeg', 'png' => 'ti-photo',
+                                                                    default => 'ti-paperclip'
+                                                                };
+                                                            @endphp
+                                                            <a href="{{ $fileUrl }}" target="_blank" class="btn btn-sm btn-outline-info">
+                                                                <i class="ti {{ $icon }} me-1"></i> Lihat Lampiran: {{ $note->attachment_name }}
+                                                            </a>
+                                                        @endif
+                                                    </div>
+
+                                                    <!-- Sisi Kanan: Tombol Edit (Hanya untuk pemilik) -->
+                                                    @if($isEditable)
+                                                        <button type="button" class="btn btn-sm btn-warning btn-edit-mod" data-id="{{ $note->id }}" data-note="{{ $note->note }}">
+                                                            <i class="ti ti-edit me-1"></i> Edit
+                                                        </button>
+                                                    @endif
+                                                    
                                                 </div>
                                             @endif
-                                            
                                         </div>
                                     </div>
                                 </div>
@@ -863,7 +888,6 @@
         </div>
     </div>
 </div>
-{{-- MODAL TAMBAH CATATAN MOD --}}
 <div class="modal fade" id="modal-tambah-catatan-mod" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -901,6 +925,32 @@
                     <button type="submit" class="btn btn-primary">Simpan Catatan</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+<!-- Modal Edit Catatan MOD -->
+<div class="modal modal-blur fade" id="modal-edit-mod" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="ti ti-edit me-2"></i>Edit Catatan MOD
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Input hidden untuk ID -->
+                <input type="hidden" id="edit-mod-id">
+                
+                <div class="mb-3">
+                    <label class="form-label required">Isi Catatan</label>
+                    <textarea class="form-control" id="edit-mod-textarea" rows="5" placeholder="Ubah catatan Anda di sini..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-primary" id="btn-save-mod-edit">Simpan Perubahan</button>
+            </div>
         </div>
     </div>
 </div>
@@ -1348,6 +1398,100 @@
                 setTimeout(() => {
                     forwardForm.submit(); 
                 }, 50); 
+            });
+        }
+    });
+</script>
+<script>
+    // =========================================================================
+    // LOGIKA EDIT CATATAN MOD (PURE JS)
+    // =========================================================================
+    document.addEventListener("DOMContentLoaded", function () {
+        
+        // 1. Tangkap aksi klik tombol edit menggunakan Event Delegation
+        // Event delegation aman digunakan bahkan jika elemen belum ada saat halaman dimuat
+        document.body.addEventListener('click', function(e) {
+            
+            const editBtn = e.target.closest('.btn-edit-mod');
+            
+            // Jika yang diklik adalah tombol edit MOD
+            if (editBtn) {
+                e.preventDefault();
+                
+                const noteId = editBtn.getAttribute('data-id');
+                const noteText = editBtn.getAttribute('data-note');
+                const modalEdit = document.getElementById('modal-edit-mod');
+                
+                if (modalEdit) {
+                    // Masukkan teks ke dalam textarea modal
+                    const textarea = document.getElementById('edit-mod-textarea');
+                    const idInput = document.getElementById('edit-mod-id');
+                    
+                    if (textarea) textarea.value = noteText;
+                    if (idInput) idInput.value = noteId;
+                    
+                    // Tampilkan modal menggunakan fungsi Pure JS Anda
+                    showModalPure(modalEdit);
+                }
+            }
+        });
+
+        // 2. Tangkap aksi simpan dari Modal
+        const btnSaveEdit = document.getElementById('btn-save-mod-edit');
+        if (btnSaveEdit) {
+            btnSaveEdit.addEventListener('click', function () {
+                const noteIdElement = document.getElementById('edit-mod-id');
+                const newNoteElement = document.getElementById('edit-mod-textarea');
+                
+                if (!noteIdElement || !newNoteElement) return;
+                
+                const noteId = noteIdElement.value;
+                const newNote = newNoteElement.value;
+                const submitBtn = this;
+                
+                submitBtn.innerHTML = 'Menyimpan...';
+                submitBtn.disabled = true;
+
+                fetch(`/admin/mod-notes/${noteId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ note: newNote })
+                })
+                .then(response => response.json().then(data => ({ status: response.status, body: data })))
+                .then(res => {
+                    if (res.status === 200) {
+                        Swal.fire('Berhasil!', res.body.message, 'success');
+                        
+                        // Update teks di halaman secara langsung
+                        const noteTextElement = document.getElementById(`note-text-${noteId}`);
+                        if (noteTextElement) {
+                            noteTextElement.innerText = newNote;
+                        }
+                        
+                        // Update data attribute pada tombol edit agar jika diklik lagi isinya sudah baru
+                        const editBtn = document.querySelector(`.btn-edit-mod[data-id="${noteId}"]`);
+                        if(editBtn) {
+                            editBtn.setAttribute('data-note', newNote);
+                        }
+                        
+                        // Tutup modal menggunakan fungsi Pure JS Anda
+                        hideModalPure(document.getElementById('modal-edit-mod'));
+                    } else {
+                        Swal.fire('Gagal!', res.body.message || 'Gagal menyimpan catatan.', 'error');
+                    }
+                })
+                .catch(error => {
+                    Swal.fire('Error!', 'Terjadi kesalahan koneksi.', 'error');
+                    console.error('Update Note Error:', error);
+                })
+                .finally(() => {
+                    submitBtn.innerHTML = 'Simpan Perubahan';
+                    submitBtn.disabled = false;
+                });
             });
         }
     });

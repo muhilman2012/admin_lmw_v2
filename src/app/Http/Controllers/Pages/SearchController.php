@@ -48,6 +48,8 @@ class SearchController extends Controller
                     $q->where('ticket_number', 'like', $searchTerm);
                 } elseif ($searchColumn === 'subject') {
                     $q->where('subject', 'like', $searchTerm);
+                } elseif ($searchColumn === 'details') {
+                    $q->where('details', 'like', $searchTerm);
                 } elseif ($searchColumn === 'reporter_name') {
                     $q->whereHas('reporter', function ($r) use ($searchTerm) {
                         $r->where('name', 'like', $searchTerm);
@@ -61,6 +63,7 @@ class SearchController extends Controller
                     $q->where(function ($subQuery) use ($searchTerm) {
                         $subQuery->where('ticket_number', 'like', $searchTerm)
                                  ->orWhere('subject', 'like', $searchTerm)
+                                 ->orWhere('details', 'like', $searchTerm)
                                  ->orWhereHas('reporter', function ($r) use ($searchTerm) {
                                      $r->where('name', 'like', $searchTerm)
                                        ->orWhere('nik', 'like', $searchTerm);
