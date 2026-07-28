@@ -45,7 +45,10 @@ Route::middleware(['auth', CheckPasswordReset::class])->prefix('admin')->group(f
 
     // Route Keep Alive
     Route::get('/keep-alive', function () {
-        return response()->json(['status' => 'alive']);
+        return response()->json([
+            'status' => 'alive',
+            'csrf_token' => csrf_token()
+        ]);
     });
     
     // Halaman Dashboard

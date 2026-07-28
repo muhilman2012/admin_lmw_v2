@@ -95,24 +95,31 @@
                     <label class="form-label">Kategori<span class="text-danger">*</span></label>
                     <select name="category_id" id="select-optgroups" class="form-select" placeholder="Pilih Kategori" required>
                         <option value="" selected disabled hidden>Pilih Kategori</option>
+                        
                         @foreach($categories as $category)
+                            <!-- OPTION UNTUK KATEGORI UTAMA (PARENT) -->
                             <option value="{{ $category->id }}" 
                                     @if(isset($report) && $report->category_id == $category->id) selected @endif
-                                    data-type="parent">
+                                    data-type="parent"
+                                    data-name="{{ $category->name }}"> <!-- [TAMBAHAN]: Sisipkan nama parent di sini -->
                                 {{ $category->name }} (Utama)
                             </option>
+                            
                             @if ($category->children->count() > 0)
                                 <optgroup label="↳ Sub-Kategori {{ $category->name }}">
                                     @foreach($category->children as $childCategory)
+                                        <!-- OPTION UNTUK SUB-KATEGORI (CHILD) -->
                                         <option value="{{ $childCategory->id }}"
                                                 @if(isset($report) && $report->category_id == $childCategory->id) selected @endif
-                                                data-parent-id="{{ $category->id }}">
+                                                data-parent-id="{{ $category->id }}"
+                                                data-name="{{ $category->name }}"> <!-- [TAMBAHAN]: Sisipkan NAMA PARENT di sini juga -->
                                             &nbsp;&nbsp;{{ $childCategory->name }}
                                         </option>
                                     @endforeach
                                 </optgroup>
                             @endif
                         @endforeach
+                        
                     </select>
                     <div class="invalid-feedback">Harap pilih Kategori.</div>
                 </div>
@@ -362,60 +369,48 @@
                         fetch(form.action, {
                             method: form.method,
                             body: formData,
+                            credentials: 'same-origin',
                             headers: {
                                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                                'Accept': 'application/json'
+                                'Accept': 'application/json' 
                             }
                         })
-                        .then(response => {
+                        .then(async response => {
                             if (!response.ok) {
-                                return response.json().then(errorData => {
-                                    throw errorData;
-                                });
+                                let errorData = {};
+                                try {
+                                    errorData = await response.json();
+                                } catch (e) {
+                                    errorData = { message: "Format respons tidak valid dari server." };
+                                }
+                                throw { status: response.status, data: errorData };
                             }
                             return response.json();
                         })
                         .then(data => {
-                            // Blok ini hanya akan dieksekusi jika respons.ok = true
                             if (data.success && data.uuid) {
-                                
-                                // Set tombol ke status berhasil
                                 submitButton.innerHTML = '<i class="ti ti-check me-1"></i>Berhasil!';
-                                
                                 Swal.fire({
-                                    toast: true,
-                                    position: 'top-end',
-                                    icon: 'success',
+                                    toast: true, position: 'top-end', icon: 'success',
                                     title: 'Laporan berhasil dibuat!',
-                                    showConfirmButton: false,
-                                    timer: 1500, // Toast duration
-                                    timerProgressBar: true,
+                                    showConfirmButton: false, timer: 1500, timerProgressBar: true,
                                 });
 
-                                // REDIRECT DILAKUKAN SETELAH TOASTER SELESAI
                                 setTimeout(() => {
-                                    toggleSubmitButton(false); // Reset status tombol (Opsional, sebelum redirect)
+                                    toggleSubmitButton(false); 
                                     window.location.href = "{{ url('admin/reports/') }}" + "/" + data.uuid + "/detail";
-                                }, 1500); // Harus sama atau lebih lama dari timer Swal.fire
-
+                                }, 1500); 
                             } else {
-                                console.error('UUID not found in server response or success is false.');
                                 Swal.fire({
-                                    toast: true,
-                                    position: 'top-end',
-                                    icon: 'error',
+                                    toast: true, position: 'top-end', icon: 'error',
                                     title: 'Terjadi kesalahan saat menyimpan laporan.',
-                                    showConfirmButton: false,
-                                    timer: 3000,
-                                    timerProgressBar: true,
+                                    showConfirmButton: false, timer: 3000, timerProgressBar: true,
                                 });
                             }
                         })
                         .catch(error => {
-                            // Blok ini akan menangkap error (422 validation, 500 server)
-                            if (error.errors) {
-                                // Handle validation errors
-                                for (const [key, messages] of Object.entries(error.errors)) {
+                            if (error.status === 422 && error.data && error.data.errors) {
+                                for (const [key, messages] of Object.entries(error.data.errors)) {
                                     const inputElement = document.querySelector(`[name="${key}"]`);
                                     if (inputElement) {
                                         inputElement.classList.add('is-invalid');
@@ -432,31 +427,74 @@
                                     }
                                 }
                                 Swal.fire({
-                                    toast: true,
-                                    position: 'top-end',
-                                    icon: 'error',
-                                    title: 'Mohon periksa kembali form Anda.',
-                                    showConfirmButton: false,
-                                    timer: 3000,
-                                    timerProgressBar: true,
+                                    toast: true, position: 'top-end', icon: 'error',
+                                    title: 'Validasi gagal. Periksa form yang ditandai merah.',
+                                    showConfirmButton: false, timer: 3000, timerProgressBar: true,
                                 });
-                            } else {
-                                // Handle other unexpected errors
+                            }
+                            else if (error.status === 419 || error.status === 401) {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'Sesi Habis (Session Expired)',
+                                    html: `Jangan tutup halaman ini! Ketikan Anda <b>masih aman</b>.<br><br>
+                                        1. Buka <b>Tab Baru</b> di browser.<br>
+                                        2. Lakukan <b>Login ulang</b> di tab baru tersebut.<br>
+                                        3. Kembali ke tab ini lalu klik tombol di bawah.`,
+                                    confirmButtonText: 'Saya Sudah Login Ulang',
+                                    allowOutsideClick: false,
+                                    allowEscapeKey: false
+                                }).then((result) => {
+                                    if (result.isConfirmed) {
+                                        
+                                        Swal.fire({
+                                            title: 'Memeriksa sesi...',
+                                            allowOutsideClick: false,
+                                            didOpen: () => { Swal.showLoading(); }
+                                        });
+
+                                        const keepAliveUrl = "{{ url('admin/keep-alive') }}?t=" + new Date().getTime();
+
+                                        fetch(keepAliveUrl, {
+                                            headers: { 'Accept': 'application/json' },
+                                            credentials: 'same-origin'
+                                        })
+                                        .then(res => {
+                                            if (!res.ok) throw new Error('Belum login');
+                                            return res.json();
+                                        })
+                                        .then(data => {
+                                            if (data.csrf_token) {
+                                                // 1. Perbarui token di Meta Tag Header
+                                                document.querySelector('meta[name="csrf-token"]').setAttribute('content', data.csrf_token);
+                                                
+                                                // 2. [PERBAIKAN FINAL]: Perbarui SEMUA input hidden token di seluruh form yang ada di halaman
+                                                document.querySelectorAll('input[name="_token"]').forEach(function(tokenInput) {
+                                                    tokenInput.value = data.csrf_token;
+                                                });
+
+                                                Swal.fire('Sesi Diperbarui!', 'Silakan klik tombol "Simpan" sekali lagi.', 'success');
+                                            }
+                                        })
+                                        .catch(err => {
+                                            Swal.fire({
+                                                icon: 'error',
+                                                title: 'Gagal',
+                                                text: 'Sistem mendeteksi Anda belum login ulang. Pastikan Anda sudah login sukses di tab baru.'
+                                            });
+                                        });
+                                    }
+                                });
+                            }
+                            else {
                                 console.error('Fetch error:', error);
                                 Swal.fire({
-                                    toast: true,
-                                    position: 'top-end',
-                                    icon: 'error',
-                                    title: 'Terjadi kesalahan koneksi.',
-                                    showConfirmButton: false,
-                                    timer: 3000,
-                                    timerProgressBar: true,
+                                    toast: true, position: 'top-end', icon: 'error',
+                                    title: error.data?.message || 'Terjadi kesalahan koneksi server.',
+                                    showConfirmButton: false, timer: 3000, timerProgressBar: true,
                                 });
                             }
                         })
                         .finally(() => {
-                            // AKTIFKAN KEMBALI TOMBOL JIKA ADA KESALAHAN
-                            // Jika sukses, tombol akan tetap disabled hingga redirect
                             const isSuccess = submitButton.innerHTML.includes('Berhasil');
                             if (!isSuccess) {
                                 toggleSubmitButton(false);

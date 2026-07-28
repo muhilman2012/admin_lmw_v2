@@ -374,7 +374,14 @@
                             @php
                                 $filePath = $report->reporter->ktpDocument->file_path;
                                 $key = ltrim($filePath, '/');
-                                $ktpUrl = signMinioUrlSmart(env('AWS_COMPLAINT_BUCKET'), $key, 10);
+                                
+                                if (str_starts_with($key, 'ktp_kiosk/')) {
+                                    $targetBucket = env('AWS_UPLOADS_BUCKET', 'apps-lmw');
+                                } else {
+                                    $targetBucket = env('AWS_COMPLAINT_BUCKET', 'apps-lmw-documents');
+                                }
+
+                                $ktpUrl = signMinioUrlSmart($targetBucket, $key, 10);
                             @endphp
                             <a href="{{ $ktpUrl }}" target="_blank">
                                 <img src="{{ $ktpUrl }}" alt="KTP Pelapor" class="img-fluid" style="max-height: 400px;">
