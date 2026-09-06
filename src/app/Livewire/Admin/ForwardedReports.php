@@ -30,7 +30,7 @@ class ForwardedReports extends Component
     public $filterUser = '';
 
     public $institutions = [];
-    public $laporStatuses = ['Belum Terverifikasi', 'Dalam Proses', 'Selesai', 'Diarsipkan', 'Ditolak', 'API Error'];
+    public $laporStatuses = ['Belum Terverifikasi', 'Dalam Proses', 'Selesai', 'Diarsipkan oleh Admin', 'Ditolak', 'API Error', 'Ditindaklanjuti oleh Instansi', 'Terverifikasi', 'Menunggu Kelengkapan Informasi'];
 
     protected $queryString = ['search' => ['except' => '']];
 
