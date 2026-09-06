@@ -372,12 +372,25 @@
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label">Kategori</label>
-                            <select class="form-select" wire:model.live="filterKategori" id="filter-kategori">
-                                <option value="">Semua Kategori</option>
-                                @foreach ($categories as $category)
-                                    <option>{{ $category }}</option>
-                                @endforeach
-                            </select>
+                            <div wire:ignore>
+                                <select class="form-select" id="filter-kategori" placeholder="Cari Kategori...">
+                                    <option value="">Semua Kategori</option>
+                                    @foreach($categoriesForMassSelect as $category)
+                                        <option value="{{ $category->name }}" data-type="parent">
+                                            {{ $category->name }} (Utama)
+                                        </option>
+                                        @if ($category->children->count() > 0)
+                                            <optgroup label="↳ Sub-Kategori {{ $category->name }}">
+                                                @foreach($category->children as $childCategory)
+                                                    <option value="{{ $childCategory->name }}" data-parent-id="{{ $category->id }}">
+                                                        &nbsp;&nbsp;{{ $childCategory->name }}
+                                                    </option>
+                                                @endforeach
+                                            </optgroup>
+                                        @endif
+                                    @endforeach
+                                </select>
+                            </div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Status</label>
@@ -1186,7 +1199,7 @@
                             filterModal.addEventListener('shown.bs.modal', () => {
                                 // Inisialisasi semua filter di sini
                                 initializeLitepicker();
-                                initializeTomSelect('filter-kategori', 'filterKategori', { allowEmptyOption: false });
+                                initializeTomSelect('filter-kategori', 'filterKategori', { allowEmptyOption: true });
                                 initializeTomSelect('filter-status', 'filterStatus');
                                 initializeTomSelect('filter-klasifikasi', 'filterKlasifikasi');
                                 initializeTomSelect('filter-distribusi', 'filterDistribusi');

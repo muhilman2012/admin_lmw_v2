@@ -189,13 +189,14 @@
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label">Instansi Tujuan</label>
-                            <select class="form-select" wire:model.live="filterInstitution">
-                                <option value="">Semua Instansi</option>
-                                {{-- $institutions harus dimuat di component backend --}}
-                                @foreach ($institutions as $inst) 
-                                    <option value="{{ $inst->id }}">{{ $inst->name }}</option>
-                                @endforeach
-                            </select>
+                            <div wire:ignore>
+                                <select class="form-select" id="filter-instansi-forward" placeholder="Cari Instansi Tujuan...">
+                                    <option value="">Semua Instansi</option>
+                                    @foreach ($institutions as $inst) 
+                                        <option value="{{ $inst->id }}">{{ $inst->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Status LAPOR!</label>
@@ -283,7 +284,7 @@
                 });
             }
             
-            // --- 3. LOGIKA PENUTUP LOADER SETELAH REDIRECT (Sukses/Gagal) ---
+            // --- LOGIKA PENUTUP LOADER SETELAH REDIRECT (Sukses/Gagal) ---
             
             // Ini akan dieksekusi saat halaman dimuat ulang (setelah redirect)
             const successMessage = '{{ session('success') }}';
@@ -313,6 +314,31 @@
                         timer: 5000
                     });
                 }
+            }
+
+            // --- LOGIKA TOMSELECT UNTUK FILTER INSTANSI TUJUAN ---
+            const filterForwardingModal = document.getElementById('modal-filter-forwarding');
+
+            if (filterForwardingModal) {
+                filterForwardingModal.addEventListener('shown.bs.modal', () => {
+                    const elInstansi = document.getElementById('filter-instansi-forward');
+                    
+                    if (window.TomSelect && elInstansi && !elInstansi.tomselect) {
+                        new TomSelect(elInstansi, {
+                            plugins: { dropdown_input: {} },
+                            create: false,
+                            allowEmptyOption: true,
+                            sortField: { field: "text", direction: "asc" },
+                            onChange: (value) => {
+                                const componentRoot = document.querySelector('[wire\\:id]');
+                                if (componentRoot && typeof Livewire !== 'undefined') {
+                                    const component = Livewire.find(componentRoot.getAttribute('wire:id'));
+                                    component.$wire.set('filterInstitution', value);
+                                }
+                            }
+                        });
+                    }
+                });
             }
         });
     </script>
