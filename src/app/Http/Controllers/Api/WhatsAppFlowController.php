@@ -18,9 +18,9 @@ class WhatsAppFlowController extends Controller
             $initialVector = base64_decode($request->input('initial_vector'));
 
             $privateKey = config('services.lmw.wa_private_key');
-            $privateKey = str_replace('\n', "\n", $privateKey);
 
             $aesKey = '';
+
             if (!openssl_private_decrypt($encryptedAesKey, $aesKey, $privateKey, OPENSSL_PKCS1_OAEP_PADDING)) {
                 throw new \Exception("Gagal mendekripsi AES Key");
             }
