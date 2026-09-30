@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use phpseclib3\Crypt\RSA;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -12,23 +13,38 @@ class WhatsAppFlowController extends Controller
     public function handleWebhook(Request $request)
     {
         try {
-            // 1. Dekripsi Request Meta
+            // 1. Ambil data dari Request
             $encryptedAesKey = base64_decode($request->input('encrypted_aes_key'));
             $encryptedFlowData = base64_decode($request->input('encrypted_flow_data'));
             $initialVector = base64_decode($request->input('initial_vector'));
 
-            $privateKey = config('services.lmw.wa_private_key');
+            // 2. Ambil Private Key dan bersihkan string \n (agar aman dari salah baca)
+            $privateKeyStr = config('services.lmw.wa_private_key');
+            $privateKeyStr = str_replace(['\\n', '\n'], "\n", $privateKeyStr);
 
-            $aesKey = '';
+            // 3. Dekripsi AES Key menggunakan phpseclib (Mendukung SHA-256 OAEP Meta)
+            try {
+                $rsa = RSA::load($privateKeyStr)
+                        ->withPadding(RSA::ENCRYPTION_OAEP)
+                        ->withHash('sha256')
+                        ->withMGFHash('sha256');
 
-            if (!openssl_private_decrypt($encryptedAesKey, $aesKey, $privateKey, OPENSSL_PKCS1_OAEP_PADDING)) {
+                $aesKey = $rsa->decrypt($encryptedAesKey);
+            } catch (\Exception $e) {
+                Log::error("RSA Decryption Failed: " . $e->getMessage());
                 throw new \Exception("Gagal mendekripsi AES Key");
             }
 
+            // 4. Dekripsi Flow Data (Tetap gunakan openssl bawaan untuk AES-256-GCM)
             $authTag = substr($encryptedFlowData, -16);
             $ciphertext = substr($encryptedFlowData, 0, -16);
 
             $flowDataJson = openssl_decrypt($ciphertext, 'aes-256-gcm', $aesKey, OPENSSL_RAW_DATA, $initialVector, $authTag);
+
+            if (!$flowDataJson) {
+                throw new \Exception("Gagal mendekripsi Flow Data (GCM)");
+            }
+
             $flowData = json_decode($flowDataJson, true);
 
             // 2. PROSES LOGIKA ACTION
