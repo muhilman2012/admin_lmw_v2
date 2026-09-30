@@ -305,29 +305,61 @@ class WhatsAppFlowController extends Controller
                 
                 // --- F. JIKA PREVIEW DIKONFIRMASI (SUBMIT AKHIR) ---
                 elseif ($screen === 'PREVIEW') {
+                    // 1. Bersihkan ID Dokumen (Hapus angka 0 dari dokumen yang di-skip)
+                    $rawDocIds = [
+                        (int) ($formData['ktp_doc_id'] ?? 0),
+                        (int) ($formData['kk_doc_id'] ?? 0),
+                        (int) ($formData['pendukung_doc_id'] ?? 0)
+                    ];
+                    // array_filter akan otomatis membuang elemen bernilai 0 atau false
+                    $cleanDocIds = array_values(array_filter($rawDocIds));
+
+                    // 2. Format Tanggal dari DatePicker WA (Milidetik) menjadi Y-m-d
+                    $waktuRaw = $formData['waktu_kejadian'] ?? '';
+                    $waktuFormatted = $waktuRaw;
+                    if (is_numeric($waktuRaw)) {
+                        // DatePicker WA mengirim timestamp Unix dalam milidetik
+                        $waktuFormatted = date('Y-m-d', $waktuRaw / 1000);
+                    }
+
+                    $waLog->info("Payload Submit Laporan LMW:", [
+                        'doc_ids' => $cleanDocIds,
+                        'waktu' => $waktuFormatted
+                    ]);
+
                     $reportResponse = Http::withHeaders($apiHeaders)->post(url('/api/reports'), [
                         'reporter_id' => (int) ($formData['reporter_id'] ?? 0),
-                        'document_ids' => [
-                            (int) ($formData['ktp_doc_id'] ?? 0),
-                            (int) ($formData['kk_doc_id'] ?? 0),
-                            (int) ($formData['pendukung_doc_id'] ?? 0)
-                        ],
+                        'document_ids' => $cleanDocIds,
                         'report_details' => [
                             'subject' => $formData['judul_pengaduan'] ?? '',
                             'details' => $formData['detail_pengaduan'] ?? '',
                             'location' => $formData['lokasi_kejadian'] ?? '',
-                            'event_date' => $formData['waktu_kejadian'] ?? '',
+                            'event_date' => $waktuFormatted,
                             'source' => $formData['sumber_pengaduan'] ?? 'whatsapp'
                         ]
                     ]);
 
-                    $responseData = [
-                        'screen' => 'SUCCESS',
-                        'data' => [
-                            'ticket_number' => (string) ($reportResponse->json('data.ticket_number') ?? '-'),
-                            'category' => (string) ($reportResponse->json('data.category') ?? '-')
-                        ]
-                    ];
+                    $waLog->info("Response API Create Report:", $reportResponse->json() ?? []);
+
+                    if ($reportResponse->successful()) {
+                        $responseData = [
+                            'screen' => 'SUCCESS',
+                            'data' => [
+                                'ticket_number' => (string) ($reportResponse->json('data.ticket_number') ?? '-'),
+                                'category' => (string) ($reportResponse->json('data.category') ?? '-')
+                            ]
+                        ];
+                    } else {
+                        $waLog->error("API Tolak Submit Laporan!", $reportResponse->json() ?? []);
+                        // Bypass ke layar Sukses dengan pesan error agar UI tidak force close
+                        $responseData = [
+                            'screen' => 'SUCCESS',
+                            'data' => [
+                                'ticket_number' => 'GAGAL_SISTEM',
+                                'category' => 'Mohon ulangi beberapa saat lagi'
+                            ]
+                        ];
+                    }
                 }
                 
                 else {
