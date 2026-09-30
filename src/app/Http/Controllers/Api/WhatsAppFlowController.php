@@ -177,12 +177,13 @@ class WhatsAppFlowController extends Controller
 
                             $responseData = [
                                 'screen' => 'IDENTITAS',
-                                'data' => ['error_message' => $apiErrorMessage] // Error dari API LMW
+                                'data' => ['error_message' => $apiErrorMessage]
                             ];
                         } else {
-                            $reporterResponse = Http::withHeaders($apiHeaders)->post($apiUrl . '/api/reporters', $payloadLmw);
+                            $reporterResponse = Http::withHeaders($apiHeaders)
+                                ->post(url('/api/reporters'), $payloadLmw);
+                            $waLog->info("Response API Create Reporter:", $reporterResponse->json() ?? []);
                             $reporterId = $reporterResponse->json('reporter_id') ?? '0';
-                            
                             $waLog->info("Sukses Lolos Validasi. Reporter ID: " . $reporterId);
 
                             $responseData = [
@@ -207,9 +208,9 @@ class WhatsAppFlowController extends Controller
                         $mediaId = $ktpData[0]['media_id']; 
                         $base64Data = $this->downloadMetaMediaAsBase64($mediaId);
 
-                        $docResponse = Http::withHeaders($apiHeaders)->post($apiUrl . '/api/documents', [
+                        $docResponse = Http::withHeaders($apiHeaders)->post(url('/api/documents'), [
                             'file_base64' => $base64Data,
-                            'description' => 'KTP Pengadu (WA Flows)'
+                            'description' => 'Dokumen KTP'
                         ]);
                         $ktpDocId = $docResponse->json('data.id') ?? '0';
                     }
@@ -236,9 +237,9 @@ class WhatsAppFlowController extends Controller
                         $mediaId = $kkData[0]['media_id'];
                         $base64Data = $this->downloadMetaMediaAsBase64($mediaId);
 
-                        $docResponse = Http::withHeaders($apiHeaders)->post($apiUrl . '/api/documents', [
+                        $docResponse = Http::withHeaders($apiHeaders)->post(url('/api/documents'), [
                             'file_base64' => $base64Data,
-                            'description' => 'Kartu Keluarga (WA Flows)'
+                            'description' => 'Dokumen KK'
                         ]);
                         $kkDocId = $docResponse->json('data.id') ?? '0';
                     }
@@ -266,9 +267,9 @@ class WhatsAppFlowController extends Controller
                         $mediaId = $buktiData[0]['media_id'];
                         $base64Data = $this->downloadMetaMediaAsBase64($mediaId);
 
-                        $docResponse = Http::withHeaders($apiHeaders)->post($apiUrl . '/api/documents', [
+                        $docResponse = Http::withHeaders($apiHeaders)->post(url('/api/documents'), [
                             'file_base64' => $base64Data,
-                            'description' => 'Dokumen Pendukung Laporan (WA Flows)'
+                            'description' => 'Dokumen Pengaduan'
                         ]);
                         $pendukungDocId = $docResponse->json('data.id') ?? '0';
                     }
@@ -290,7 +291,7 @@ class WhatsAppFlowController extends Controller
                 
                 // --- F. JIKA PREVIEW DIKONFIRMASI (SUBMIT AKHIR) ---
                 elseif ($screen === 'PREVIEW') {
-                    $reportResponse = Http::withHeaders($apiHeaders)->post($apiUrl . '/api/reports', [
+                    $reportResponse = Http::withHeaders($apiHeaders)->post(url('/api/reports'), [
                         'reporter_id' => (int) ($formData['reporter_id'] ?? 0),
                         'document_ids' => [
                             (int) ($formData['ktp_doc_id'] ?? 0),
