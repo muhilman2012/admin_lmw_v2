@@ -35,13 +35,13 @@ class WhatsAppFlowController extends Controller
                 throw new \Exception("Gagal mendekripsi AES Key");
             }
 
-            // 4. Dekripsi Flow Data (Tetap gunakan openssl bawaan untuk AES-256-GCM)
+            // 4. Dekripsi Flow Data (Gunakan aes-128-gcm sesuai panjang kunci 16 byte dari Meta)
             $authTag = substr($encryptedFlowData, -16);
             $ciphertext = substr($encryptedFlowData, 0, -16);
 
             $flowDataJson = openssl_decrypt(
                 $ciphertext, 
-                'aes-256-gcm', 
+                'aes-128-gcm',
                 $aesKey, 
                 OPENSSL_RAW_DATA, 
                 $initialVector, 
@@ -112,7 +112,6 @@ class WhatsAppFlowController extends Controller
                 }
             }
             elseif ($action === 'proses_upload_ktp') {
-                // Konversi Media ID dari Meta menjadi Base64
                 $mediaId = $flowData['ktp_base64']; 
                 $base64Data = $this->downloadMetaMediaAsBase64($mediaId);
 
@@ -221,7 +220,17 @@ class WhatsAppFlowController extends Controller
 
             $responseJson = json_encode($responseData);
             $responseAuthTag = '';
-            $encryptedResponse = openssl_encrypt($responseJson, 'aes-256-gcm', $aesKey, OPENSSL_RAW_DATA, $flippedIv, $responseAuthTag);
+            
+            // PERBAIKAN: Gunakan aes-128-gcm di sini juga!
+            $encryptedResponse = openssl_encrypt(
+                $responseJson, 
+                'aes-128-gcm', 
+                $aesKey, 
+                OPENSSL_RAW_DATA, 
+                $flippedIv, 
+                $responseAuthTag
+            );
+            
             $finalResponse = base64_encode($encryptedResponse . $responseAuthTag);
 
             return response($finalResponse, 200)->header('Content-Type', 'text/plain');
