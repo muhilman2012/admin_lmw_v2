@@ -110,16 +110,19 @@ class WhatsAppFlowController extends Controller
                     $email = $formData['email'] ?? '';
                     $address = $formData['address'] ?? '';
                     
-                    // Tangkap nomor HP dan pastikan formatnya berawalan 62
+                    // --- MEKANISME AUTO-FORMAT NOMOR HP ---
                     $rawPhone = $formData['phone_number'] ?? '';
-                    $cleanPhone = preg_replace('/[^0-9]/', '', $rawPhone); // Hapus karakter non-angka
+                    // 1. Hapus semua karakter selain angka (misal: spasi, strip, tanda +)
+                    $cleanPhone = preg_replace('/[^0-9]/', '', $rawPhone); 
+                    
+                    // 2. Ubah awalan 08 atau 8 menjadi awalan 62
                     if (str_starts_with($cleanPhone, '08')) {
                         $cleanPhone = '62' . substr($cleanPhone, 1);
                     } elseif (str_starts_with($cleanPhone, '8')) {
                         $cleanPhone = '62' . $cleanPhone;
                     }
 
-                    // 1. LAPISAN VALIDASI LOKAL (Sesuai Standar Qontak)
+                    // 1. LAPISAN VALIDASI LOKAL
                     $errorMessage = null;
                     if (!preg_match('/^\d{16}$/', $nik)) {
                         $errorMessage = 'NIK harus 16 digit angka.';
@@ -149,7 +152,7 @@ class WhatsAppFlowController extends Controller
                             'name' => $name,
                             'email' => $email,
                             'address' => $address,
-                            'phone_number' => $cleanPhone // Masukkan nomor yang sudah di-format
+                            'phone_number' => $cleanPhone
                         ];
 
                         $eligibilityResponse = Http::withHeaders($apiHeaders)
@@ -196,14 +199,20 @@ class WhatsAppFlowController extends Controller
                 
                 // --- C. JIKA FORM UPLOAD KTP DISUBMIT ---
                 elseif ($screen === 'UPLOAD_KTP') {
-                    $mediaId = $formData['ktp_base64'] ?? ''; 
-                    $base64Data = $this->downloadMetaMediaAsBase64($mediaId);
+                    $ktpData = $formData['ktp_base64'] ?? [];
+                    $ktpDocId = '0'; // ID default jika user tidak upload file
 
-                    $docResponse = Http::withHeaders($apiHeaders)->post($apiUrl . '/api/documents', [
-                        'file_base64' => $base64Data,
-                        'description' => 'KTP Pengadu (WA Flows)'
-                    ]);
-                    $ktpDocId = $docResponse->json('data.id') ?? '0';
+                    // Cek apakah array tidak kosong dan media_id ada
+                    if (!empty($ktpData) && isset($ktpData[0]['media_id'])) {
+                        $mediaId = $ktpData[0]['media_id']; 
+                        $base64Data = $this->downloadMetaMediaAsBase64($mediaId);
+
+                        $docResponse = Http::withHeaders($apiHeaders)->post($apiUrl . '/api/documents', [
+                            'file_base64' => $base64Data,
+                            'description' => 'KTP Pengadu (WA Flows)'
+                        ]);
+                        $ktpDocId = $docResponse->json('data.id') ?? '0';
+                    }
 
                     $responseData = [
                         'screen' => 'UPLOAD_KK',
@@ -220,14 +229,19 @@ class WhatsAppFlowController extends Controller
                 
                 // --- D. JIKA FORM UPLOAD KK DISUBMIT ---
                 elseif ($screen === 'UPLOAD_KK') {
-                    $mediaId = $formData['kk_base64'] ?? '';
-                    $base64Data = $this->downloadMetaMediaAsBase64($mediaId);
+                    $kkData = $formData['kk_base64'] ?? [];
+                    $kkDocId = '0'; 
 
-                    $docResponse = Http::withHeaders($apiHeaders)->post($apiUrl . '/api/documents', [
-                        'file_base64' => $base64Data,
-                        'description' => 'Kartu Keluarga (WA Flows)'
-                    ]);
-                    $kkDocId = $docResponse->json('data.id') ?? '0';
+                    if (!empty($kkData) && isset($kkData[0]['media_id'])) {
+                        $mediaId = $kkData[0]['media_id'];
+                        $base64Data = $this->downloadMetaMediaAsBase64($mediaId);
+
+                        $docResponse = Http::withHeaders($apiHeaders)->post($apiUrl . '/api/documents', [
+                            'file_base64' => $base64Data,
+                            'description' => 'Kartu Keluarga (WA Flows)'
+                        ]);
+                        $kkDocId = $docResponse->json('data.id') ?? '0';
+                    }
 
                     $responseData = [
                         'screen' => 'UPLOAD_BUKTI',
@@ -245,14 +259,19 @@ class WhatsAppFlowController extends Controller
                 
                 // --- E. JIKA FORM UPLOAD BUKTI DISUBMIT ---
                 elseif ($screen === 'UPLOAD_BUKTI') {
-                    $mediaId = $formData['pendukung_base64'] ?? '';
-                    $base64Data = $this->downloadMetaMediaAsBase64($mediaId);
+                    $buktiData = $formData['pendukung_base64'] ?? [];
+                    $pendukungDocId = '0';
 
-                    $docResponse = Http::withHeaders($apiHeaders)->post($apiUrl . '/api/documents', [
-                        'file_base64' => $base64Data,
-                        'description' => 'Dokumen Pendukung Laporan (WA Flows)'
-                    ]);
-                    $pendukungDocId = $docResponse->json('data.id') ?? '0';
+                    if (!empty($buktiData) && isset($buktiData[0]['media_id'])) {
+                        $mediaId = $buktiData[0]['media_id'];
+                        $base64Data = $this->downloadMetaMediaAsBase64($mediaId);
+
+                        $docResponse = Http::withHeaders($apiHeaders)->post($apiUrl . '/api/documents', [
+                            'file_base64' => $base64Data,
+                            'description' => 'Dokumen Pendukung Laporan (WA Flows)'
+                        ]);
+                        $pendukungDocId = $docResponse->json('data.id') ?? '0';
+                    }
 
                     $responseData = [
                         'screen' => 'PREVIEW',
