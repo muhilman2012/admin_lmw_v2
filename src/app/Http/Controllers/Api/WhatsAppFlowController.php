@@ -82,7 +82,15 @@ class WhatsAppFlowController extends Controller
 
             if ($action === 'ping') {
                 $responseData = ['data' => ['status' => 'active']];
-            } 
+            }
+            elseif ($action === 'INIT') {
+                $responseData = [
+                    'screen' => 'IDENTITAS',
+                    'data' => [
+                        'error_message' => ''
+                    ]
+                ];
+            }
             elseif ($action === 'proses_identitas') {
                 $phoneNumber = $flowData['flow_token'] ?? ''; 
                 $payloadLmw = [
@@ -96,13 +104,30 @@ class WhatsAppFlowController extends Controller
                 $eligibilityResponse = Http::withHeaders($apiHeaders)
                     ->post($apiUrl . '/api/reporters/check-eligibility-v2', $payloadLmw);
 
-                if (!$eligibilityResponse->successful() || $eligibilityResponse->json('status') === 'error' || $eligibilityResponse->json('status') === 'failed') {
-                    $errorMessage = $eligibilityResponse->json('message') ?? 'NIK tidak valid atau sedang dalam masa tunggu.';
+                $resData = $eligibilityResponse->json();
+
+                // 1. Cek apakah request gagal atau secara eksplisit eligible bernilai false
+                if (!$eligibilityResponse->successful() || (isset($resData['eligible']) && $resData['eligible'] === false)) {
+                    
+                    $errorMessage = 'Verifikasi gagal. Silakan periksa kembali data Anda.'; // Pesan default
+                    
+                    // 2. Cari secara dinamis di bagian mana (eligibility/phone/dukcapil) yang statusnya false
+                    if (isset($resData['validations']) && is_array($resData['validations'])) {
+                        foreach ($resData['validations'] as $key => $validation) {
+                            if (isset($validation['status']) && $validation['status'] === false) {
+                                $errorMessage = $validation['message'] ?? "Terjadi kesalahan pada pengecekan {$key}.";
+                                break; // Berhenti mencari setelah menemukan error pertama
+                            }
+                        }
+                    }
+
+                    // 3. Kembalikan user ke screen IDENTITAS beserta pesan errornya
                     $responseData = [
                         'screen' => 'IDENTITAS',
                         'data' => ['error_message' => "⚠️ " . $errorMessage]
                     ];
                 } else {
+                    // Jika eligible bernilai true, daftarkan pelapor dan lanjut ke form Pengaduan
                     $reporterResponse = Http::withHeaders($apiHeaders)->post($apiUrl . '/api/reporters', $payloadLmw);
                     $reporterId = $reporterResponse->json('reporter_id') ?? '0';
                     $responseData = [
