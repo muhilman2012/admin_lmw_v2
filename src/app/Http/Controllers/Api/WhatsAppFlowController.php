@@ -142,7 +142,7 @@ class WhatsAppFlowController extends Controller
                         ];
 
                         $eligibilityResponse = Http::withHeaders($apiHeaders)
-                            ->post($apiUrl . '/api/reporters/check-eligibility-v2', $payloadLmw);
+                            ->post(url('/api/reporters/check-eligibility-v2'), $payloadLmw);
 
                         $resData = $eligibilityResponse->json();
                         $waLog->info("Response API Eligibility:", $resData ?? []);
