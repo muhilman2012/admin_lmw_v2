@@ -201,16 +201,20 @@ class WhatsAppFlowController extends Controller
                 // --- C. JIKA FORM UPLOAD KTP DISUBMIT ---
                 elseif ($screen === 'UPLOAD_KTP') {
                     $ktpData = $formData['ktp_base64'] ?? [];
-                    $ktpDocId = '0'; // ID default jika user tidak upload file
+                    $ktpDocId = '0';
 
-                    // Cek apakah array tidak kosong dan media_id ada
-                    if (!empty($ktpData) && isset($ktpData[0]['media_id'])) {
-                        $mediaId = $ktpData[0]['media_id']; 
-                        $base64Data = $this->downloadMetaMediaAsBase64($mediaId);
+                    if (!empty($ktpData) && isset($ktpData[0]['cdn_url'])) {
+                        if (str_contains($ktpData[0]['cdn_url'], 'EXAMPLE_DATA')) {
+                            $waLog->info("Terdeteksi Simulator Meta (KTP). Memakai gambar dummy.");
+                            $base64Data = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+                        } else {
+                            // PERBAIKAN: Lempar seluruh objek $ktpData[0] ke fungsi baru
+                            $base64Data = $this->downloadAndDecryptFlowMedia($ktpData[0]);
+                        }
 
                         $docResponse = Http::withHeaders($apiHeaders)->post(url('/api/documents'), [
                             'file_base64' => $base64Data,
-                            'description' => 'Dokumen KTP'
+                            'description' => 'KTP Pengadu (WA Flows)'
                         ]);
                         $ktpDocId = $docResponse->json('data.id') ?? '0';
                     }
@@ -233,13 +237,18 @@ class WhatsAppFlowController extends Controller
                     $kkData = $formData['kk_base64'] ?? [];
                     $kkDocId = '0'; 
 
-                    if (!empty($kkData) && isset($kkData[0]['media_id'])) {
-                        $mediaId = $kkData[0]['media_id'];
-                        $base64Data = $this->downloadMetaMediaAsBase64($mediaId);
+                    if (!empty($kkData) && isset($kkData[0]['cdn_url'])) {
+                        if (str_contains($kkData[0]['cdn_url'], 'EXAMPLE_DATA')) {
+                            $waLog->info("Terdeteksi Simulator Meta (KK). Memakai gambar dummy.");
+                            $base64Data = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+                        } else {
+                            // PERBAIKAN DI SINI
+                            $base64Data = $this->downloadAndDecryptFlowMedia($kkData[0]);
+                        }
 
                         $docResponse = Http::withHeaders($apiHeaders)->post(url('/api/documents'), [
                             'file_base64' => $base64Data,
-                            'description' => 'Dokumen KK'
+                            'description' => 'Kartu Keluarga (WA Flows)'
                         ]);
                         $kkDocId = $docResponse->json('data.id') ?? '0';
                     }
@@ -263,13 +272,18 @@ class WhatsAppFlowController extends Controller
                     $buktiData = $formData['pendukung_base64'] ?? [];
                     $pendukungDocId = '0';
 
-                    if (!empty($buktiData) && isset($buktiData[0]['media_id'])) {
-                        $mediaId = $buktiData[0]['media_id'];
-                        $base64Data = $this->downloadMetaMediaAsBase64($mediaId);
+                    if (!empty($buktiData) && isset($buktiData[0]['cdn_url'])) {
+                        if (str_contains($buktiData[0]['cdn_url'], 'EXAMPLE_DATA')) {
+                            $waLog->info("Terdeteksi Simulator Meta (Bukti). Memakai gambar dummy.");
+                            $base64Data = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+                        } else {
+                            // PERBAIKAN DI SINI
+                            $base64Data = $this->downloadAndDecryptFlowMedia($buktiData[0]);
+                        }
 
                         $docResponse = Http::withHeaders($apiHeaders)->post(url('/api/documents'), [
                             'file_base64' => $base64Data,
-                            'description' => 'Dokumen Pengaduan'
+                            'description' => 'Dokumen Pendukung Laporan (WA Flows)'
                         ]);
                         $pendukungDocId = $docResponse->json('data.id') ?? '0';
                     }
@@ -368,43 +382,65 @@ class WhatsAppFlowController extends Controller
     /**
      * Fungsi helper untuk mengambil file dari Server Meta dan mengubahnya ke Base64
      */
-    private function downloadMetaMediaAsBase64($mediaId)
+    private function downloadAndDecryptFlowMedia($mediaObject)
     {
-        $metaToken = config('services.lmw.wa_meta_token'); 
-        
         $waLog = \Illuminate\Support\Facades\Log::build([
             'driver' => 'single',
             'path' => storage_path('logs/wa_flows_debug.log'),
         ]);
         
-        $waLog->info("Mencoba fetch URL Media dari Meta untuk ID: " . $mediaId);
+        $cdnUrl = $mediaObject['cdn_url'] ?? '';
+        $metadata = $mediaObject['encryption_metadata'] ?? null;
+        $fileName = $mediaObject['file_name'] ?? 'document.jpg';
 
-        // 1. Dapatkan URL unduhan Media dari Graph API Meta
-        $response = Http::withToken($metaToken)
-            ->get("https://graph.facebook.com/v19.0/{$mediaId}");
+        if (!$cdnUrl || !$metadata) {
+            throw new \Exception("Data media tidak lengkap (cdn_url atau encryption_metadata tidak ditemukan).");
+        }
+
+        $waLog->info("Mendownload file terenkripsi dari CDN Meta...");
+
+        // 1. Download file biner terenkripsi dari CDN (Tidak butuh token Meta karena URL sudah memiliki signature)
+        $response = Http::get($cdnUrl);
         
         if (!$response->successful()) {
-            $errorBody = $response->body();
-            $waLog->error("Meta API Fetch URL Error: " . $errorBody);
-            throw new \Exception('Gagal fetch URL Meta: ' . $errorBody);
+            throw new \Exception("Gagal mendownload file dari CDN Meta. Status: " . $response->status());
         }
         
-        $mediaUrl = $response->json('url');
-        $waLog->info("Berhasil dapat Media URL: " . $mediaUrl);
+        $encryptedData = $response->body();
 
-        // 2. Download File Biner aslinya
-        $fileResponse = Http::withToken($metaToken)->get($mediaUrl);
-        
-        if (!$fileResponse->successful()) {
-            $errorBody = $fileResponse->body();
-            $waLog->error("Meta API Download File Error: " . $errorBody);
-            throw new \Exception('Gagal download file biner Meta: ' . $errorBody);
+        // 2. Siapkan Kunci Dekripsi (Konversi dari Base64)
+        $encKey = base64_decode($metadata['encryption_key']);
+        $iv = base64_decode($metadata['iv']);
+
+        $waLog->info("Mendekripsi file dengan AES-256-CBC...");
+
+        // 3. Dekripsi file menggunakan algoritma standar WhatsApp (AES-256-CBC)
+        $decryptedData = openssl_decrypt(
+            $encryptedData,
+            'aes-256-cbc',
+            $encKey,
+            OPENSSL_RAW_DATA,
+            $iv
+        );
+
+        if ($decryptedData === false) {
+            $waLog->error("Dekripsi OpenSSL Gagal!");
+            throw new \Exception("Gagal mendekripsi file CDN Meta.");
         }
 
-        $mimeType = $fileResponse->header('Content-Type') ?? 'application/pdf';
-        $base64 = base64_encode($fileResponse->body());
+        // 4. Deteksi Tipe MIME berdasarkan ekstensi file
+        $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+        $mimeType = match($extension) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'pdf' => 'application/pdf',
+            default => 'application/octet-stream',
+        };
+
+        // 5. Ubah ke format Base64 untuk dikirim ke API LMW
+        $base64 = base64_encode($decryptedData);
         
-        $waLog->info("Berhasil convert dokumen ke Base64. Ukuran: " . strlen($base64) . " bytes");
+        $waLog->info("Berhasil mendekripsi dokumen {$fileName}. Ukuran asli: " . strlen($decryptedData) . " bytes");
 
         return "data:{$mimeType};base64,{$base64}";
     }
