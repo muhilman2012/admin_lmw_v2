@@ -39,9 +39,30 @@ class WhatsAppFlowController extends Controller
             $authTag = substr($encryptedFlowData, -16);
             $ciphertext = substr($encryptedFlowData, 0, -16);
 
-            $flowDataJson = openssl_decrypt($ciphertext, 'aes-256-gcm', $aesKey, OPENSSL_RAW_DATA, $initialVector, $authTag);
+            $flowDataJson = openssl_decrypt(
+                $ciphertext, 
+                'aes-256-gcm', 
+                $aesKey, 
+                OPENSSL_RAW_DATA, 
+                $initialVector, 
+                $authTag
+            );
 
             if (!$flowDataJson) {
+                // Kumpulkan semua pesan error dari OpenSSL
+                $sslError = "";
+                while ($msg = openssl_error_string()) {
+                    $sslError .= $msg . " | ";
+                }
+                
+                // Log rincian panjang data untuk mengecek anomali
+                Log::error("GCM Decryption Failed", [
+                    'aes_key_length' => strlen($aesKey),
+                    'iv_length' => strlen($initialVector),
+                    'auth_tag_length' => strlen($authTag),
+                    'ssl_error' => $sslError
+                ]);
+                
                 throw new \Exception("Gagal mendekripsi Flow Data (GCM)");
             }
 
