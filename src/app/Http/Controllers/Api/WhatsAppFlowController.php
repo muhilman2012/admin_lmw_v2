@@ -68,11 +68,19 @@ class WhatsAppFlowController extends Controller
 
             $flowData = json_decode($flowDataJson, true);
 
-            // 2. PROSES LOGIKA ACTION
+            // BIKIN LOG KHUSUS WA FLOWS
+            $waLog = \Illuminate\Support\Facades\Log::build([
+                'driver' => 'single',
+                'path' => storage_path('logs/wa_flows_debug.log'),
+            ]);
+
             $action = $flowData['action'] ?? null;
             $responseData = [];
 
-            // Header standar API Internal LMW
+            // Catat data yang masuk dari WhatsApp
+            $waLog->info("=== REQUEST DARI WA FLOWS ===");
+            $waLog->info("Action: " . $action, $flowData ?? []);
+
             $apiHeaders = [
                 'Authorization' => 'Bearer ' . config('services.lmw.api_token'),
                 'X-LMW-API-KEY' => config('services.lmw.api_key'),
@@ -82,13 +90,11 @@ class WhatsAppFlowController extends Controller
 
             if ($action === 'ping') {
                 $responseData = ['data' => ['status' => 'active']];
-            }
+            } 
             elseif ($action === 'INIT') {
                 $responseData = [
                     'screen' => 'IDENTITAS',
-                    'data' => [
-                        'error_message' => ''
-                    ]
+                    'data' => ['error_message' => '']
                 ];
             }
             elseif ($action === 'proses_identitas') {
@@ -105,31 +111,34 @@ class WhatsAppFlowController extends Controller
                     ->post($apiUrl . '/api/reporters/check-eligibility-v2', $payloadLmw);
 
                 $resData = $eligibilityResponse->json();
+                
+                // Catat balasan asli dari API internal ke log
+                $waLog->info("Response API Eligibility:", $resData ?? []);
 
-                // 1. Cek apakah request gagal atau secara eksplisit eligible bernilai false
                 if (!$eligibilityResponse->successful() || (isset($resData['eligible']) && $resData['eligible'] === false)) {
+                    $errorMessage = 'Verifikasi gagal. Silakan periksa kembali data Anda.'; 
                     
-                    $errorMessage = 'Verifikasi gagal. Silakan periksa kembali data Anda.'; // Pesan default
-                    
-                    // 2. Cari secara dinamis di bagian mana (eligibility/phone/dukcapil) yang statusnya false
                     if (isset($resData['validations']) && is_array($resData['validations'])) {
                         foreach ($resData['validations'] as $key => $validation) {
                             if (isset($validation['status']) && $validation['status'] === false) {
                                 $errorMessage = $validation['message'] ?? "Terjadi kesalahan pada pengecekan {$key}.";
-                                break; // Berhenti mencari setelah menemukan error pertama
+                                break;
                             }
                         }
                     }
 
-                    // 3. Kembalikan user ke screen IDENTITAS beserta pesan errornya
+                    $waLog->warning("Hasil Validasi Ditolak: " . $errorMessage);
+
                     $responseData = [
                         'screen' => 'IDENTITAS',
                         'data' => ['error_message' => "⚠️ " . $errorMessage]
                     ];
                 } else {
-                    // Jika eligible bernilai true, daftarkan pelapor dan lanjut ke form Pengaduan
                     $reporterResponse = Http::withHeaders($apiHeaders)->post($apiUrl . '/api/reporters', $payloadLmw);
                     $reporterId = $reporterResponse->json('reporter_id') ?? '0';
+                    
+                    $waLog->info("Sukses Lolos Validasi. Reporter ID: " . $reporterId);
+
                     $responseData = [
                         'screen' => 'PENGADUAN',
                         'data' => ['reporter_id' => (string) $reporterId]
