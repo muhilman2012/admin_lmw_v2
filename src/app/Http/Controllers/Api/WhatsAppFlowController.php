@@ -399,24 +399,26 @@ class WhatsAppFlowController extends Controller
 
         $waLog->info("Mendownload file terenkripsi dari CDN Meta...");
 
-        // 1. Download file biner terenkripsi dari CDN (Tidak butuh token Meta karena URL sudah memiliki signature)
         $response = Http::get($cdnUrl);
         
         if (!$response->successful()) {
             throw new \Exception("Gagal mendownload file dari CDN Meta. Status: " . $response->status());
         }
         
-        $encryptedData = $response->body();
+        $downloadedData = $response->body();
 
-        // 2. Siapkan Kunci Dekripsi (Konversi dari Base64)
+        // KUNCI PERBAIKAN: Pisahkan Ciphertext murni dari 10-byte HMAC Mac di ujung file
+        $ciphertext = substr($downloadedData, 0, -10);
+
+        // Siapkan Kunci Dekripsi (Konversi dari Base64)
         $encKey = base64_decode($metadata['encryption_key']);
         $iv = base64_decode($metadata['iv']);
 
         $waLog->info("Mendekripsi file dengan AES-256-CBC...");
 
-        // 3. Dekripsi file menggunakan algoritma standar WhatsApp (AES-256-CBC)
+        // Dekripsi hanya bagian ciphertext-nya saja
         $decryptedData = openssl_decrypt(
-            $encryptedData,
+            $ciphertext,
             'aes-256-cbc',
             $encKey,
             OPENSSL_RAW_DATA,
@@ -424,11 +426,16 @@ class WhatsAppFlowController extends Controller
         );
 
         if ($decryptedData === false) {
-            $waLog->error("Dekripsi OpenSSL Gagal!");
+            // Tangkap pesan error OpenSSL spesifik jika masih gagal
+            $sslError = "";
+            while ($msg = openssl_error_string()) {
+                $sslError .= $msg . " | ";
+            }
+            $waLog->error("Dekripsi OpenSSL Gagal! Detail: " . $sslError);
             throw new \Exception("Gagal mendekripsi file CDN Meta.");
         }
 
-        // 4. Deteksi Tipe MIME berdasarkan ekstensi file
+        // Deteksi Tipe MIME berdasarkan ekstensi file
         $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
         $mimeType = match($extension) {
             'jpg', 'jpeg' => 'image/jpeg',
@@ -437,7 +444,7 @@ class WhatsAppFlowController extends Controller
             default => 'application/octet-stream',
         };
 
-        // 5. Ubah ke format Base64 untuk dikirim ke API LMW
+        // Ubah ke format Base64 untuk dikirim ke API LMW
         $base64 = base64_encode($decryptedData);
         
         $waLog->info("Berhasil mendekripsi dokumen {$fileName}. Ukuran asli: " . strlen($decryptedData) . " bytes");
