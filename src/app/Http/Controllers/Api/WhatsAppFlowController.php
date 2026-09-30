@@ -214,7 +214,7 @@ class WhatsAppFlowController extends Controller
 
                         $docResponse = Http::withHeaders($apiHeaders)->post(url('/api/documents'), [
                             'file_base64' => $base64Data,
-                            'description' => 'KTP Pengadu (WA Flows)'
+                            'description' => 'Dokumen KTP'
                         ]);
                         $ktpDocId = $docResponse->json('data.id') ?? '0';
                     }
@@ -248,7 +248,7 @@ class WhatsAppFlowController extends Controller
 
                         $docResponse = Http::withHeaders($apiHeaders)->post(url('/api/documents'), [
                             'file_base64' => $base64Data,
-                            'description' => 'Kartu Keluarga (WA Flows)'
+                            'description' => 'Dokumen Kartu Keluarga'
                         ]);
                         $kkDocId = $docResponse->json('data.id') ?? '0';
                     }
@@ -283,7 +283,7 @@ class WhatsAppFlowController extends Controller
 
                         $docResponse = Http::withHeaders($apiHeaders)->post(url('/api/documents'), [
                             'file_base64' => $base64Data,
-                            'description' => 'Dokumen Pendukung Laporan (WA Flows)'
+                            'description' => 'Dokumen Pengaduan'
                         ]);
                         $pendukungDocId = $docResponse->json('data.id') ?? '0';
                     }
