@@ -74,12 +74,14 @@ class WhatsAppFlowController extends Controller
                 'path' => storage_path('logs/wa_flows_debug.log'),
             ]);
 
-            $action = $flowData['action'] ?? null;
-            $responseData = [];
+            // 5. TANGKAP VARIABEL ROOT DARI META
+            $rootAction = $flowData['action'] ?? null; // Selalu berisi: ping, INIT, atau data_exchange
+            $screen = $flowData['screen'] ?? null;     // Berisi screen yang baru saja disubmit
+            $formData = $flowData['data'] ?? [];       // Ini yang berisi inputan Form (NIK, Nama, KTP, dll)
 
             // Catat data yang masuk dari WhatsApp
             $waLog->info("=== REQUEST DARI WA FLOWS ===");
-            $waLog->info("Action: " . $action, $flowData ?? []);
+            $waLog->info("Root Action: {$rootAction} | Screen: {$screen}", $formData);
 
             $apiHeaders = [
                 'Authorization' => 'Bearer ' . config('services.lmw.api_token'),
@@ -87,157 +89,208 @@ class WhatsAppFlowController extends Controller
                 'Accept' => 'application/json'
             ];
             $apiUrl = config('services.lmw.api_url');
+            $responseData = [];
 
-            if ($action === 'ping') {
+            // 6. ROUTING LOGIKA BERDASARKAN ROOT ACTION & SCREEN
+            if ($rootAction === 'ping') {
                 $responseData = ['data' => ['status' => 'active']];
             } 
-            elseif ($action === 'INIT') {
+            elseif ($rootAction === 'INIT') {
                 $responseData = [
                     'screen' => 'IDENTITAS',
                     'data' => ['error_message' => '']
                 ];
             }
-            elseif ($action === 'proses_identitas') {
-                $phoneNumber = $flowData['flow_token'] ?? ''; 
-                $payloadLmw = [
-                    'nik' => $flowData['nik'],
-                    'name' => $flowData['name'],
-                    'email' => $flowData['email'] ?? '',
-                    'address' => $flowData['address'],
-                    'phone_number' => $phoneNumber 
-                ];
-
-                $eligibilityResponse = Http::withHeaders($apiHeaders)
-                    ->post($apiUrl . '/api/reporters/check-eligibility-v2', $payloadLmw);
-
-                $resData = $eligibilityResponse->json();
+            elseif ($rootAction === 'data_exchange') {
                 
-                // Catat balasan asli dari API internal ke log
-                $waLog->info("Response API Eligibility:", $resData ?? []);
-
-                if (!$eligibilityResponse->successful() || (isset($resData['eligible']) && $resData['eligible'] === false)) {
-                    $errorMessage = 'Verifikasi gagal. Silakan periksa kembali data Anda.'; 
+                // --- A. JIKA FORM IDENTITAS YANG DISUBMIT ---
+                if ($screen === 'IDENTITAS') {
+                    $nik = $formData['nik'] ?? '';
+                    $name = $formData['name'] ?? '';
+                    $email = $formData['email'] ?? '';
+                    $address = $formData['address'] ?? '';
                     
-                    if (isset($resData['validations']) && is_array($resData['validations'])) {
-                        foreach ($resData['validations'] as $key => $validation) {
-                            if (isset($validation['status']) && $validation['status'] === false) {
-                                $errorMessage = $validation['message'] ?? "Terjadi kesalahan pada pengecekan {$key}.";
-                                break;
-                            }
-                        }
+                    // 1. LAPISAN VALIDASI LOKAL (Sesuai Standar Qontak)
+                    $errorMessage = null;
+                    if (!preg_match('/^\d{16}$/', $nik)) {
+                        $errorMessage = 'NIK harus 16 digit angka.';
+                    } elseif (trim($name) === '') {
+                        $errorMessage = 'Nama wajib diisi.';
+                    } elseif ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) { 
+                        $errorMessage = 'Format email tidak valid.';
+                    } elseif (trim($address) === '') {
+                        $errorMessage = 'Alamat wajib diisi.';
                     }
 
-                    $waLog->warning("Hasil Validasi Ditolak: " . $errorMessage);
+                    // Jika validasi lokal gagal, langsung kembalikan error ke WA
+                    if ($errorMessage !== null) {
+                        $responseData = [
+                            'screen' => 'IDENTITAS',
+                            'data' => [
+                                'error_message' => $errorMessage // Tanpa embel-embel emoji
+                            ]
+                        ];
+                    } 
+                    // 2. JIKA VALIDASI LOKAL LOLOS, LANJUT CEK KE API INTERNAL LMW
+                    else {
+                        $payloadLmw = [
+                            'nik' => $nik,
+                            'name' => $name,
+                            'email' => $email,
+                            'address' => $address,
+                            'phone_number' => '081100000000' // Dummy untuk testing, WA Flows tidak kirim nomor otomatis
+                        ];
+
+                        $eligibilityResponse = Http::withHeaders($apiHeaders)
+                            ->post($apiUrl . '/api/reporters/check-eligibility-v2', $payloadLmw);
+
+                        $resData = $eligibilityResponse->json();
+                        $waLog->info("Response API Eligibility:", $resData ?? []);
+
+                        if (!$eligibilityResponse->successful() || (isset($resData['eligible']) && $resData['eligible'] === false)) {
+                            $apiErrorMessage = 'Verifikasi gagal. Silakan periksa kembali data Anda.'; 
+                            
+                            if (isset($resData['validations']) && is_array($resData['validations'])) {
+                                foreach ($resData['validations'] as $key => $validation) {
+                                    if (isset($validation['status']) && $validation['status'] === false) {
+                                        $apiErrorMessage = $validation['message'] ?? "Kesalahan pada {$key}.";
+                                        break;
+                                    }
+                                }
+                            }
+
+                            $waLog->warning("Hasil Validasi Ditolak: " . $apiErrorMessage);
+
+                            $responseData = [
+                                'screen' => 'IDENTITAS',
+                                'data' => ['error_message' => $apiErrorMessage] // Error dari API LMW
+                            ];
+                        } else {
+                            $reporterResponse = Http::withHeaders($apiHeaders)->post($apiUrl . '/api/reporters', $payloadLmw);
+                            $reporterId = $reporterResponse->json('reporter_id') ?? '0';
+                            
+                            $waLog->info("Sukses Lolos Validasi. Reporter ID: " . $reporterId);
+
+                            $responseData = [
+                                'screen' => 'PENGADUAN',
+                                'data' => ['reporter_id' => (string) $reporterId]
+                            ];
+                        }
+                    }
+                }
+                
+                // --- B. JIKA FORM PENGADUAN (LANJUT UPLOAD KTP) DISUBMIT ---
+                // Di WA Flows Anda, form PENGADUAN action-nya adalah 'navigate' ke UPLOAD_KTP.
+                // Jadi kita tidak perlu menangkap 'PENGADUAN' di sini, melainkan langsung menangkap UPLOAD_KTP saat disubmit.
+                
+                // --- C. JIKA FORM UPLOAD KTP DISUBMIT ---
+                elseif ($screen === 'UPLOAD_KTP') {
+                    $mediaId = $formData['ktp_base64'] ?? ''; 
+                    $base64Data = $this->downloadMetaMediaAsBase64($mediaId);
+
+                    $docResponse = Http::withHeaders($apiHeaders)->post($apiUrl . '/api/documents', [
+                        'file_base64' => $base64Data,
+                        'description' => 'KTP Pengadu (WA Flows)'
+                    ]);
+                    $ktpDocId = $docResponse->json('data.id') ?? '0';
 
                     $responseData = [
-                        'screen' => 'IDENTITAS',
-                        'data' => ['error_message' => "⚠️ " . $errorMessage]
-                    ];
-                } else {
-                    $reporterResponse = Http::withHeaders($apiHeaders)->post($apiUrl . '/api/reporters', $payloadLmw);
-                    $reporterId = $reporterResponse->json('reporter_id') ?? '0';
-                    
-                    $waLog->info("Sukses Lolos Validasi. Reporter ID: " . $reporterId);
-
-                    $responseData = [
-                        'screen' => 'PENGADUAN',
-                        'data' => ['reporter_id' => (string) $reporterId]
+                        'screen' => 'UPLOAD_KK',
+                        'data' => [
+                            'reporter_id' => $formData['reporter_id'] ?? '',
+                            'ktp_doc_id' => (string) $ktpDocId,
+                            'judul_pengaduan' => $formData['judul_pengaduan'] ?? '',
+                            'detail_pengaduan' => $formData['detail_pengaduan'] ?? '',
+                            'lokasi_kejadian' => $formData['lokasi_kejadian'] ?? '',
+                            'waktu_kejadian' => $formData['waktu_kejadian'] ?? ''
+                        ]
                     ];
                 }
-            }
-            elseif ($action === 'proses_upload_ktp') {
-                $mediaId = $flowData['ktp_base64']; 
-                $base64Data = $this->downloadMetaMediaAsBase64($mediaId);
+                
+                // --- D. JIKA FORM UPLOAD KK DISUBMIT ---
+                elseif ($screen === 'UPLOAD_KK') {
+                    $mediaId = $formData['kk_base64'] ?? '';
+                    $base64Data = $this->downloadMetaMediaAsBase64($mediaId);
 
-                $docResponse = Http::withHeaders($apiHeaders)->post($apiUrl . '/api/documents', [
-                    'file_base64' => $base64Data,
-                    'description' => 'KTP Pengadu (WA Flows)'
-                ]);
-                $ktpDocId = $docResponse->json('data.id') ?? '0';
+                    $docResponse = Http::withHeaders($apiHeaders)->post($apiUrl . '/api/documents', [
+                        'file_base64' => $base64Data,
+                        'description' => 'Kartu Keluarga (WA Flows)'
+                    ]);
+                    $kkDocId = $docResponse->json('data.id') ?? '0';
 
-                $responseData = [
-                    'screen' => 'UPLOAD_KK',
-                    'data' => [
-                        'reporter_id' => $flowData['reporter_id'],
-                        'ktp_doc_id' => (string) $ktpDocId,
-                        'judul_pengaduan' => $flowData['judul_pengaduan'],
-                        'detail_pengaduan' => $flowData['detail_pengaduan'],
-                        'lokasi_kejadian' => $flowData['lokasi_kejadian'],
-                        'waktu_kejadian' => $flowData['waktu_kejadian']
-                    ]
-                ];
-            }
-            elseif ($action === 'proses_upload_kk') {
-                $mediaId = $flowData['kk_base64'];
-                $base64Data = $this->downloadMetaMediaAsBase64($mediaId);
+                    $responseData = [
+                        'screen' => 'UPLOAD_BUKTI',
+                        'data' => [
+                            'reporter_id' => $formData['reporter_id'] ?? '',
+                            'ktp_doc_id' => $formData['ktp_doc_id'] ?? '',
+                            'kk_doc_id' => (string) $kkDocId,
+                            'judul_pengaduan' => $formData['judul_pengaduan'] ?? '',
+                            'detail_pengaduan' => $formData['detail_pengaduan'] ?? '',
+                            'lokasi_kejadian' => $formData['lokasi_kejadian'] ?? '',
+                            'waktu_kejadian' => $formData['waktu_kejadian'] ?? ''
+                        ]
+                    ];
+                }
+                
+                // --- E. JIKA FORM UPLOAD BUKTI DISUBMIT ---
+                elseif ($screen === 'UPLOAD_BUKTI') {
+                    $mediaId = $formData['pendukung_base64'] ?? '';
+                    $base64Data = $this->downloadMetaMediaAsBase64($mediaId);
 
-                $docResponse = Http::withHeaders($apiHeaders)->post($apiUrl . '/api/documents', [
-                    'file_base64' => $base64Data,
-                    'description' => 'Kartu Keluarga (WA Flows)'
-                ]);
-                $kkDocId = $docResponse->json('data.id') ?? '0';
+                    $docResponse = Http::withHeaders($apiHeaders)->post($apiUrl . '/api/documents', [
+                        'file_base64' => $base64Data,
+                        'description' => 'Dokumen Pendukung Laporan (WA Flows)'
+                    ]);
+                    $pendukungDocId = $docResponse->json('data.id') ?? '0';
 
-                $responseData = [
-                    'screen' => 'UPLOAD_BUKTI',
-                    'data' => [
-                        'reporter_id' => $flowData['reporter_id'],
-                        'ktp_doc_id' => $flowData['ktp_doc_id'],
-                        'kk_doc_id' => (string) $kkDocId,
-                        'judul_pengaduan' => $flowData['judul_pengaduan'],
-                        'detail_pengaduan' => $flowData['detail_pengaduan'],
-                        'lokasi_kejadian' => $flowData['lokasi_kejadian'],
-                        'waktu_kejadian' => $flowData['waktu_kejadian']
-                    ]
-                ];
-            }
-            elseif ($action === 'proses_upload_bukti') {
-                $mediaId = $flowData['pendukung_base64'];
-                $base64Data = $this->downloadMetaMediaAsBase64($mediaId);
+                    $responseData = [
+                        'screen' => 'PREVIEW',
+                        'data' => [
+                            'reporter_id' => $formData['reporter_id'] ?? '',
+                            'ktp_doc_id' => $formData['ktp_doc_id'] ?? '',
+                            'kk_doc_id' => $formData['kk_doc_id'] ?? '',
+                            'pendukung_doc_id' => (string) $pendukungDocId,
+                            'judul_pengaduan' => $formData['judul_pengaduan'] ?? '',
+                            'detail_pengaduan' => $formData['detail_pengaduan'] ?? '',
+                            'lokasi_kejadian' => $formData['lokasi_kejadian'] ?? '',
+                            'waktu_kejadian' => $formData['waktu_kejadian'] ?? ''
+                        ]
+                    ];
+                }
+                
+                // --- F. JIKA PREVIEW DIKONFIRMASI (SUBMIT AKHIR) ---
+                elseif ($screen === 'PREVIEW') {
+                    $reportResponse = Http::withHeaders($apiHeaders)->post($apiUrl . '/api/reports', [
+                        'reporter_id' => (int) ($formData['reporter_id'] ?? 0),
+                        'document_ids' => [
+                            (int) ($formData['ktp_doc_id'] ?? 0),
+                            (int) ($formData['kk_doc_id'] ?? 0),
+                            (int) ($formData['pendukung_doc_id'] ?? 0)
+                        ],
+                        'report_details' => [
+                            'subject' => $formData['judul_pengaduan'] ?? '',
+                            'details' => $formData['detail_pengaduan'] ?? '',
+                            'location' => $formData['lokasi_kejadian'] ?? '',
+                            'event_date' => $formData['waktu_kejadian'] ?? '',
+                            'source' => $formData['sumber_pengaduan'] ?? 'whatsapp'
+                        ]
+                    ]);
 
-                $docResponse = Http::withHeaders($apiHeaders)->post($apiUrl . '/api/documents', [
-                    'file_base64' => $base64Data,
-                    'description' => 'Dokumen Pendukung Laporan (WA Flows)'
-                ]);
-                $pendukungDocId = $docResponse->json('data.id') ?? '0';
-
-                $responseData = [
-                    'screen' => 'PREVIEW',
-                    'data' => [
-                        'reporter_id' => $flowData['reporter_id'],
-                        'ktp_doc_id' => $flowData['ktp_doc_id'],
-                        'kk_doc_id' => $flowData['kk_doc_id'],
-                        'pendukung_doc_id' => (string) $pendukungDocId,
-                        'judul_pengaduan' => $flowData['judul_pengaduan'],
-                        'detail_pengaduan' => $flowData['detail_pengaduan'],
-                        'lokasi_kejadian' => $flowData['lokasi_kejadian'],
-                        'waktu_kejadian' => $flowData['waktu_kejadian']
-                    ]
-                ];
-            }
-            elseif ($action === 'submit_laporan_akhir') {
-                $reportResponse = Http::withHeaders($apiHeaders)->post($apiUrl . '/api/reports', [
-                    'reporter_id' => (int) $flowData['reporter_id'],
-                    'document_ids' => [
-                        (int) $flowData['ktp_doc_id'],
-                        (int) $flowData['kk_doc_id'],
-                        (int) $flowData['pendukung_doc_id']
-                    ],
-                    'report_details' => [
-                        'subject' => $flowData['judul_pengaduan'],
-                        'details' => $flowData['detail_pengaduan'],
-                        'location' => $flowData['lokasi_kejadian'],
-                        'event_date' => $flowData['waktu_kejadian'],
-                        'source' => $flowData['sumber_pengaduan'] ?? 'whatsapp'
-                    ]
-                ]);
-
-                $responseData = [
-                    'screen' => 'SUCCESS',
-                    'data' => [
-                        'ticket_number' => (string) ($reportResponse->json('data.ticket_number') ?? '-'),
-                        'category' => (string) ($reportResponse->json('data.category') ?? '-')
-                    ]
-                ];
+                    $responseData = [
+                        'screen' => 'SUCCESS',
+                        'data' => [
+                            'ticket_number' => (string) ($reportResponse->json('data.ticket_number') ?? '-'),
+                            'category' => (string) ($reportResponse->json('data.category') ?? '-')
+                        ]
+                    ];
+                }
+                
+                else {
+                    $responseData = [
+                        'screen' => 'SUCCESS',
+                        'data' => ['ticket_number' => 'UNKNOWN_SCREEN', 'category' => '-']
+                    ];
+                }
             }
             else {
                 $responseData = [
@@ -246,7 +299,7 @@ class WhatsAppFlowController extends Controller
                 ];
             }
 
-            // 3. ENKRIPSI KEMBALI BALASAN UNTUK META
+            // 7. ENKRIPSI KEMBALI BALASAN UNTUK META
             $flippedIv = '';
             for ($i = 0; $i < strlen($initialVector); $i++) {
                 $flippedIv .= chr(~ord($initialVector[$i]) & 0xFF);
