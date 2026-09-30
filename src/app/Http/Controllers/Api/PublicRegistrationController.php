@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use App\Services\DukcapilService;
 use App\Models\RegistrationQueue;
 use App\Models\Report;
 use App\Models\Reporter;
@@ -88,7 +89,7 @@ class PublicRegistrationController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request, \App\Services\DukcapilService $dukcapilService)
     {
         $this->sanitizeInput($request);
 
@@ -121,8 +122,8 @@ class PublicRegistrationController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => "Pendaftaran hanya tersedia untuk periode kunjungan " . 
-                            $settings->open_date->format('d/m/Y') . " s/d " . 
-                            $settings->close_date->format('d/m/Y')
+                             $settings->open_date->format('d/m/Y') . " s/d " . 
+                             $settings->close_date->format('d/m/Y')
             ], 200);
         }
 
@@ -165,6 +166,19 @@ class PublicRegistrationController extends Controller
                 'status'  => 'error',
                 'message' => "NIK Anda sudah memiliki reservasi aktif atau telah dilayani dalam {$limitDays} hari terakhir."
             ], 200);
+        }
+
+        $verification = $dukcapilService->verifyIdentity(
+            $request->nik, 
+            $request->name, 
+            $request->address
+        );
+
+        if (!$verification['is_valid']) {
+            return response()->json([
+                'status' => 'error', 
+                'message' => $verification['message']
+            ], 200); 
         }
 
         $slotSetting = \App\Models\VisitSlotSetting::where('time_start', $request->visit_time)

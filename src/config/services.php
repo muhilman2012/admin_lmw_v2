@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    'lmw' => [
+        'api_url'   => env('LMW_INTERNAL_API_URL'),
+        'api_key'   => env('LMW_INTERNAL_API_KEY'),
+        'api_token' => env('LMW_INTERNAL_API_TOKEN'),
+        'wa_private_key' => env('WA_PRIVATE_KEY'),
+        'wa_meta_token'  => env('WA_META_TOKEN'),
+    ],
+
 ];

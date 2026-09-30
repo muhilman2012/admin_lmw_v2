@@ -15,15 +15,11 @@ use Illuminate\Support\Facades\Auth;
 class ReporterController extends Controller
 {
     /**
-     * Memeriksa eligibilitas NIK untuk laporan baru.
-     * Aturan: Pengadu hanya bisa membuat 1 laporan dalam 20 hari.
-     *
-     * @param  string  $nik
-     * @return \Illuminate\Http\JsonResponse
+     * [LEGACY] Memeriksa eligibilitas NIK untuk laporan baru (Hanya cek 20 hari).
+     * Endpoint: GET /api/reporters/check-eligibility/{nik}
      */
     public function checkEligibility(string $nik)
     {
-        // Cek apakah NIK memiliki format yang benar
         if (strlen($nik) !== 16 || !is_numeric($nik)) {
             return response()->json([
                 'status' => 'error',
@@ -55,7 +51,6 @@ class ReporterController extends Controller
 
         $daysSinceLastReport = Carbon::parse($latestReport->created_at)->diffInDays();
         $isEligible = $daysSinceLastReport > 20;
-
         $message = $isEligible ? 'NIK eligible untuk membuat laporan baru.' : 'NIK tidak eligible karena laporan terakhir dibuat dalam 20 hari terakhir.';
 
         return response()->json([
@@ -63,6 +58,107 @@ class ReporterController extends Controller
             'message' => $message,
             'eligible' => $isEligible
         ]);
+    }
+
+    /**
+     * [V2] Memeriksa eligibilitas NIK (20 hari), Nomor HP (Maks 5x/Bulan), dan Validasi Dukcapil.
+     * Endpoint: POST /api/reporters/check-eligibility-v2
+     */
+    public function checkEligibilityV2(Request $request, \App\Services\DukcapilService $dukcapilService)
+    {
+        $validated = $request->validate([
+            'nik' => 'required|string|size:16|regex:/^[0-9]+$/',
+            'name' => 'required|string',
+            'address' => 'required|string',
+            'phone_number' => 'required|string|regex:/^628[0-9]+$/'
+        ], [
+            'nik.size' => 'Format NIK tidak valid, harus 16 digit.',
+            'nik.regex' => 'Format NIK hanya boleh berisi angka.',
+            'name.required' => 'Parameter Nama diperlukan.',
+            'address.required' => 'Parameter Alamat diperlukan.',
+            'phone_number.required' => 'Parameter Nomor HP diperlukan.',
+            'phone_number.regex' => 'Nomor HP tidak valid. Harus diawali dengan 628 dan hanya berisi angka.'
+        ]);
+
+        $nik = $validated['nik'];
+        $name = $validated['name'];
+        $address = $validated['address'];
+        $phoneNumber = $validated['phone_number'];
+
+        $isInternalValid = true;
+        $eligibilityMessage = 'Memenuhi syarat rentang waktu (belum ada aduan dalam 20 hari terakhir).';
+        $phoneMessage = 'Memenuhi syarat kuota laporan nomor HP.';
+
+        // 1. Pengecekan Aturan 20 Hari (NIK)
+        $reporter = Reporter::where('nik', $nik)->first();
+
+        if ($reporter) {
+            $latestReport = Report::where('reporter_id', $reporter->id)
+                                ->latest('created_at')
+                                ->first();
+
+            if ($latestReport) {
+                $daysSinceLastReport = Carbon::parse($latestReport->created_at)->diffInDays();
+                
+                if ($daysSinceLastReport <= 20) {
+                    $isInternalValid = false;
+                    $eligibilityMessage = 'NIK Anda sudah tercatat membuat laporan dalam 20 hari terakhir.';
+                }
+            }
+        }
+
+        // 2. Pengecekan Kuota Nomor HP (Maks 5x dalam 30 hari terakhir)
+        $reportCountThisMonth = Report::whereHas('reporter', function ($query) use ($phoneNumber) {
+            $query->where('phone_number', $phoneNumber);
+        })->where('created_at', '>=', Carbon::now()->subDays(30))->count();
+
+        // Masukkan count ke dalam pesan sukses default
+        $phoneMessage = "Memenuhi syarat kuota laporan nomor HP ({$reportCountThisMonth}/5).";
+
+        if ($reportCountThisMonth >= 5) {
+            $isInternalValid = false;
+            // Masukkan count ke dalam pesan gagal
+            $phoneMessage = "Nomor HP ini telah mencapai batas maksimal ({$reportCountThisMonth}/5 laporan) dalam 30 hari terakhir.";
+        }
+
+        // Gagal di aturan internal -> Stop & kembalikan error 422
+        if (!$isInternalValid) {
+            return response()->json([
+                'status' => 'error',
+                'eligible' => false,
+                'messages' => [
+                    'eligibility_validation' => $eligibilityMessage,
+                    'phone_validation'       => $phoneMessage,
+                    'dukcapil_validation'    => 'Validasi Dukcapil dilewati karena tidak memenuhi syarat internal.'
+                ]
+            ], 422);
+        }
+
+        // 3. Validasi API Dukcapil
+        $verification = $dukcapilService->verifyIdentity($nik, $name, $address);
+
+        if (!$verification['is_valid']) {
+            return response()->json([
+                'status' => 'error',
+                'eligible' => false,
+                'messages' => [
+                    'eligibility_validation' => $eligibilityMessage,
+                    'phone_validation'       => $phoneMessage,
+                    'dukcapil_validation'    => $verification['message']
+                ]
+            ], 422); 
+        }
+
+        // 4. Lolos Semua Validasi
+        return response()->json([
+            'status' => 'success',
+            'eligible' => true,
+            'messages' => [
+                'eligibility_validation' => $eligibilityMessage,
+                'phone_validation'       => $phoneMessage,
+                'dukcapil_validation'    => 'Data kependudukan valid dan terverifikasi.'
+            ]
+        ], 200);
     }
 
     /**

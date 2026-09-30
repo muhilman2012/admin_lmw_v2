@@ -21,6 +21,9 @@ use App\Http\Controllers\Pages\NotificationController;
 use App\Http\Controllers\Pages\KmsController;
 use App\Http\Controllers\Pages\KioskController;
 use App\Http\Controllers\ReceiptPdfController;
+use App\Http\Controllers\WaBlastController;
+use App\Http\Controllers\ContactController;
+use App\Http\Controllers\ContactCategoryController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -233,6 +236,40 @@ Route::middleware(['auth', CheckPasswordReset::class])->prefix('admin')->group(f
         Route::post('/start-serving', [KioskController::class, 'startServing'])->name('start-serving');
         Route::post('/recall-trigger', [KioskController::class, 'recall'])->name('recall-trigger');
         Route::post('/cancel-queue', [KioskController::class, 'cancelQueue'])->name('cancel-queue');
+    });
+
+    // --- Pengelolaan WhatsApp Blast ---
+    Route::prefix('wa-blast')->name('wa.blast.')->middleware('can:access-wa-blast')->group(function () {
+        
+        // 1. Dashboard & Eksekusi Blast
+        Route::get('/', [WaBlastController::class, 'index'])->name('index');
+        Route::get('/form', [WaBlastController::class, 'form'])->name('form'); 
+        
+        Route::post('/send', [WaBlastController::class, 'sendBlast'])->name('send');
+
+        // 2. Manajemen Kontak
+        Route::prefix('contacts')->name('contacts.')->group(function () {
+            Route::get('/', [ContactController::class, 'index'])->name('index');
+            Route::get('/create', [ContactController::class, 'create'])->name('create');
+            Route::post('/', [ContactController::class, 'store'])->name('store');
+            Route::get('/{contact}/edit', [ContactController::class, 'edit'])->name('edit');
+            Route::put('/{contact}', [ContactController::class, 'update'])->name('update');
+            Route::delete('/{contact}', [ContactController::class, 'destroy'])->name('destroy');
+            
+            // Rute untuk download template
+            Route::get('/template', [ContactController::class, 'downloadTemplate'])->name('template');
+            
+            // Rute untuk eksekusi import (Cukup satu saja, duplikatnya dihapus)
+            Route::post('/import', [ContactController::class, 'importExcel'])->name('import');
+        });
+
+        // 3. Manajemen Kategori Kontak
+        Route::prefix('categories')->name('categories.')->group(function () {
+            Route::get('/', [ContactCategoryController::class, 'index'])->name('index');
+            Route::post('/', [ContactCategoryController::class, 'store'])->name('store');
+            Route::put('/{category}', [ContactCategoryController::class, 'update'])->name('update');
+            Route::delete('/{category}', [ContactCategoryController::class, 'destroy'])->name('destroy');
+        });
     });
 });
 

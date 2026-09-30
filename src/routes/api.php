@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReporterController;
 use App\Http\Controllers\Api\PublicRegistrationController;
+use App\Http\Controllers\Api\WhatsappWebhookController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -26,6 +27,7 @@ Route::middleware(['auth:sanctum', VerifyLmwApiToken::class])->group(function ()
     Route::post('/documents', [DocumentController::class, 'upload']);
     Route::post('/reports', [ReportController::class, 'store']);
     Route::get('/reporters/check-eligibility/{nik}', [ReporterController::class, 'checkEligibility']);
+    Route::post('/reporters/check-eligibility-v2', [ReporterController::class, 'checkEligibilityV2']);
     Route::post('/reporters', [ReporterController::class, 'checkOrStore']);
 
     // API untuk alur verifikasi dua langkah
@@ -47,3 +49,5 @@ Route::middleware(['auth:sanctum', VerifyLmwApiToken::class])->group(function ()
         Route::get('/calendar-meta', [PublicRegistrationController::class, 'getCalendarMeta']);
     });
 });
+
+Route::post('/whatsapp/webhook', [WhatsappWebhookController::class, 'handle']);
