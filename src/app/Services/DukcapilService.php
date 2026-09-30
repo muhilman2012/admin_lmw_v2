@@ -92,7 +92,7 @@ class DukcapilService
         $alamatScore = $this->extractScore($content['ALAMAT'] ?? '');
 
         // 3. Atur Threshold
-        $thresholdNama = 95;
+        $thresholdNama = 90;
         $thresholdAlamat = 70;
 
         if ($namaScore >= $thresholdNama && $alamatScore >= $thresholdAlamat) {

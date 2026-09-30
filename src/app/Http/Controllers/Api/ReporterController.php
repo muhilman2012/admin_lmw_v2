@@ -11,6 +11,7 @@ use App\Models\ActivityLog;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
 
 class ReporterController extends Controller
 {
@@ -66,7 +67,8 @@ class ReporterController extends Controller
      */
     public function checkEligibilityV2(Request $request, \App\Services\DukcapilService $dukcapilService)
     {
-        $validated = $request->validate([
+        // 1. Gunakan Validator::make agar bisa merespons 200 secara manual jika input tidak lengkap
+        $validator = Validator::make($request->all(), [
             'nik' => 'required|string|size:16|regex:/^[0-9]+$/',
             'name' => 'required|string',
             'address' => 'required|string',
@@ -80,85 +82,121 @@ class ReporterController extends Controller
             'phone_number.regex' => 'Nomor HP tidak valid. Harus diawali dengan 628 dan hanya berisi angka.'
         ]);
 
-        $nik = $validated['nik'];
-        $name = $validated['name'];
-        $address = $validated['address'];
-        $phoneNumber = $validated['phone_number'];
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'eligible' => false,
+                'message' => 'Format data input tidak valid.',
+                'errors' => $validator->errors()
+            ], 200);
+        }
+
+        $nik = $request->nik;
+        $name = $request->name;
+        $address = $request->address;
+        $phoneNumber = $request->phone_number;
+
+        // Inisialisasi struktur object untuk masing-masing validasi
+        $validations = [
+            'eligibility' => [
+                'status' => true,
+                'code' => 'VALID_20_DAYS',
+                'message' => 'Memenuhi syarat rentang waktu (belum ada aduan dalam 20 hari terakhir).'
+            ],
+            'phone' => [
+                'status' => true,
+                'code' => 'VALID_PHONE_QUOTA',
+                'message' => 'Memenuhi syarat kuota laporan nomor HP.'
+            ],
+            'dukcapil' => [
+                'status' => false,
+                'code' => 'PENDING',
+                'message' => 'Menunggu pengecekan sistem.'
+            ]
+        ];
 
         $isInternalValid = true;
-        $eligibilityMessage = 'Memenuhi syarat rentang waktu (belum ada aduan dalam 20 hari terakhir).';
-        $phoneMessage = 'Memenuhi syarat kuota laporan nomor HP.';
 
-        // 1. Pengecekan Aturan 20 Hari (NIK)
+        // 2. Pengecekan Aturan 20 Hari (NIK)
         $reporter = Reporter::where('nik', $nik)->first();
-
         if ($reporter) {
             $latestReport = Report::where('reporter_id', $reporter->id)
                                 ->latest('created_at')
                                 ->first();
 
             if ($latestReport) {
-                $daysSinceLastReport = Carbon::parse($latestReport->created_at)->diffInDays();
-                
+                $daysSinceLastReport = \Carbon\Carbon::parse($latestReport->created_at)->diffInDays();
                 if ($daysSinceLastReport <= 20) {
                     $isInternalValid = false;
-                    $eligibilityMessage = 'NIK Anda sudah tercatat membuat laporan dalam 20 hari terakhir.';
+                    $validations['eligibility'] = [
+                        'status' => false,
+                        'code' => 'ERR_NIK_LIMIT',
+                        'message' => 'NIK Anda sudah tercatat membuat laporan dalam 20 hari terakhir.'
+                    ];
                 }
             }
         }
 
-        // 2. Pengecekan Kuota Nomor HP (Maks 5x dalam 30 hari terakhir)
+        // 3. Pengecekan Kuota Nomor HP (Maks 5x dalam 30 hari terakhir)
         $reportCountThisMonth = Report::whereHas('reporter', function ($query) use ($phoneNumber) {
             $query->where('phone_number', $phoneNumber);
-        })->where('created_at', '>=', Carbon::now()->subDays(30))->count();
-
-        // Masukkan count ke dalam pesan sukses default
-        $phoneMessage = "Memenuhi syarat kuota laporan nomor HP ({$reportCountThisMonth}/5).";
+        })->where('created_at', '>=', \Carbon\Carbon::now()->subDays(30))->count();
 
         if ($reportCountThisMonth >= 5) {
             $isInternalValid = false;
-            // Masukkan count ke dalam pesan gagal
-            $phoneMessage = "Nomor HP ini telah mencapai batas maksimal ({$reportCountThisMonth}/5 laporan) dalam 30 hari terakhir.";
+            $validations['phone'] = [
+                'status' => false,
+                'code' => 'ERR_PHONE_LIMIT',
+                'message' => "Nomor HP ini telah mencapai batas maksimal ({$reportCountThisMonth}/5 laporan) dalam 30 hari terakhir."
+            ];
+        } else {
+            $validations['phone']['message'] = "Memenuhi syarat kuota laporan nomor HP ({$reportCountThisMonth}/5).";
         }
 
-        // Gagal di aturan internal -> Stop & kembalikan error 422
+        // Jika GAGAL di aturan internal -> Stop & kembalikan error dengan 200 OK
         if (!$isInternalValid) {
+            $validations['dukcapil'] = [
+                'status' => false,
+                'code' => 'ERR_SKIPPED',
+                'message' => 'Validasi Dukcapil dilewati karena tidak memenuhi syarat internal.'
+            ];
+
             return response()->json([
                 'status' => 'error',
                 'eligible' => false,
-                'messages' => [
-                    'eligibility_validation' => $eligibilityMessage,
-                    'phone_validation'       => $phoneMessage,
-                    'dukcapil_validation'    => 'Validasi Dukcapil dilewati karena tidak memenuhi syarat internal.'
-                ]
-            ], 422);
+                'validations' => $validations
+            ], 200); // 200 OK
         }
 
-        // 3. Validasi API Dukcapil
+        // 4. Validasi API Dukcapil
         $verification = $dukcapilService->verifyIdentity($nik, $name, $address);
 
         if (!$verification['is_valid']) {
+            $validations['dukcapil'] = [
+                'status' => false,
+                'code' => 'ERR_DUKCAPIL_INVALID',
+                'message' => $verification['message']
+            ];
+
             return response()->json([
                 'status' => 'error',
                 'eligible' => false,
-                'messages' => [
-                    'eligibility_validation' => $eligibilityMessage,
-                    'phone_validation'       => $phoneMessage,
-                    'dukcapil_validation'    => $verification['message']
-                ]
-            ], 422); 
+                'validations' => $validations
+            ], 200); // 200 OK
         }
 
-        // 4. Lolos Semua Validasi
+        // 5. Lolos Semua Validasi
+        $validations['dukcapil'] = [
+            'status' => true,
+            'code' => 'VALID_DUKCAPIL',
+            'message' => 'Data kependudukan valid dan terverifikasi.'
+        ];
+
         return response()->json([
             'status' => 'success',
             'eligible' => true,
-            'messages' => [
-                'eligibility_validation' => $eligibilityMessage,
-                'phone_validation'       => $phoneMessage,
-                'dukcapil_validation'    => 'Data kependudukan valid dan terverifikasi.'
-            ]
-        ], 200);
+            'validations' => $validations
+        ], 200); // 200 OK
     }
 
     /**
