@@ -354,7 +354,13 @@ class WhatsAppFlowController extends Controller
             return response($finalResponse, 200)->header('Content-Type', 'text/plain');
 
         } catch (\Exception $e) {
-            Log::error("WA Flows Error: " . $e->getMessage());
+            $waLog = \Illuminate\Support\Facades\Log::build([
+                'driver' => 'single',
+                'path' => storage_path('logs/wa_flows_debug.log'),
+            ]);
+            $waLog->error("FATAL WA Flows Error: " . $e->getMessage());
+            
+            \Illuminate\Support\Facades\Log::error("WA Flows Error: " . $e->getMessage());
             return response('Server Error', 500);
         }
     }
@@ -364,29 +370,41 @@ class WhatsAppFlowController extends Controller
      */
     private function downloadMetaMediaAsBase64($mediaId)
     {
-        // 1. Ambil token dari config services.php
         $metaToken = config('services.lmw.wa_meta_token'); 
+        
+        $waLog = \Illuminate\Support\Facades\Log::build([
+            'driver' => 'single',
+            'path' => storage_path('logs/wa_flows_debug.log'),
+        ]);
+        
+        $waLog->info("Mencoba fetch URL Media dari Meta untuk ID: " . $mediaId);
 
-        // 2. Dapatkan URL unduhan Media dari Graph API Meta
+        // 1. Dapatkan URL unduhan Media dari Graph API Meta
         $response = Http::withToken($metaToken)
             ->get("https://graph.facebook.com/v19.0/{$mediaId}");
         
         if (!$response->successful()) {
-            throw new \Exception('Gagal mendapatkan URL dari Meta Media ID: ' . $mediaId);
+            $errorBody = $response->body();
+            $waLog->error("Meta API Fetch URL Error: " . $errorBody);
+            throw new \Exception('Gagal fetch URL Meta: ' . $errorBody);
         }
         
         $mediaUrl = $response->json('url');
+        $waLog->info("Berhasil dapat Media URL: " . $mediaUrl);
 
-        // 3. Download File Biner aslinya (WAJIB pakai token Meta lagi)
+        // 2. Download File Biner aslinya
         $fileResponse = Http::withToken($metaToken)->get($mediaUrl);
         
         if (!$fileResponse->successful()) {
-            throw new \Exception('Gagal mengunduh file biner dokumen dari Meta');
+            $errorBody = $fileResponse->body();
+            $waLog->error("Meta API Download File Error: " . $errorBody);
+            throw new \Exception('Gagal download file biner Meta: ' . $errorBody);
         }
 
-        // 4. Konversi biner ke format Base64 yang siap dikirim ke API LMW
         $mimeType = $fileResponse->header('Content-Type') ?? 'application/pdf';
         $base64 = base64_encode($fileResponse->body());
+        
+        $waLog->info("Berhasil convert dokumen ke Base64. Ukuran: " . strlen($base64) . " bytes");
 
         return "data:{$mimeType};base64,{$base64}";
     }
