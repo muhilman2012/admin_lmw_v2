@@ -110,6 +110,15 @@ class WhatsAppFlowController extends Controller
                     $email = $formData['email'] ?? '';
                     $address = $formData['address'] ?? '';
                     
+                    // Tangkap nomor HP dan pastikan formatnya berawalan 62
+                    $rawPhone = $formData['phone_number'] ?? '';
+                    $cleanPhone = preg_replace('/[^0-9]/', '', $rawPhone); // Hapus karakter non-angka
+                    if (str_starts_with($cleanPhone, '08')) {
+                        $cleanPhone = '62' . substr($cleanPhone, 1);
+                    } elseif (str_starts_with($cleanPhone, '8')) {
+                        $cleanPhone = '62' . $cleanPhone;
+                    }
+
                     // 1. LAPISAN VALIDASI LOKAL (Sesuai Standar Qontak)
                     $errorMessage = null;
                     if (!preg_match('/^\d{16}$/', $nik)) {
@@ -120,6 +129,8 @@ class WhatsAppFlowController extends Controller
                         $errorMessage = 'Format email tidak valid.';
                     } elseif (trim($address) === '') {
                         $errorMessage = 'Alamat wajib diisi.';
+                    } elseif (!preg_match('/^628\d{7,13}$/', $cleanPhone)) {
+                        $errorMessage = 'Nomor HP tidak valid.';
                     }
 
                     // Jika validasi lokal gagal, langsung kembalikan error ke WA
@@ -127,7 +138,7 @@ class WhatsAppFlowController extends Controller
                         $responseData = [
                             'screen' => 'IDENTITAS',
                             'data' => [
-                                'error_message' => $errorMessage // Tanpa embel-embel emoji
+                                'error_message' => $errorMessage
                             ]
                         ];
                     } 
@@ -138,7 +149,7 @@ class WhatsAppFlowController extends Controller
                             'name' => $name,
                             'email' => $email,
                             'address' => $address,
-                            'phone_number' => '081100000000' // Dummy untuk testing, WA Flows tidak kirim nomor otomatis
+                            'phone_number' => $cleanPhone // Masukkan nomor yang sudah di-format
                         ];
 
                         $eligibilityResponse = Http::withHeaders($apiHeaders)
