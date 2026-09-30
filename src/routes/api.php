@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReporterController;
 use App\Http\Controllers\Api\PublicRegistrationController;
 use App\Http\Controllers\Api\WhatsappWebhookController;
+use App\Http\Controllers\Api\WhatsAppFlowController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -51,3 +52,4 @@ Route::middleware(['auth:sanctum', VerifyLmwApiToken::class])->group(function ()
 });
 
 Route::post('/whatsapp/webhook', [WhatsappWebhookController::class, 'handle']);
+Route::post('/whatsapp-flow-webhook', [WhatsAppFlowController::class, 'handleWebhook']);
