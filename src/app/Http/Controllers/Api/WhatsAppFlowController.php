@@ -202,105 +202,112 @@ class WhatsAppFlowController extends Controller
                 elseif ($screen === 'UPLOAD_KTP') {
                     $ktpData = $formData['ktp_base64'] ?? [];
                     $ktpDocId = '0';
+                    $errorMessage = null;
 
-                    if (!empty($ktpData) && isset($ktpData[0]['cdn_url'])) {
-                        if (str_contains($ktpData[0]['cdn_url'], 'EXAMPLE_DATA')) {
-                            $waLog->info("Terdeteksi Simulator Meta (KTP). Memakai gambar dummy.");
-                            $base64Data = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
-                        } else {
-                            // PERBAIKAN: Lempar seluruh objek $ktpData[0] ke fungsi baru
-                            $base64Data = $this->downloadAndDecryptFlowMedia($ktpData[0]);
+                    if (empty($ktpData)) {
+                        $errorMessage = "KTP wajib dilampirkan.";
+                    } elseif (count($ktpData) > 1) {
+                        $errorMessage = "KTP hanya boleh 1 file saja.";
+                    } else {
+                        try {
+                            if (str_contains($ktpData[0]['cdn_url'], 'EXAMPLE_DATA')) {
+                                $base64Data = "data:image/png;base64,..."; // Dummy
+                            } else {
+                                $base64Data = $this->downloadAndDecryptFlowMedia($ktpData[0], 2 * 1024 * 1024); // Limit 2MB
+                            }
+
+                            $docResponse = Http::withHeaders($apiHeaders)->post(url('/api/documents'), [
+                                'file_base64' => $base64Data,
+                                'description' => 'Dokumen KTP'
+                            ]);
+                            $ktpDocId = $docResponse->json('data.id') ?? '0';
+                        } catch (\Exception $e) {
+                            $errorMessage = ($e->getMessage() === 'FILE_TOO_LARGE') ? "Ukuran KTP maksimal 2MB." : "Gagal memproses KTP.";
                         }
-
-                        $docResponse = Http::withHeaders($apiHeaders)->post(url('/api/documents'), [
-                            'file_base64' => $base64Data,
-                            'description' => 'Dokumen KTP'
-                        ]);
-                        $ktpDocId = $docResponse->json('data.id') ?? '0';
                     }
 
-                    $responseData = [
-                        'screen' => 'UPLOAD_KK',
-                        'data' => [
-                            'reporter_id' => $formData['reporter_id'] ?? '',
-                            'ktp_doc_id' => (string) $ktpDocId,
-                            'judul_pengaduan' => $formData['judul_pengaduan'] ?? '',
-                            'detail_pengaduan' => $formData['detail_pengaduan'] ?? '',
-                            'lokasi_kejadian' => $formData['lokasi_kejadian'] ?? '',
-                            'waktu_kejadian' => $formData['waktu_kejadian'] ?? ''
-                        ]
-                    ];
+                    if ($errorMessage) {
+                        $responseData = ['version' => '3.0', 'screen' => 'UPLOAD_KTP', 'data' => array_merge($formData, ['error_message' => $errorMessage])];
+                    } else {
+                        $responseData = ['version' => '3.0', 'screen' => 'UPLOAD_KK', 'data' => array_merge($formData, ['ktp_doc_id' => (string) $ktpDocId, 'error_message' => ''])];
+                    }
                 }
                 
                 // --- D. JIKA FORM UPLOAD KK DISUBMIT ---
                 elseif ($screen === 'UPLOAD_KK') {
                     $kkData = $formData['kk_base64'] ?? [];
                     $kkDocId = '0'; 
+                    $errorMessage = null;
 
-                    if (!empty($kkData) && isset($kkData[0]['cdn_url'])) {
-                        if (str_contains($kkData[0]['cdn_url'], 'EXAMPLE_DATA')) {
-                            $waLog->info("Terdeteksi Simulator Meta (KK). Memakai gambar dummy.");
-                            $base64Data = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
-                        } else {
-                            // PERBAIKAN DI SINI
-                            $base64Data = $this->downloadAndDecryptFlowMedia($kkData[0]);
+                    if (empty($kkData)) {
+                        $errorMessage = "KK wajib dilampirkan.";
+                    } elseif (count($kkData) > 1) {
+                        $errorMessage = "KK hanya boleh 1 file saja.";
+                    } else {
+                        try {
+                            if (str_contains($kkData[0]['cdn_url'], 'EXAMPLE_DATA')) {
+                                $base64Data = "data:image/png;base64,..."; // Dummy
+                            } else {
+                                $base64Data = $this->downloadAndDecryptFlowMedia($kkData[0], 2 * 1024 * 1024); // Limit 2MB
+                            }
+
+                            $docResponse = Http::withHeaders($apiHeaders)->post(url('/api/documents'), [
+                                'file_base64' => $base64Data,
+                                'description' => 'Dokumen Kartu Keluarga'
+                            ]);
+                            $kkDocId = $docResponse->json('data.id') ?? '0';
+                        } catch (\Exception $e) {
+                            $errorMessage = ($e->getMessage() === 'FILE_TOO_LARGE') ? "Ukuran KK maksimal 2MB." : "Gagal memproses KK.";
                         }
-
-                        $docResponse = Http::withHeaders($apiHeaders)->post(url('/api/documents'), [
-                            'file_base64' => $base64Data,
-                            'description' => 'Dokumen Kartu Keluarga'
-                        ]);
-                        $kkDocId = $docResponse->json('data.id') ?? '0';
                     }
 
-                    $responseData = [
-                        'screen' => 'UPLOAD_BUKTI',
-                        'data' => [
-                            'reporter_id' => $formData['reporter_id'] ?? '',
-                            'ktp_doc_id' => $formData['ktp_doc_id'] ?? '',
-                            'kk_doc_id' => (string) $kkDocId,
-                            'judul_pengaduan' => $formData['judul_pengaduan'] ?? '',
-                            'detail_pengaduan' => $formData['detail_pengaduan'] ?? '',
-                            'lokasi_kejadian' => $formData['lokasi_kejadian'] ?? '',
-                            'waktu_kejadian' => $formData['waktu_kejadian'] ?? ''
-                        ]
-                    ];
+                    if ($errorMessage) {
+                        $responseData = ['version' => '3.0', 'screen' => 'UPLOAD_KK', 'data' => array_merge($formData, ['error_message' => $errorMessage])];
+                    } else {
+                        $responseData = ['version' => '3.0', 'screen' => 'UPLOAD_BUKTI', 'data' => array_merge($formData, ['kk_doc_id' => (string) $kkDocId, 'error_message' => ''])];
+                    }
                 }
                 
                 // --- E. JIKA FORM UPLOAD BUKTI DISUBMIT ---
                 elseif ($screen === 'UPLOAD_BUKTI') {
                     $buktiData = $formData['pendukung_base64'] ?? [];
-                    $pendukungDocId = '0';
+                    $pendukungDocIds = []; // Bisa banyak ID karena boleh multi-file
+                    $errorMessage = null;
 
-                    if (!empty($buktiData) && isset($buktiData[0]['cdn_url'])) {
-                        if (str_contains($buktiData[0]['cdn_url'], 'EXAMPLE_DATA')) {
-                            $waLog->info("Terdeteksi Simulator Meta (Bukti). Memakai gambar dummy.");
-                            $base64Data = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
-                        } else {
-                            // PERBAIKAN DI SINI
-                            $base64Data = $this->downloadAndDecryptFlowMedia($buktiData[0]);
+                    if (empty($buktiData)) {
+                        $errorMessage = "Bukti wajib dilampirkan minimal 1 file.";
+                    } else {
+                        try {
+                            // Looping semua file bukti yang dipilih user
+                            foreach ($buktiData as $fileData) {
+                                if (str_contains($fileData['cdn_url'], 'EXAMPLE_DATA')) {
+                                    $base64Data = "data:image/png;base64,..."; // Dummy
+                                } else {
+                                    $base64Data = $this->downloadAndDecryptFlowMedia($fileData, 5 * 1024 * 1024); // Limit 5MB per file
+                                }
+
+                                $docResponse = Http::withHeaders($apiHeaders)->post(url('/api/documents'), [
+                                    'file_base64' => $base64Data,
+                                    'description' => 'Dokumen Bukti Pengaduan'
+                                ]);
+                                
+                                $newDocId = $docResponse->json('data.id');
+                                if ($newDocId) {
+                                    $pendukungDocIds[] = $newDocId;
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            $errorMessage = ($e->getMessage() === 'FILE_TOO_LARGE') ? "Terdapat file bukti yang ukurannya melebihi 5MB." : "Gagal memproses Bukti.";
                         }
-
-                        $docResponse = Http::withHeaders($apiHeaders)->post(url('/api/documents'), [
-                            'file_base64' => $base64Data,
-                            'description' => 'Dokumen Pengaduan'
-                        ]);
-                        $pendukungDocId = $docResponse->json('data.id') ?? '0';
                     }
 
-                    $responseData = [
-                        'screen' => 'PREVIEW',
-                        'data' => [
-                            'reporter_id' => $formData['reporter_id'] ?? '',
-                            'ktp_doc_id' => $formData['ktp_doc_id'] ?? '',
-                            'kk_doc_id' => $formData['kk_doc_id'] ?? '',
-                            'pendukung_doc_id' => (string) $pendukungDocId,
-                            'judul_pengaduan' => $formData['judul_pengaduan'] ?? '',
-                            'detail_pengaduan' => $formData['detail_pengaduan'] ?? '',
-                            'lokasi_kejadian' => $formData['lokasi_kejadian'] ?? '',
-                            'waktu_kejadian' => $formData['waktu_kejadian'] ?? ''
-                        ]
-                    ];
+                    if ($errorMessage) {
+                        $responseData = ['version' => '3.0', 'screen' => 'UPLOAD_BUKTI', 'data' => array_merge($formData, ['error_message' => $errorMessage])];
+                    } else {
+                        // Gabungkan seluruh ID jadi string dipisah koma (Misal: "15,16,17") jika user upload > 1 bukti
+                        $pendukungIdsStr = implode(',', $pendukungDocIds);
+                        $responseData = ['version' => '3.0', 'screen' => 'PREVIEW', 'data' => array_merge($formData, ['pendukung_doc_id' => $pendukungIdsStr])];
+                    }
                 }
                 
                 // --- F. JIKA PREVIEW DIKONFIRMASI (SUBMIT AKHIR) ---
@@ -415,7 +422,7 @@ class WhatsAppFlowController extends Controller
     /**
      * Fungsi helper untuk mengambil file dari Server Meta dan mengubahnya ke Base64
      */
-    private function downloadAndDecryptFlowMedia($mediaObject)
+    private function downloadAndDecryptFlowMedia($mediaObject, $maxBytes = 2097152)
     {
         $waLog = \Illuminate\Support\Facades\Log::build([
             'driver' => 'single',
@@ -468,6 +475,12 @@ class WhatsAppFlowController extends Controller
             throw new \Exception("Gagal mendekripsi file CDN Meta.");
         }
 
+        $fileSize = strlen($decryptedData);
+        if ($fileSize > $maxBytes) {
+            $waLog->warning("File {$fileName} ditolak karena melebihi batas. Ukuran: {$fileSize} bytes, Max: {$maxBytes} bytes");
+            throw new \Exception("FILE_TOO_LARGE");
+        }
+
         // Deteksi Tipe MIME berdasarkan ekstensi file
         $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
         $mimeType = match($extension) {
@@ -480,7 +493,7 @@ class WhatsAppFlowController extends Controller
         // Ubah ke format Base64 untuk dikirim ke API LMW
         $base64 = base64_encode($decryptedData);
         
-        $waLog->info("Berhasil mendekripsi dokumen {$fileName}. Ukuran asli: " . strlen($decryptedData) . " bytes");
+        $waLog->info("Berhasil mendekripsi dokumen {$fileName}. Ukuran asli: {$fileSize} bytes");
 
         return "data:{$mimeType};base64,{$base64}";
     }
