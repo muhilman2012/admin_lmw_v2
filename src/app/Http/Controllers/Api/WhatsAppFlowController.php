@@ -452,6 +452,14 @@ class WhatsAppFlowController extends Controller
             throw new \Exception("Data media tidak lengkap (cdn_url atau encryption_metadata tidak ditemukan).");
         }
 
+        $allowedExtensions = ['jpeg', 'jpg', 'png', 'heic', 'pdf', 'docx', 'pptx', 'doc'];
+        $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+        
+        if (!in_array($extension, $allowedExtensions)) {
+            $waLog->warning("File {$fileName} ditolak karena ekstensi tidak diizinkan: {$extension}");
+            throw new \Exception("INVALID_EXTENSION");
+        }
+
         $waLog->info("Mendownload file terenkripsi dari CDN Meta...");
 
         $response = Http::get($cdnUrl);
@@ -496,12 +504,14 @@ class WhatsAppFlowController extends Controller
             throw new \Exception("FILE_TOO_LARGE");
         }
 
-        // Deteksi Tipe MIME berdasarkan ekstensi file
-        $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
         $mimeType = match($extension) {
             'jpg', 'jpeg' => 'image/jpeg',
-            'png' => 'image/png',
-            'pdf' => 'application/pdf',
+            'png'  => 'image/png',
+            'heic' => 'image/heic',
+            'pdf'  => 'application/pdf',
+            'doc'  => 'application/msword',
+            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
             default => 'application/octet-stream',
         };
 
