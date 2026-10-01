@@ -344,7 +344,7 @@ class WhatsAppFlowController extends Controller
                     if ($reportResponse->successful()) {
                         $responseData = [
                             'version' => '3.0',
-                            'screen' => 'SUCCESS',
+                            'screen' => 'SELESAI',
                             'data' => [
                                 'ticket_number' => (string) ($reportResponse->json('data.ticket_number') ?? '-'),
                                 'category' => (string) ($reportResponse->json('data.category') ?? '-')
@@ -354,7 +354,7 @@ class WhatsAppFlowController extends Controller
                         $waLog->error("API Tolak Submit Laporan!", $reportResponse->json() ?? []);
                         $responseData = [
                             'version' => '3.0',
-                            'screen' => 'SUCCESS',
+                            'screen' => 'SELESAI',
                             'data' => [
                                 'ticket_number' => 'GAGAL_SISTEM',
                                 'category' => 'Mohon ulangi beberapa saat lagi'
