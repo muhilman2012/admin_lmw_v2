@@ -343,6 +343,7 @@ class WhatsAppFlowController extends Controller
 
                     if ($reportResponse->successful()) {
                         $responseData = [
+                            'version' => '3.0',
                             'screen' => 'SUCCESS',
                             'data' => [
                                 'ticket_number' => (string) ($reportResponse->json('data.ticket_number') ?? '-'),
@@ -351,8 +352,8 @@ class WhatsAppFlowController extends Controller
                         ];
                     } else {
                         $waLog->error("API Tolak Submit Laporan!", $reportResponse->json() ?? []);
-                        // Bypass ke layar Sukses dengan pesan error agar UI tidak force close
                         $responseData = [
+                            'version' => '3.0',
                             'screen' => 'SUCCESS',
                             'data' => [
                                 'ticket_number' => 'GAGAL_SISTEM',
