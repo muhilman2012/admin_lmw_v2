@@ -271,42 +271,57 @@ class WhatsAppFlowController extends Controller
                 // --- E. JIKA FORM UPLOAD BUKTI DISUBMIT ---
                 elseif ($screen === 'UPLOAD_BUKTI') {
                     $buktiData = $formData['pendukung_base64'] ?? [];
-                    $pendukungDocIds = []; // Bisa banyak ID karena boleh multi-file
+                    $pendukungDocIds = [];
                     $errorMessage = null;
 
                     if (empty($buktiData)) {
                         $errorMessage = "Bukti wajib dilampirkan minimal 1 file.";
                     } else {
                         try {
-                            // Looping semua file bukti yang dipilih user
-                            foreach ($buktiData as $fileData) {
+                            foreach ($buktiData as $index => $fileData) {
                                 if (str_contains($fileData['cdn_url'], 'EXAMPLE_DATA')) {
-                                    $base64Data = "data:image/png;base64,..."; // Dummy
+                                    $base64Data = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="; 
                                 } else {
-                                    $base64Data = $this->downloadAndDecryptFlowMedia($fileData, 5 * 1024 * 1024); // Limit 5MB per file
+                                    $base64Data = $this->downloadAndDecryptFlowMedia($fileData, 5 * 1024 * 1024);
                                 }
 
                                 $docResponse = Http::withHeaders($apiHeaders)->post(url('/api/documents'), [
                                     'file_base64' => $base64Data,
-                                    'description' => 'Dokumen Bukti Pengaduan'
+                                    'description' => 'Dokumen Bukti Pengaduan (File ke-' . ($index + 1) . ')'
                                 ]);
                                 
+                                if (!$docResponse->successful()) {
+                                    $waLog->error("API LMW menolak file Bukti ke-" . ($index + 1) . " | HTTP: " . $docResponse->status() . " | Body: " . $docResponse->body());
+                                    throw new \Exception("API_ERROR");
+                                }
+
                                 $newDocId = $docResponse->json('data.id');
                                 if ($newDocId) {
                                     $pendukungDocIds[] = $newDocId;
                                 }
                             }
                         } catch (\Exception $e) {
-                            $errorMessage = ($e->getMessage() === 'FILE_TOO_LARGE') ? "Terdapat file bukti yang ukurannya melebihi 5MB." : "Gagal memproses Bukti.";
+                            if ($e->getMessage() === 'FILE_TOO_LARGE') {
+                                $errorMessage = "Terdapat file bukti yang ukurannya melebihi 5MB. Silakan kurangi ukurannya.";
+                            } else {
+                                $errorMessage = "Server gagal menyimpan dokumen bukti. Pastikan koneksi stabil atau kurangi jumlah file.";
+                            }
                         }
                     }
 
                     if ($errorMessage) {
-                        $responseData = ['version' => '3.0', 'screen' => 'UPLOAD_BUKTI', 'data' => array_merge($formData, ['error_message' => $errorMessage])];
+                        $responseData = [
+                            'version' => '3.0', 
+                            'screen' => 'UPLOAD_BUKTI', 
+                            'data' => array_merge($formData, ['error_message' => $errorMessage])
+                        ];
                     } else {
-                        // Gabungkan seluruh ID jadi string dipisah koma (Misal: "15,16,17") jika user upload > 1 bukti
                         $pendukungIdsStr = implode(',', $pendukungDocIds);
-                        $responseData = ['version' => '3.0', 'screen' => 'PREVIEW', 'data' => array_merge($formData, ['pendukung_doc_id' => $pendukungIdsStr])];
+                        $responseData = [
+                            'version' => '3.0', 
+                            'screen' => 'PREVIEW', 
+                            'data' => array_merge($formData, ['pendukung_doc_id' => $pendukungIdsStr])
+                        ];
                     }
                 }
                 
