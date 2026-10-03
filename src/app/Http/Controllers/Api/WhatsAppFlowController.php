@@ -327,60 +327,85 @@ class WhatsAppFlowController extends Controller
                 
                 // --- F. JIKA PREVIEW DIKONFIRMASI (SUBMIT AKHIR) ---
                 elseif ($screen === 'PREVIEW') {
-                    // 1. Bersihkan ID Dokumen (Hapus angka 0 dari dokumen yang di-skip)
-                    $rawDocIds = [
-                        (int) ($formData['ktp_doc_id'] ?? 0),
-                        (int) ($formData['kk_doc_id'] ?? 0),
-                        (int) ($formData['pendukung_doc_id'] ?? 0)
-                    ];
-                    // array_filter akan otomatis membuang elemen bernilai 0 atau false
-                    $cleanDocIds = array_values(array_filter($rawDocIds));
+                    $reporterId = $formData['reporter_id'] ?? '0';
+                    $lockKey = 'submit_lmw_wa_lock_' . $reporterId;
 
-                    // 2. Format Tanggal dari DatePicker WA (Milidetik) menjadi Y-m-d
-                    $waktuRaw = $formData['waktu_kejadian'] ?? '';
-                    $waktuFormatted = $waktuRaw;
-                    if (is_numeric($waktuRaw)) {
-                        // DatePicker WA mengirim timestamp Unix dalam milidetik
-                        $waktuFormatted = date('Y-m-d', $waktuRaw / 1000);
+                    if (!Cache::add($lockKey, true, 15)) {
+                        $waLog->warning("Terdeteksi double click submit laporan oleh reporter ID: {$reporterId}");
+                        
+                        $responseData = [
+                            'version' => '3.0',
+                            'screen' => 'PREVIEW',
+                            'data' => array_merge($formData, [
+                                'error_message' => '⏳ Laporan Anda sedang diproses. Mohon tunggu sebentar dan jangan menekan tombol berkali-kali.'
+                            ])
+                        ];
+                        
+                        break;
                     }
 
-                    $waLog->info("Payload Submit Laporan LMW:", [
-                        'doc_ids' => $cleanDocIds,
-                        'waktu' => $waktuFormatted
-                    ]);
-
-                    $reportResponse = Http::withHeaders($apiHeaders)->post(url('/api/reports'), [
-                        'reporter_id' => (int) ($formData['reporter_id'] ?? 0),
-                        'document_ids' => $cleanDocIds,
-                        'report_details' => [
-                            'subject' => $formData['judul_pengaduan'] ?? '',
-                            'details' => $formData['detail_pengaduan'] ?? '',
-                            'location' => $formData['lokasi_kejadian'] ?? '',
-                            'event_date' => $waktuFormatted,
-                            'source' => $formData['sumber_pengaduan'] ?? 'whatsapp'
-                        ]
-                    ]);
-
-                    $waLog->info("Response API Create Report:", $reportResponse->json() ?? []);
-
-                    if ($reportResponse->successful()) {
-                        $responseData = [
-                            'version' => '3.0',
-                            'screen' => 'SELESAI',
-                            'data' => [
-                                'ticket_number' => (string) ($reportResponse->json('data.ticket_number') ?? '-'),
-                                'category' => (string) ($reportResponse->json('data.category') ?? '-')
-                            ]
+                    try {
+                        $rawDocIds = [
+                            (int) ($formData['ktp_doc_id'] ?? 0),
+                            (int) ($formData['kk_doc_id'] ?? 0)
                         ];
-                    } else {
-                        $waLog->error("API Tolak Submit Laporan!", $reportResponse->json() ?? []);
+
+                        $buktiIdsStr = $formData['pendukung_doc_id'] ?? '';
+                        if (!empty($buktiIdsStr)) {
+                            $buktiArr = explode(',', $buktiIdsStr);
+                            foreach ($buktiArr as $bId) {
+                                $rawDocIds[] = (int) trim($bId);
+                            }
+                        }
+
+                        $cleanDocIds = array_values(array_filter($rawDocIds));
+
+                        $waktuRaw = $formData['waktu_kejadian'] ?? '';
+                        $waktuFormatted = is_numeric($waktuRaw) ? date('Y-m-d', $waktuRaw / 1000) : $waktuRaw;
+
+                        $reportResponse = Http::withHeaders($apiHeaders)->post(url('/api/reports'), [
+                            'reporter_id' => (int) $reporterId,
+                            'document_ids' => $cleanDocIds, 
+                            'report_details' => [
+                                'subject' => $formData['judul_pengaduan'] ?? '',
+                                'details' => $formData['detail_pengaduan'] ?? '',
+                                'location' => $formData['lokasi_kejadian'] ?? '',
+                                'event_date' => $waktuFormatted,
+                                'source' => $formData['sumber_pengaduan'] ?? 'whatsapp'
+                            ]
+                        ]);
+
+                        if ($reportResponse->successful()) {
+                            $responseData = [
+                                'version' => '3.0',
+                                'screen' => 'SELESAI',
+                                'data' => [
+                                    'ticket_number' => (string) ($reportResponse->json('data.ticket_number') ?? '-'),
+                                    'category' => (string) ($reportResponse->json('data.category') ?? '-')
+                                ]
+                            ];
+                        } else {
+                            Cache::forget($lockKey);
+                            
+                            $waLog->error("API Submit Laporan Gagal: " . $reportResponse->body());
+                            $responseData = [
+                                'version' => '3.0',
+                                'screen' => 'PREVIEW',
+                                'data' => array_merge($formData, [
+                                    'error_message' => 'Terjadi kesalahan sistem saat menyimpan laporan. Silakan coba lagi.'
+                                ])
+                            ];
+                        }
+                    } catch (\Exception $e) {
+                        Cache::forget($lockKey);
+                        $waLog->error("Error Exception Submit Laporan: " . $e->getMessage());
+                        
                         $responseData = [
                             'version' => '3.0',
-                            'screen' => 'SELESAI',
-                            'data' => [
-                                'ticket_number' => 'GAGAL_SISTEM',
-                                'category' => 'Mohon ulangi beberapa saat lagi'
-                            ]
+                            'screen' => 'PREVIEW',
+                            'data' => array_merge($formData, [
+                                'error_message' => 'Gagal terhubung ke server. Silakan coba beberapa saat lagi.'
+                            ])
                         ];
                     }
                 }
