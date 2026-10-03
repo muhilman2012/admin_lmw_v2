@@ -360,6 +360,16 @@ class WhatsAppFlowController extends Controller
 
                         $cleanDocIds = array_values(array_filter($rawDocIds));
 
+                        $judulRaw = $formData['judul_pengaduan'] ?? '';
+                        $detailRaw = $formData['detail_pengaduan'] ?? '';
+                        $lokasiRaw = $formData['lokasi_kejadian'] ?? '';
+
+                        $judulBersih = trim(preg_replace('/[^a-zA-Z0-9\s\.,\-]/', ' ', $judulRaw));
+                        $judulBersih = preg_replace('/\s+/', ' ', $judulBersih);
+
+                        $detailBersih = trim(preg_replace('/[^a-zA-Z0-9\s\.,\-\(\)\/\r\n]/', ' ', $detailRaw));
+                        $lokasiBersih = trim(preg_replace('/[^a-zA-Z0-9\s\.,\-\(\)\/]/', ' ', $lokasiRaw));
+
                         $waktuRaw = $formData['waktu_kejadian'] ?? '';
                         $waktuFormatted = is_numeric($waktuRaw) ? date('Y-m-d', $waktuRaw / 1000) : $waktuRaw;
 
@@ -367,9 +377,9 @@ class WhatsAppFlowController extends Controller
                             'reporter_id' => (int) $reporterId,
                             'document_ids' => $cleanDocIds, 
                             'report_details' => [
-                                'subject' => $formData['judul_pengaduan'] ?? '',
-                                'details' => $formData['detail_pengaduan'] ?? '',
-                                'location' => $formData['lokasi_kejadian'] ?? '',
+                                'subject' => $judulBersih,
+                                'details' => $detailBersih,
+                                'location' => $lokasiBersih,
                                 'event_date' => $waktuFormatted,
                                 'source' => $formData['sumber_pengaduan'] ?? 'whatsapp'
                             ]
