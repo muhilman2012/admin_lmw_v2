@@ -340,83 +340,80 @@ class WhatsAppFlowController extends Controller
                                 'error_message' => '⏳ Laporan Anda sedang diproses. Mohon tunggu sebentar dan jangan menekan tombol berkali-kali.'
                             ])
                         ];
-                        
-                        break;
-                    }
-
-                    try {
-                        $rawDocIds = [
-                            (int) ($formData['ktp_doc_id'] ?? 0),
-                            (int) ($formData['kk_doc_id'] ?? 0)
-                        ];
-
-                        $buktiIdsStr = $formData['pendukung_doc_id'] ?? '';
-                        if (!empty($buktiIdsStr)) {
-                            $buktiArr = explode(',', $buktiIdsStr);
-                            foreach ($buktiArr as $bId) {
-                                $rawDocIds[] = (int) trim($bId);
-                            }
-                        }
-
-                        $cleanDocIds = array_values(array_filter($rawDocIds));
-
-                        $judulRaw = $formData['judul_pengaduan'] ?? '';
-                        $detailRaw = $formData['detail_pengaduan'] ?? '';
-                        $lokasiRaw = $formData['lokasi_kejadian'] ?? '';
-
-                        $judulBersih = trim(preg_replace('/[^a-zA-Z0-9\s\.,\-]/', ' ', $judulRaw));
-                        $judulBersih = preg_replace('/\s+/', ' ', $judulBersih);
-
-                        $detailBersih = trim(preg_replace('/[^a-zA-Z0-9\s\.,\-\(\)\/\r\n]/', ' ', $detailRaw));
-                        $lokasiBersih = trim(preg_replace('/[^a-zA-Z0-9\s\.,\-\(\)\/]/', ' ', $lokasiRaw));
-
-                        $waktuRaw = $formData['waktu_kejadian'] ?? '';
-                        $waktuFormatted = is_numeric($waktuRaw) ? date('Y-m-d', $waktuRaw / 1000) : $waktuRaw;
-
-                        $reportResponse = Http::withHeaders($apiHeaders)->post(url('/api/reports'), [
-                            'reporter_id' => (int) $reporterId,
-                            'document_ids' => $cleanDocIds, 
-                            'report_details' => [
-                                'subject' => $judulBersih,
-                                'details' => $detailBersih,
-                                'location' => $lokasiBersih,
-                                'event_date' => $waktuFormatted,
-                                'source' => $formData['sumber_pengaduan'] ?? 'whatsapp'
-                            ]
-                        ]);
-
-                        if ($reportResponse->successful()) {
-                            $responseData = [
-                                'version' => '3.0',
-                                'screen' => 'SELESAI',
-                                'data' => [
-                                    'ticket_number' => (string) ($reportResponse->json('data.ticket_number') ?? '-'),
-                                    'category' => (string) ($reportResponse->json('data.category') ?? '-')
-                                ]
+                    } 
+                    else {
+                        try {
+                            $rawDocIds = [
+                                (int) ($formData['ktp_doc_id'] ?? 0),
+                                (int) ($formData['kk_doc_id'] ?? 0)
                             ];
-                        } else {
+
+                            $buktiIdsStr = $formData['pendukung_doc_id'] ?? '';
+                            if (!empty($buktiIdsStr)) {
+                                $buktiArr = explode(',', $buktiIdsStr);
+                                foreach ($buktiArr as $bId) {
+                                    $rawDocIds[] = (int) trim($bId);
+                                }
+                            }
+
+                            $cleanDocIds = array_values(array_filter($rawDocIds));
+
+                            // Sanitasi Judul & Detail
+                            $judulRaw = $formData['judul_pengaduan'] ?? '';
+                            $detailRaw = $formData['detail_pengaduan'] ?? '';
+                            $lokasiRaw = $formData['lokasi_kejadian'] ?? '';
+
+                            $judulBersih = preg_replace('/\s+/', ' ', trim(preg_replace('/[^a-zA-Z0-9\s\.,\-]/', ' ', $judulRaw)));
+                            $detailBersih = trim(preg_replace('/[^a-zA-Z0-9\s\.,\-\(\)\/\r\n]/', ' ', $detailRaw));
+                            $lokasiBersih = trim(preg_replace('/[^a-zA-Z0-9\s\.,\-\(\)\/]/', ' ', $lokasiRaw));
+
+                            $waktuRaw = $formData['waktu_kejadian'] ?? '';
+                            $waktuFormatted = is_numeric($waktuRaw) ? date('Y-m-d', $waktuRaw / 1000) : $waktuRaw;
+
+                            $reportResponse = Http::withHeaders($apiHeaders)->post(url('/api/reports'), [
+                                'reporter_id' => (int) $reporterId,
+                                'document_ids' => $cleanDocIds, 
+                                'report_details' => [
+                                    'subject' => $judulBersih,
+                                    'details' => $detailBersih,
+                                    'location' => $lokasiBersih,
+                                    'event_date' => $waktuFormatted,
+                                    'source' => $formData['sumber_pengaduan'] ?? 'whatsapp'
+                                ]
+                            ]);
+
+                            if ($reportResponse->successful()) {
+                                $responseData = [
+                                    'version' => '3.0',
+                                    'screen' => 'SELESAI',
+                                    'data' => [
+                                        'ticket_number' => (string) ($reportResponse->json('data.ticket_number') ?? '-'),
+                                        'category' => (string) ($reportResponse->json('data.category') ?? '-')
+                                    ]
+                                ];
+                            } else {
+                                Cache::forget($lockKey);
+                                $waLog->error("API Submit Laporan Gagal: " . $reportResponse->body());
+                                $responseData = [
+                                    'version' => '3.0',
+                                    'screen' => 'PREVIEW',
+                                    'data' => array_merge($formData, [
+                                        'error_message' => 'Terjadi kesalahan sistem saat menyimpan laporan. Silakan coba lagi.'
+                                    ])
+                                ];
+                            }
+                        } catch (\Exception $e) {
                             Cache::forget($lockKey);
+                            $waLog->error("Error Exception Submit Laporan: " . $e->getMessage());
                             
-                            $waLog->error("API Submit Laporan Gagal: " . $reportResponse->body());
                             $responseData = [
                                 'version' => '3.0',
                                 'screen' => 'PREVIEW',
                                 'data' => array_merge($formData, [
-                                    'error_message' => 'Terjadi kesalahan sistem saat menyimpan laporan. Silakan coba lagi.'
+                                    'error_message' => 'Gagal terhubung ke server. Silakan coba beberapa saat lagi.'
                                 ])
                             ];
                         }
-                    } catch (\Exception $e) {
-                        Cache::forget($lockKey);
-                        $waLog->error("Error Exception Submit Laporan: " . $e->getMessage());
-                        
-                        $responseData = [
-                            'version' => '3.0',
-                            'screen' => 'PREVIEW',
-                            'data' => array_merge($formData, [
-                                'error_message' => 'Gagal terhubung ke server. Silakan coba beberapa saat lagi.'
-                            ])
-                        ];
                     }
                 }
                 
