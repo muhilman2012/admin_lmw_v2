@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use App\Models\ApiLog;
 
 class DukcapilService
 {
@@ -23,6 +24,9 @@ class DukcapilService
         if (Cache::has($cacheKey)) {
             return Cache::get($cacheKey);
         }
+
+        $url = '';
+        $payload = [];
 
         try {
             $baseUrl = env('DUKCAPIL_BASE_URL');
@@ -47,6 +51,21 @@ class DukcapilService
                 ->timeout(15)
                 ->post($url, $payload);
 
+            $logPayload = $payload;
+            if (isset($logPayload['PASSWORD'])) {
+                $logPayload['PASSWORD'] = '********';
+            }
+
+            ApiLog::create([
+                'endpoint'      => $url,
+                'method'        => 'POST',
+                'payload'       => $logPayload,
+                'response_code' => $response->status(),
+                'response_body' => $response->json() ?? ['raw_body' => $response->body()],
+                'ip_address'    => $payload['IP_USER'],
+                'reference_id'  => $nik,
+            ]);
+
             if (!$response->successful()) {
                 Log::error('Dukcapil API Error: ' . $response->body());
                 return ['is_valid' => false, 'message' => 'Layanan kependudukan sedang tidak tersedia.'];
@@ -54,10 +73,8 @@ class DukcapilService
 
             $dukcapilData = $response->json();
 
-            // Evaluasi hasil kembalian dari Dukcapil
             $result = $this->evaluateMatch($dukcapilData);
 
-            // Jika valid, cache selama 24 jam agar tidak bolak-balik hit API untuk NIK yang sama hari ini
             if ($result['is_valid']) {
                 Cache::put($cacheKey, $result, now()->addHours(24));
             }
@@ -66,6 +83,22 @@ class DukcapilService
 
         } catch (\Exception $e) {
             Log::error('Dukcapil Service Exception: ' . $e->getMessage());
+            
+            $logPayload = $payload ?: ['NIK' => $nik];
+            if (isset($logPayload['PASSWORD'])) {
+                $logPayload['PASSWORD'] = '********';
+            }
+            
+            ApiLog::create([
+                'endpoint'      => $url ?: 'Dukcapil_API',
+                'method'        => 'POST',
+                'payload'       => $logPayload,
+                'response_code' => 500,
+                'response_body' => ['error_message' => $e->getMessage()],
+                'ip_address'    => env('DUKCAPIL_IP_USER', '10.160.86.46'),
+                'reference_id'  => $nik,
+            ]);
+
             return ['is_valid' => false, 'message' => 'Terjadi kesalahan sistem saat memverifikasi NIK.'];
         }
     }
