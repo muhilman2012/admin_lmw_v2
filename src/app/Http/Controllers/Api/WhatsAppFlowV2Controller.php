@@ -136,6 +136,7 @@ class WhatsAppFlowV2Controller extends Controller
                     $ticketNumber = trim($formData['nomor_tiket'] ?? $formData['ticket_number'] ?? '');
                     $nik          = trim($formData['nik'] ?? '');
 
+                    // 1. Validasi Input Lokal
                     if ($ticketNumber === '') {
                         $errorMessage = 'Nomor tiket wajib diisi.';
                     } elseif (!preg_match('/^\d{16}$/', $nik)) {
@@ -148,7 +149,10 @@ class WhatsAppFlowV2Controller extends Controller
                         $responseData = [
                             'version' => '3.0',
                             'screen'  => 'CEK_STATUS',
-                            'data'    => array_merge($formData, ['error_message' => $errorMessage])
+                            'data'    => array_merge($formData, [
+                                'error_message' => $errorMessage,
+                                'is_error'      => true
+                            ])
                         ];
                     } else {
                         // Langkah 1: Cek apakah laporan ada
@@ -160,7 +164,8 @@ class WhatsAppFlowV2Controller extends Controller
                                 'version' => '3.0',
                                 'screen'  => 'CEK_STATUS',
                                 'data'    => array_merge($formData, [
-                                    'error_message' => 'Nomor tiket tidak ditemukan. Mohon periksa kembali.'
+                                    'error_message' => 'Nomor tiket tidak ditemukan. Mohon periksa kembali.',
+                                    'is_error'      => true
                                 ])
                             ];
                         } else {
@@ -173,7 +178,8 @@ class WhatsAppFlowV2Controller extends Controller
                                     'version' => '3.0',
                                     'screen'  => 'CEK_STATUS',
                                     'data'    => array_merge($formData, [
-                                        'error_message' => 'NIK tidak sesuai dengan data pelapor nomor tiket ini.'
+                                        'error_message' => 'NIK tidak sesuai dengan data pelapor nomor tiket ini.',
+                                        'is_error'      => true
                                     ])
                                 ];
                             } else {
@@ -183,19 +189,16 @@ class WhatsAppFlowV2Controller extends Controller
                                 if ($statusRes->successful()) {
                                     $info = $statusRes->json('data') ?? [];
 
+                                    // PERBAIKAN 2: Hanya kirim 5 data yang dibutuhkan sesuai screen DETAIL_LAPORAN
                                     $responseData = [
                                         'version' => '3.0',
-                                        'screen'  => 'DETAIL_LAPORAN', // Sesuai JSON routing_model
+                                        'screen'  => 'DETAIL_LAPORAN',
                                         'data'    => [
-                                            'nomor_tiket'      => (string) ($info['ticket_number'] ?? $ticketNumber),
-                                            'nama_pelapor'     => (string) ($info['nama_pengadu'] ?? '-'),
-                                            'status_laporan'   => (string) ($info['status_laporan'] ?? 'Dalam Proses'),
-                                            'tanggal_lapor'    => (string) ($info['tanggal_laporan'] ?? date('d-m-Y')),
-                                            'kategori'         => (string) ($info['kategori'] ?? 'Pengaduan Masyarakat'),
-                                            'judul_pengaduan'  => (string) ($info['judul_pengaduan'] ?? 'Laporan #' . $ticketNumber),
-                                            'detail_pengaduan' => (string) ($info['tanggapan'] ?? ($info['detail_pengaduan'] ?? 'Sedang ditelaah petugas.')),
-                                            'lokasi_kejadian'  => (string) ($info['lokasi_kejadian'] ?? '-'),
-                                            'waktu_kejadian'   => (string) ($info['waktu_kejadian'] ?? '-')
+                                            'nomor_tiket'    => (string) ($info['ticket_number'] ?? $ticketNumber),
+                                            'nama_pelapor'   => (string) ($info['nama_pengadu'] ?? '-'),
+                                            'tanggal_lapor'  => (string) ($info['tanggal_laporan'] ?? date('d-m-Y')),
+                                            'status_laporan' => (string) ($info['status_laporan'] ?? 'Dalam Proses'),
+                                            'tanggapan'      => (string) ($info['tanggapan'] ?? 'Laporan pengaduan Saudara dalam proses verifikasi & penelaahan.')
                                         ]
                                     ];
                                 } else {
@@ -203,7 +206,8 @@ class WhatsAppFlowV2Controller extends Controller
                                         'version' => '3.0',
                                         'screen'  => 'CEK_STATUS',
                                         'data'    => array_merge($formData, [
-                                            'error_message' => 'Gagal mengambil detail status. Silakan coba kembali.'
+                                            'error_message' => 'Gagal mengambil detail status. Silakan coba kembali.',
+                                            'is_error'      => true
                                         ])
                                     ];
                                 }
