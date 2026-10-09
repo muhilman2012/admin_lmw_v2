@@ -95,10 +95,9 @@ class WhatsAppFlowV2Controller extends Controller
             elseif ($rootAction === 'data_exchange') {
                 
                 // =================================================================
-                // 1. SCREEN: MENU UTAMA (SUDAH DISINKRONKAN DENGAN JSON)
+                // 1. SCREEN: MENU UTAMA
                 // =================================================================
                 if ($screen === 'MENU') {
-                    // Mendukung 'pilihan_menu' sesuai JSON Flow
                     $pilihan = $formData['pilihan_menu'] ?? $formData['menu_pilihan'] ?? '';
 
                     if ($pilihan === 'kirim_laporan' || $pilihan === 'buat_pengaduan') {
@@ -107,6 +106,7 @@ class WhatsAppFlowV2Controller extends Controller
                             'screen'  => 'IDENTITAS',
                             'data'    => ['error_message' => '']
                         ];
+                    } // <-- PERBAIKAN: Kurung tutup ini yang sebelumnya hilang
                     elseif ($pilihan === 'cek_status') {
                         $responseData = [
                             'version' => '3.0',
@@ -116,7 +116,6 @@ class WhatsAppFlowV2Controller extends Controller
                             ]
                         ];
                     } elseif ($pilihan === 'kirim_dokumen') {
-                        // Sesuai routing_model JSON: "KIRIM_DOKUMEN"
                         $responseData = [
                             'version' => '3.0',
                             'screen'  => 'KIRIM_DOKUMEN',
@@ -137,7 +136,7 @@ class WhatsAppFlowV2Controller extends Controller
                 elseif ($screen === 'CEK_STATUS') {
                     $ticketNumber = trim($formData['nomor_tiket'] ?? $formData['ticket_number'] ?? '');
                     $nik          = trim($formData['nik'] ?? '');
-                    // Validasi lokal
+
                     if ($ticketNumber === '') {
                         $errorMessage = '⚠️ Nomor tiket wajib diisi.';
                     } elseif (!preg_match('/^\d{16}$/', $nik)) {
@@ -145,6 +144,7 @@ class WhatsAppFlowV2Controller extends Controller
                     } else {
                         $errorMessage = null;
                     }
+
                     if ($errorMessage) {
                         $responseData = [
                             'version' => '3.0',
@@ -155,6 +155,7 @@ class WhatsAppFlowV2Controller extends Controller
                         // Langkah 1: Cek apakah laporan ada
                         $checkRes = Http::withHeaders($apiHeaders)->get(url("/api/reports/{$ticketNumber}/check"));
                         $exists   = $checkRes->json('data.exists') ?? false;
+
                         if (!$checkRes->successful() || !$exists) {
                             $responseData = [
                                 'version' => '3.0',
@@ -167,6 +168,7 @@ class WhatsAppFlowV2Controller extends Controller
                             // Langkah 2: Verifikasi NIK
                             $verifyRes = Http::withHeaders($apiHeaders)->get(url("/api/reports/{$ticketNumber}/verify"), ['nik' => $nik]);
                             $verified  = $verifyRes->json('data.verified') ?? false;
+
                             if (!$verifyRes->successful() || !$verified) {
                                 $responseData = [
                                     'version' => '3.0',
@@ -178,8 +180,10 @@ class WhatsAppFlowV2Controller extends Controller
                             } else {
                                 // Langkah 3: Ambil status & kirim HANYA 5 data yang diminta
                                 $statusRes = Http::withHeaders($apiHeaders)->get(url("/api/reports/{$ticketNumber}/status"));
+
                                 if ($statusRes->successful()) {
                                     $info = $statusRes->json('data') ?? [];
+
                                     $responseData = [
                                         'version' => '3.0',
                                         'screen'  => 'DETAIL_LAPORAN',
@@ -324,7 +328,7 @@ class WhatsAppFlowV2Controller extends Controller
                                 if ($docResponse->successful()) {
                                     $responseData = [
                                         'version' => '3.0',
-                                        'screen'  => 'DOKUMEN_TERKIRIM', // Sesuai JSON routing_model
+                                        'screen'  => 'DOKUMEN_TERKIRIM',
                                         'data'    => [
                                             'nomor_tiket' => (string) $ticketNumber,
                                         ]
