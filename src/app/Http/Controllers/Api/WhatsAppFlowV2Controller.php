@@ -11,15 +11,8 @@ use Illuminate\Support\Facades\Log;
 
 class WhatsAppFlowV2Controller extends Controller
 {
-    /**
-     * Durasi Lock Idempotency (detik).
-     * Mencegah spam klik/retry dalam 60 detik.
-     */
     private const LOCK_TTL = 60;
 
-    /**
-     * Handler Utama Webhook WhatsApp Flows
-     */
     public function handleWebhook(Request $request)
     {
         $waLog = Log::build([
@@ -33,7 +26,7 @@ class WhatsAppFlowV2Controller extends Controller
             $encryptedFlowData = base64_decode($request->input('encrypted_flow_data'));
             $initialVector     = base64_decode($request->input('initial_vector'));
 
-            // 2. Dekripsi Kunci AES menggunakan Private Key RSA
+            // 2. Dekripsi Kunci AES menggunakan Private Key
             $privateKeyStr = config('services.lmw.wa_private_key');
             $privateKeyStr = str_replace(['\\n', '\n'], "\n", $privateKeyStr);
 
@@ -73,11 +66,10 @@ class WhatsAppFlowV2Controller extends Controller
 
             $flowData = json_decode($flowDataJson, true);
 
-            // 4. Tangkap Parameter Root dari Meta
             $rootAction = $flowData['action'] ?? null;
             $screen     = $flowData['screen'] ?? null;
             $formData   = $flowData['data'] ?? [];
-            $flowToken  = $flowData['flow_token'] ?? null; // ID Unik sesi Flow dari Meta
+            $flowToken  = $flowData['flow_token'] ?? null;
 
             $waLog->info("=== REQUEST DARI WA FLOWS ===");
             $waLog->info("Action: {$rootAction} | Screen: {$screen} | Token: {$flowToken}", $formData);
@@ -90,12 +82,11 @@ class WhatsAppFlowV2Controller extends Controller
 
             $responseData = [];
 
-            // 5. ROUTING SCREEN
+            // 4. ROUTING BERDASARKAN ROOT ACTION & SCREEN
             if ($rootAction === 'ping') {
                 $responseData = ['data' => ['status' => 'active']];
             } 
             elseif ($rootAction === 'INIT') {
-                // Saat pertama dibuka, arahkan ke Menu Utama
                 $responseData = [
                     'screen' => 'MENU',
                     'data'   => ['error_message' => '']
@@ -104,42 +95,47 @@ class WhatsAppFlowV2Controller extends Controller
             elseif ($rootAction === 'data_exchange') {
                 
                 // =================================================================
-                // 1. SCREEN: MENU UTAMA
+                // 1. SCREEN: MENU UTAMA (SUDAH DISINKRONKAN DENGAN JSON)
                 // =================================================================
                 if ($screen === 'MENU') {
-                    $pilihan = $formData['menu_pilihan'] ?? '';
+                    // Mendukung 'pilihan_menu' sesuai JSON Flow
+                    $pilihan = $formData['pilihan_menu'] ?? $formData['menu_pilihan'] ?? '';
 
-                    if ($pilihan === 'buat_pengaduan') {
+                    if ($pilihan === 'kirim_laporan' || $pilihan === 'buat_pengaduan') {
                         $responseData = [
-                            'screen' => 'IDENTITAS',
-                            'data'   => ['error_message' => '']
+                            'version' => '3.0',
+                            'screen'  => 'IDENTITAS',
+                            'data'    => ['error_message' => '']
                         ];
                     } elseif ($pilihan === 'cek_status') {
                         $responseData = [
-                            'screen' => 'CEK_STATUS',
-                            'data'   => ['error_message' => '']
+                            'version' => '3.0',
+                            'screen'  => 'CEK_STATUS',
+                            'data'    => ['error_message' => '']
                         ];
                     } elseif ($pilihan === 'kirim_dokumen') {
+                        // Sesuai routing_model JSON: "KIRIM_DOKUMEN"
                         $responseData = [
-                            'screen' => 'VERIFIKASI_DOKUMEN',
-                            'data'   => ['error_message' => '']
+                            'version' => '3.0',
+                            'screen'  => 'KIRIM_DOKUMEN',
+                            'data'    => ['error_message' => '']
                         ];
                     } else {
                         $responseData = [
-                            'screen' => 'MENU',
-                            'data'   => ['error_message' => 'Silakan pilih menu layanan terlebih dahulu.']
+                            'version' => '3.0',
+                            'screen'  => 'MENU',
+                            'data'    => ['error_message' => 'Silakan pilih layanan yang Anda butuhkan terlebih dahulu.']
                         ];
                     }
                 }
 
                 // =================================================================
-                // 2. CABANG: CEK STATUS LAPORAN (VERIFIKASI 2 LANGKAH)
+                // 2. SCREEN: CEK STATUS (VERIFIKASI 2 LANGKAH)
                 // =================================================================
                 elseif ($screen === 'CEK_STATUS') {
-                    $ticketNumber = trim($formData['ticket_number'] ?? '');
+                    $ticketNumber = trim($formData['nomor_tiket'] ?? $formData['ticket_number'] ?? '');
                     $nik          = trim($formData['nik'] ?? '');
 
-                    // Validasi Input Lokal
                     if ($ticketNumber === '') {
                         $errorMessage = 'Nomor tiket wajib diisi.';
                     } elseif (!preg_match('/^\d{16}$/', $nik)) {
@@ -155,52 +151,51 @@ class WhatsAppFlowV2Controller extends Controller
                             'data'    => array_merge($formData, ['error_message' => $errorMessage])
                         ];
                     } else {
-                        // LANGKAH 1: Cek apakah laporan ada
-                        $checkRes = Http::withHeaders($apiHeaders)
-                            ->get(url("/api/reports/{$ticketNumber}/check"));
-                        
-                        $exists = $checkRes->json('data.exists') ?? false;
+                        // Langkah 1: Cek apakah laporan ada
+                        $checkRes = Http::withHeaders($apiHeaders)->get(url("/api/reports/{$ticketNumber}/check"));
+                        $exists   = $checkRes->json('data.exists') ?? false;
 
                         if (!$checkRes->successful() || !$exists) {
                             $responseData = [
                                 'version' => '3.0',
                                 'screen'  => 'CEK_STATUS',
                                 'data'    => array_merge($formData, [
-                                    'error_message' => 'Nomor tiket pengaduan tidak ditemukan. Mohon periksa kembali.'
+                                    'error_message' => 'Nomor tiket tidak ditemukan. Mohon periksa kembali.'
                                 ])
                             ];
                         } else {
-                            // LANGKAH 2: Verifikasi kecocokan NIK Pelapor
-                            $verifyRes = Http::withHeaders($apiHeaders)
-                                ->get(url("/api/reports/{$ticketNumber}/verify"), ['nik' => $nik]);
-                            
-                            $verified = $verifyRes->json('data.verified') ?? false;
+                            // Langkah 2: Verifikasi NIK
+                            $verifyRes = Http::withHeaders($apiHeaders)->get(url("/api/reports/{$ticketNumber}/verify"), ['nik' => $nik]);
+                            $verified  = $verifyRes->json('data.verified') ?? false;
 
                             if (!$verifyRes->successful() || !$verified) {
                                 $responseData = [
                                     'version' => '3.0',
                                     'screen'  => 'CEK_STATUS',
                                     'data'    => array_merge($formData, [
-                                        'error_message' => 'NIK tidak sesuai dengan data pelapor pada nomor tiket tersebut.'
+                                        'error_message' => 'NIK tidak sesuai dengan data pelapor nomor tiket ini.'
                                     ])
                                 ];
                             } else {
-                                // LANGKAH 3: Ambil detail status laporan
-                                $statusRes = Http::withHeaders($apiHeaders)
-                                    ->get(url("/api/reports/{$ticketNumber}/status"));
+                                // Langkah 3: Ambil detail status & arahkan ke screen DETAIL_LAPORAN
+                                $statusRes = Http::withHeaders($apiHeaders)->get(url("/api/reports/{$ticketNumber}/status"));
 
                                 if ($statusRes->successful()) {
                                     $info = $statusRes->json('data') ?? [];
-                                    
+
                                     $responseData = [
                                         'version' => '3.0',
-                                        'screen'  => 'HASIL_STATUS',
+                                        'screen'  => 'DETAIL_LAPORAN', // Sesuai JSON routing_model
                                         'data'    => [
-                                            'ticket_number'   => (string) ($info['ticket_number'] ?? $ticketNumber),
-                                            'nama_pengadu'    => (string) ($info['nama_pengadu'] ?? '-'),
-                                            'tanggal_laporan' => (string) ($info['tanggal_laporan'] ?? '-'),
-                                            'status_laporan'  => (string) ($info['status_laporan'] ?? '-'),
-                                            'tanggapan'       => (string) ($info['tanggapan'] ?? 'Belum ada tanggapan.'),
+                                            'nomor_tiket'      => (string) ($info['ticket_number'] ?? $ticketNumber),
+                                            'nama_pelapor'     => (string) ($info['nama_pengadu'] ?? '-'),
+                                            'status_laporan'   => (string) ($info['status_laporan'] ?? 'Dalam Proses'),
+                                            'tanggal_lapor'    => (string) ($info['tanggal_laporan'] ?? date('d-m-Y')),
+                                            'kategori'         => (string) ($info['kategori'] ?? 'Pengaduan Masyarakat'),
+                                            'judul_pengaduan'  => (string) ($info['judul_pengaduan'] ?? 'Laporan #' . $ticketNumber),
+                                            'detail_pengaduan' => (string) ($info['tanggapan'] ?? ($info['detail_pengaduan'] ?? 'Sedang ditelaah petugas.')),
+                                            'lokasi_kejadian'  => (string) ($info['lokasi_kejadian'] ?? '-'),
+                                            'waktu_kejadian'   => (string) ($info['waktu_kejadian'] ?? '-')
                                         ]
                                     ];
                                 } else {
@@ -208,7 +203,7 @@ class WhatsAppFlowV2Controller extends Controller
                                         'version' => '3.0',
                                         'screen'  => 'CEK_STATUS',
                                         'data'    => array_merge($formData, [
-                                            'error_message' => 'Gagal mengambil detail status. Silakan coba lagi nanti.'
+                                            'error_message' => 'Gagal mengambil detail status. Silakan coba kembali.'
                                         ])
                                     ];
                                 }
@@ -218,12 +213,10 @@ class WhatsAppFlowV2Controller extends Controller
                 }
 
                 // =================================================================
-                // 3. CABANG: KIRIM DOKUMEN TAMBAHAN
+                // 3. SCREEN: KIRIM DOKUMEN (VERIFIKASI & ELIGIBILITAS)
                 // =================================================================
-                
-                // --- 3A. VERIFIKASI TIKET, NIK & ELIGIBILITAS ---
-                elseif ($screen === 'VERIFIKASI_DOKUMEN') {
-                    $ticketNumber = trim($formData['ticket_number'] ?? '');
+                elseif ($screen === 'KIRIM_DOKUMEN') {
+                    $ticketNumber = trim($formData['nomor_tiket'] ?? $formData['ticket_number'] ?? '');
                     $nik          = trim($formData['nik'] ?? '');
 
                     if ($ticketNumber === '') {
@@ -237,51 +230,49 @@ class WhatsAppFlowV2Controller extends Controller
                     if ($errorMessage) {
                         $responseData = [
                             'version' => '3.0',
-                            'screen'  => 'VERIFIKASI_DOKUMEN',
+                            'screen'  => 'KIRIM_DOKUMEN',
                             'data'    => array_merge($formData, ['error_message' => $errorMessage])
                         ];
                     } else {
-                        // 1. Cek keberadaan tiket
+                        // 1. Cek Tiket
                         $checkRes = Http::withHeaders($apiHeaders)->get(url("/api/reports/{$ticketNumber}/check"));
                         if (!$checkRes->successful() || !($checkRes->json('data.exists') ?? false)) {
                             $responseData = [
                                 'version' => '3.0',
-                                'screen'  => 'VERIFIKASI_DOKUMEN',
+                                'screen'  => 'KIRIM_DOKUMEN',
                                 'data'    => array_merge($formData, ['error_message' => 'Nomor tiket tidak ditemukan.'])
                             ];
                         } else {
                             // 2. Verifikasi NIK
-                            $verifyRes = Http::withHeaders($apiHeaders)
-                                ->get(url("/api/reports/{$ticketNumber}/verify"), ['nik' => $nik]);
-
+                            $verifyRes = Http::withHeaders($apiHeaders)->get(url("/api/reports/{$ticketNumber}/verify"), ['nik' => $nik]);
                             if (!$verifyRes->successful() || !($verifyRes->json('data.verified') ?? false)) {
                                 $responseData = [
                                     'version' => '3.0',
-                                    'screen'  => 'VERIFIKASI_DOKUMEN',
+                                    'screen'  => 'KIRIM_DOKUMEN',
                                     'data'    => array_merge($formData, ['error_message' => 'NIK tidak sesuai dengan data pemohon.'])
                                 ];
                             } else {
                                 // 3. Cek Eligibilitas Dokumen Tambahan
-                                $eligibilityRes = Http::withHeaders($apiHeaders)
-                                    ->get(url("/api/reports/{$ticketNumber}/document-eligibility"));
-
-                                $isEligible = $eligibilityRes->json('data.eligible') ?? false;
+                                $eligibilityRes = Http::withHeaders($apiHeaders)->get(url("/api/reports/{$ticketNumber}/document-eligibility"));
+                                $isEligible     = $eligibilityRes->json('data.eligible') ?? false;
 
                                 if (!$isEligible) {
                                     $msg = $eligibilityRes->json('message') ?? 'Laporan ini tidak dalam status yang membutuhkan data dukung tambahan.';
                                     $responseData = [
                                         'version' => '3.0',
-                                        'screen'  => 'VERIFIKASI_DOKUMEN',
+                                        'screen'  => 'KIRIM_DOKUMEN',
                                         'data'    => array_merge($formData, ['error_message' => $msg])
                                     ];
                                 } else {
-                                    // Berhasil lolos -> Arahkan ke screen upload dokumen tambahan
+                                    // Arahkan ke screen UPLOAD_DOKUMEN_TAMBAHAN
                                     $responseData = [
                                         'version' => '3.0',
                                         'screen'  => 'UPLOAD_DOKUMEN_TAMBAHAN',
                                         'data'    => [
-                                            'ticket_number' => $ticketNumber,
-                                            'error_message' => ''
+                                            'nomor_tiket'     => (string) $ticketNumber,
+                                            'reporter_id'     => '0',
+                                            'judul_pengaduan' => 'Laporan Tiket #' . $ticketNumber,
+                                            'error_message'   => ''
                                         ]
                                     ];
                                 }
@@ -290,9 +281,11 @@ class WhatsAppFlowV2Controller extends Controller
                     }
                 }
 
-                // --- 3B. SUBMIT UPLOAD DOKUMEN TAMBAHAN (DILINDUNGI ANTI DOUBLE-CLICK) ---
+                // =================================================================
+                // 4. SCREEN: UPLOAD DOKUMEN TAMBAHAN (DILINDUNGI IDEMPOTENCY)
+                // =================================================================
                 elseif ($screen === 'UPLOAD_DOKUMEN_TAMBAHAN') {
-                    $ticketNumber = $formData['ticket_number'] ?? '';
+                    $ticketNumber = $formData['nomor_tiket'] ?? '';
                     $dokumenData  = $formData['dokumen_tambahan_base64'] ?? [];
                     $keterangan   = $formData['keterangan_dokumen'] ?? 'Dokumen Pengaduan Tambahan via WhatsApp';
 
@@ -303,15 +296,10 @@ class WhatsAppFlowV2Controller extends Controller
                             'data'    => array_merge($formData, ['error_message' => 'Dokumen tambahan wajib dilampirkan.'])
                         ];
                     } else {
-                        // Kunci Idempotency: Cegah multiple click
-                        $idempotencyKey = 'submit_doc_lock_' . md5($ticketNumber . ($flowToken ?? json_encode($dokumenData)));
+                        $idempotencyKey  = 'submit_doc_lock_' . md5($ticketNumber . ($flowToken ?? json_encode($dokumenData)));
                         $cachedResultKey = 'submit_doc_res_' . $idempotencyKey;
 
                         if (!Cache::add($idempotencyKey, true, self::LOCK_TTL)) {
-                            // Request duplikat terdeteksi!
-                            $waLog->warning("Terdeteksi double click submit dokumen tambahan: {$ticketNumber}");
-
-                            // Jika proses pertama sudah selesai dan menghasilkan response sukses, kembalikan response tersebut
                             $cachedResponse = Cache::get($cachedResultKey);
                             if ($cachedResponse) {
                                 $responseData = $cachedResponse;
@@ -326,16 +314,14 @@ class WhatsAppFlowV2Controller extends Controller
                             }
                         } else {
                             try {
-                                // Download & dekripsi file dari Meta CDN
                                 $fileObj = is_array($dokumenData) && isset($dokumenData[0]) ? $dokumenData[0] : $dokumenData;
-                                
+
                                 if (str_contains($fileObj['cdn_url'] ?? '', 'EXAMPLE_DATA')) {
                                     $base64Data = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
                                 } else {
-                                    $base64Data = $this->downloadAndDecryptFlowMedia($fileObj, 10 * 1024 * 1024); // Batas 10MB
+                                    $base64Data = $this->downloadAndDecryptFlowMedia($fileObj, 5 * 1024 * 1024);
                                 }
 
-                                // PATCH ke API submitAdditionalDocument
                                 $docResponse = Http::withHeaders($apiHeaders)
                                     ->patch(url("/api/reports/{$ticketNumber}/document-additional"), [
                                         'file_base64' => $base64Data,
@@ -345,15 +331,12 @@ class WhatsAppFlowV2Controller extends Controller
                                 if ($docResponse->successful()) {
                                     $responseData = [
                                         'version' => '3.0',
-                                        'screen'  => 'SELESAI_DOKUMEN',
+                                        'screen'  => 'DOKUMEN_TERKIRIM', // Sesuai JSON routing_model
                                         'data'    => [
-                                            'ticket_number' => (string) $ticketNumber,
-                                            'status_baru'   => (string) ($docResponse->json('data.new_status') ?? 'Proses verifikasi dan telaah'),
-                                            'pesan'         => 'Dokumen tambahan berhasil diterima oleh petugas.'
+                                            'nomor_tiket' => (string) $ticketNumber,
                                         ]
                                     ];
 
-                                    // Simpan hasil sukses ke cache agar jika ada sisa retry/klik, tetap return sukses
                                     Cache::put($cachedResultKey, $responseData, self::LOCK_TTL);
                                 } else {
                                     Cache::forget($idempotencyKey);
@@ -366,9 +349,9 @@ class WhatsAppFlowV2Controller extends Controller
                                 }
                             } catch (\Exception $e) {
                                 Cache::forget($idempotencyKey);
-                                $msg = ($e->getMessage() === 'FILE_TOO_LARGE') 
-                                    ? 'Ukuran file dokumen melebihi batas maksimal.' 
-                                    : 'Terjadi kendala saat memproses dokumen: ' . $e->getMessage();
+                                $msg = ($e->getMessage() === 'FILE_TOO_LARGE')
+                                    ? 'Ukuran file melebihi batas 5MB.'
+                                    : 'Kendala saat memproses dokumen: ' . $e->getMessage();
 
                                 $responseData = [
                                     'version' => '3.0',
@@ -381,10 +364,8 @@ class WhatsAppFlowV2Controller extends Controller
                 }
 
                 // =================================================================
-                // 4. CABANG: BUAT PENGADUAN BARU (EXISTING DENGAN PERBAIKAN)
+                // 5. ALUR PENGADUAN BARU
                 // =================================================================
-                
-                // --- 4A. FORM IDENTITAS ---
                 elseif ($screen === 'IDENTITAS') {
                     $nik      = $formData['nik'] ?? '';
                     $name     = $formData['name'] ?? '';
@@ -414,13 +395,11 @@ class WhatsAppFlowV2Controller extends Controller
 
                     if ($errorMessage !== null) {
                         $responseData = [
-                            'screen' => 'IDENTITAS',
-                            'data'   => ['error_message' => $errorMessage]
+                            'version' => '3.0',
+                            'screen'  => 'IDENTITAS',
+                            'data'    => array_merge($formData, ['error_message' => $errorMessage])
                         ];
                     } else {
-                        // Kunci Idempotency: Hindari duplicate reporter creation
-                        $idempotencyReporterKey = 'reporter_lock_' . md5($nik . $cleanPhone);
-                        
                         $payloadLmw = [
                             'nik'          => $nik,
                             'name'         => $name,
@@ -446,24 +425,23 @@ class WhatsAppFlowV2Controller extends Controller
                             }
 
                             $responseData = [
-                                'screen' => 'IDENTITAS',
-                                'data'   => ['error_message' => $apiErrorMessage]
+                                'version' => '3.0',
+                                'screen'  => 'IDENTITAS',
+                                'data'    => array_merge($formData, ['error_message' => $apiErrorMessage])
                             ];
                         } else {
-                            $reporterResponse = Http::withHeaders($apiHeaders)
-                                ->post(url('/api/reporters'), $payloadLmw);
-
+                            $reporterResponse = Http::withHeaders($apiHeaders)->post(url('/api/reporters'), $payloadLmw);
                             $reporterId = $reporterResponse->json('reporter_id') ?? '0';
 
                             $responseData = [
-                                'screen' => 'PENGADUAN',
-                                'data'   => ['reporter_id' => (string) $reporterId]
+                                'version' => '3.0',
+                                'screen'  => 'PENGADUAN',
+                                'data'    => ['reporter_id' => (string) $reporterId]
                             ];
                         }
                     }
                 }
 
-                // --- 4B. UPLOAD KTP ---
                 elseif ($screen === 'UPLOAD_KTP') {
                     $ktpData  = $formData['ktp_base64'] ?? [];
                     $ktpDocId = '0';
@@ -498,7 +476,6 @@ class WhatsAppFlowV2Controller extends Controller
                     }
                 }
 
-                // --- 4C. UPLOAD KK ---
                 elseif ($screen === 'UPLOAD_KK') {
                     $kkData   = $formData['kk_base64'] ?? [];
                     $kkDocId  = '0';
@@ -533,7 +510,6 @@ class WhatsAppFlowV2Controller extends Controller
                     }
                 }
 
-                // --- 4D. UPLOAD BUKTI ---
                 elseif ($screen === 'UPLOAD_BUKTI') {
                     $buktiData = $formData['pendukung_base64'] ?? [];
                     $pendukungDocIds = [];
@@ -587,19 +563,14 @@ class WhatsAppFlowV2Controller extends Controller
                     }
                 }
 
-                // --- 4E. SUBMIT AKHIR LAPORAN (DILINDUNGI ANTI DOUBLE-CLICK) ---
                 elseif ($screen === 'PREVIEW') {
                     $reporterId = $formData['reporter_id'] ?? '0';
                     $judul      = $formData['judul_pengaduan'] ?? '';
 
-                    // Gunakan flow_token atau kombinasi reporter_id + hash judul
                     $lockKey = 'submit_report_lock_' . md5($reporterId . $judul . ($flowToken ?? ''));
                     $cachedSuccessKey = 'submit_report_success_' . $lockKey;
 
                     if (!Cache::add($lockKey, true, self::LOCK_TTL)) {
-                        $waLog->warning("Terdeteksi double click submit laporan oleh reporter ID: {$reporterId}");
-
-                        // Jika request pertama sudah selesai, return response SELESAI yang sama
                         $cachedResponse = Cache::get($cachedSuccessKey);
                         if ($cachedResponse) {
                             $responseData = $cachedResponse;
@@ -626,9 +597,7 @@ class WhatsAppFlowV2Controller extends Controller
                                 }
                             }
 
-                            $cleanDocIds = array_values(array_filter($rawDocIds));
-
-                            // Sanitasi String
+                            $cleanDocIds  = array_values(array_filter($rawDocIds));
                             $judulBersih  = preg_replace('/\s+/', ' ', trim(preg_replace('/[^a-zA-Z0-9\s\.,\-]/', ' ', $formData['judul_pengaduan'] ?? '')));
                             $detailBersih = trim(preg_replace('/[^a-zA-Z0-9\s\.,\-\(\)\/\r\n]/', ' ', $formData['detail_pengaduan'] ?? ''));
                             $lokasiBersih = trim(preg_replace('/[^a-zA-Z0-9\s\.,\-\(\)\/]/', ' ', $formData['lokasi_kejadian'] ?? ''));
@@ -658,11 +627,9 @@ class WhatsAppFlowV2Controller extends Controller
                                     ]
                                 ];
 
-                                // Simpan response sukses ke cache agar retry request mendapatkan tiket yang sama
                                 Cache::put($cachedSuccessKey, $responseData, self::LOCK_TTL);
                             } else {
                                 Cache::forget($lockKey);
-                                $waLog->error("API Submit Laporan Gagal: " . $reportResponse->body());
                                 $responseData = [
                                     'version' => '3.0',
                                     'screen'  => 'PREVIEW',
@@ -673,8 +640,6 @@ class WhatsAppFlowV2Controller extends Controller
                             }
                         } catch (\Exception $e) {
                             Cache::forget($lockKey);
-                            $waLog->error("Error Exception Submit Laporan: " . $e->getMessage());
-
                             $responseData = [
                                 'version' => '3.0',
                                 'screen'  => 'PREVIEW',
@@ -686,13 +651,14 @@ class WhatsAppFlowV2Controller extends Controller
                     }
                 } else {
                     $responseData = [
-                        'screen' => 'MENU',
-                        'data'   => ['error_message' => 'Screen tidak dikenali.']
+                        'version' => '3.0',
+                        'screen'  => 'MENU',
+                        'data'    => ['error_message' => 'Screen tidak dikenali.']
                     ];
                 }
             }
 
-            // 6. Enkripsi Balasan untuk Meta (AES-128-GCM)
+            // 5. Enkripsi Balasan untuk Meta (AES-128-GCM)
             $flippedIv = '';
             for ($i = 0; $i < strlen($initialVector); $i++) {
                 $flippedIv .= chr(~ord($initialVector[$i]) & 0xFF);
@@ -721,16 +687,8 @@ class WhatsAppFlowV2Controller extends Controller
         }
     }
 
-    /**
-     * Helper: Mendownload file terenkripsi dari CDN Meta dan mengubahnya ke Base64
-     */
     private function downloadAndDecryptFlowMedia($mediaObject, $maxBytes = 5242880)
     {
-        $waLog = Log::build([
-            'driver' => 'single',
-            'path'   => storage_path('logs/wa_flows_debug.log'),
-        ]);
-
         $cdnUrl   = $mediaObject['cdn_url'] ?? '';
         $metadata = $mediaObject['encryption_metadata'] ?? null;
         $fileName = $mediaObject['file_name'] ?? 'document.jpg';
@@ -752,7 +710,7 @@ class WhatsAppFlowV2Controller extends Controller
         }
 
         $downloadedData = $response->body();
-        $ciphertext     = substr($downloadedData, 0, -10); // Potong 10 byte HMAC
+        $ciphertext     = substr($downloadedData, 0, -10);
         $encKey         = base64_decode($metadata['encryption_key']);
         $iv             = base64_decode($metadata['iv']);
 
