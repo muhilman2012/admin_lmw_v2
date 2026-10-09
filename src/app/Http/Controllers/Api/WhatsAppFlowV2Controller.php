@@ -89,9 +89,9 @@ class WhatsAppFlowV2Controller extends Controller
             elseif ($rootAction === 'INIT') {
                 $responseData = [
                     'screen' => 'MENU',
-                    'data'   => ['error_message' => '']
+                    'data'   => []
                 ];
-            } 
+            }
             elseif ($rootAction === 'data_exchange') {
                 
                 // =================================================================
@@ -99,27 +99,23 @@ class WhatsAppFlowV2Controller extends Controller
                 // =================================================================
                 if ($screen === 'MENU') {
                     $pilihan = $formData['pilihan_menu'] ?? $formData['menu_pilihan'] ?? '';
-
                     if ($pilihan === 'kirim_laporan' || $pilihan === 'buat_pengaduan') {
                         $responseData = [
                             'version' => '3.0',
                             'screen'  => 'IDENTITAS',
-                            'data'    => ['error_message' => '']
+                            'data'    => []
                         ];
-                    } // <-- PERBAIKAN: Kurung tutup ini yang sebelumnya hilang
-                    elseif ($pilihan === 'cek_status') {
+                    } elseif ($pilihan === 'cek_status') {
                         $responseData = [
                             'version' => '3.0',
                             'screen'  => 'CEK_STATUS',
-                            'data'    => [
-                                'error_message' => ' '
-                            ]
+                            'data'    => [] // <-- HAPUS 'error_message' => ' ', cukup array kosong!
                         ];
                     } elseif ($pilihan === 'kirim_dokumen') {
                         $responseData = [
                             'version' => '3.0',
                             'screen'  => 'KIRIM_DOKUMEN',
-                            'data'    => ['error_message' => '']
+                            'data'    => []
                         ];
                     } else {
                         $responseData = [
@@ -266,10 +262,7 @@ class WhatsAppFlowV2Controller extends Controller
                                         'version' => '3.0',
                                         'screen'  => 'UPLOAD_DOKUMEN_TAMBAHAN',
                                         'data'    => [
-                                            'nomor_tiket'     => (string) $ticketNumber,
-                                            'reporter_id'     => '0',
-                                            'judul_pengaduan' => 'Laporan Tiket #' . $ticketNumber,
-                                            'error_message'   => ''
+                                            'nomor_tiket' => (string) $ticketNumber,
                                         ]
                                     ];
                                 }
@@ -284,7 +277,7 @@ class WhatsAppFlowV2Controller extends Controller
                 elseif ($screen === 'UPLOAD_DOKUMEN_TAMBAHAN') {
                     $ticketNumber = $formData['nomor_tiket'] ?? '';
                     $dokumenData  = $formData['dokumen_tambahan_base64'] ?? [];
-                    $keterangan   = $formData['keterangan_dokumen'] ?? 'Dokumen Pengaduan Tambahan via WhatsApp';
+                    $keterangan = 'Dokumen Pengaduan Tambahan via WhatsApp';
 
                     if (empty($dokumenData)) {
                         $responseData = [
