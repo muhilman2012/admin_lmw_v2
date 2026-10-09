@@ -107,11 +107,13 @@ class WhatsAppFlowV2Controller extends Controller
                             'screen'  => 'IDENTITAS',
                             'data'    => ['error_message' => '']
                         ];
-                    } elseif ($pilihan === 'cek_status') {
+                    elseif ($pilihan === 'cek_status') {
                         $responseData = [
                             'version' => '3.0',
                             'screen'  => 'CEK_STATUS',
-                            'data'    => ['error_message' => '']
+                            'data'    => [
+                                'error_message' => ' '
+                            ]
                         ];
                     } elseif ($pilihan === 'kirim_dokumen') {
                         // Sesuai routing_model JSON: "KIRIM_DOKUMEN"
@@ -135,70 +137,58 @@ class WhatsAppFlowV2Controller extends Controller
                 elseif ($screen === 'CEK_STATUS') {
                     $ticketNumber = trim($formData['nomor_tiket'] ?? $formData['ticket_number'] ?? '');
                     $nik          = trim($formData['nik'] ?? '');
-
-                    // 1. Validasi Input Lokal
+                    // Validasi lokal
                     if ($ticketNumber === '') {
-                        $errorMessage = 'Nomor tiket wajib diisi.';
+                        $errorMessage = '⚠️ Nomor tiket wajib diisi.';
                     } elseif (!preg_match('/^\d{16}$/', $nik)) {
-                        $errorMessage = 'NIK harus 16 digit angka.';
+                        $errorMessage = '⚠️ NIK harus 16 digit angka.';
                     } else {
                         $errorMessage = null;
                     }
-
                     if ($errorMessage) {
                         $responseData = [
                             'version' => '3.0',
                             'screen'  => 'CEK_STATUS',
-                            'data'    => array_merge($formData, [
-                                'error_message' => $errorMessage,
-                                'is_error'      => true
-                            ])
+                            'data'    => array_merge($formData, ['error_message' => $errorMessage])
                         ];
                     } else {
                         // Langkah 1: Cek apakah laporan ada
                         $checkRes = Http::withHeaders($apiHeaders)->get(url("/api/reports/{$ticketNumber}/check"));
                         $exists   = $checkRes->json('data.exists') ?? false;
-
                         if (!$checkRes->successful() || !$exists) {
                             $responseData = [
                                 'version' => '3.0',
                                 'screen'  => 'CEK_STATUS',
                                 'data'    => array_merge($formData, [
-                                    'error_message' => 'Nomor tiket tidak ditemukan. Mohon periksa kembali.',
-                                    'is_error'      => true
+                                    'error_message' => '⚠️ Nomor tiket tidak ditemukan. Mohon periksa kembali.'
                                 ])
                             ];
                         } else {
                             // Langkah 2: Verifikasi NIK
                             $verifyRes = Http::withHeaders($apiHeaders)->get(url("/api/reports/{$ticketNumber}/verify"), ['nik' => $nik]);
                             $verified  = $verifyRes->json('data.verified') ?? false;
-
                             if (!$verifyRes->successful() || !$verified) {
                                 $responseData = [
                                     'version' => '3.0',
                                     'screen'  => 'CEK_STATUS',
                                     'data'    => array_merge($formData, [
-                                        'error_message' => 'NIK tidak sesuai dengan data pelapor nomor tiket ini.',
-                                        'is_error'      => true
+                                        'error_message' => '⚠️ NIK tidak sesuai dengan data pelapor nomor tiket ini.'
                                     ])
                                 ];
                             } else {
-                                // Langkah 3: Ambil detail status & arahkan ke screen DETAIL_LAPORAN
+                                // Langkah 3: Ambil status & kirim HANYA 5 data yang diminta
                                 $statusRes = Http::withHeaders($apiHeaders)->get(url("/api/reports/{$ticketNumber}/status"));
-
                                 if ($statusRes->successful()) {
                                     $info = $statusRes->json('data') ?? [];
-
-                                    // PERBAIKAN 2: Hanya kirim 5 data yang dibutuhkan sesuai screen DETAIL_LAPORAN
                                     $responseData = [
                                         'version' => '3.0',
                                         'screen'  => 'DETAIL_LAPORAN',
                                         'data'    => [
-                                            'nomor_tiket'    => (string) ($info['ticket_number'] ?? $ticketNumber),
-                                            'nama_pelapor'   => (string) ($info['nama_pengadu'] ?? '-'),
-                                            'tanggal_lapor'  => (string) ($info['tanggal_laporan'] ?? date('d-m-Y')),
-                                            'status_laporan' => (string) ($info['status_laporan'] ?? 'Dalam Proses'),
-                                            'tanggapan'      => (string) ($info['tanggapan'] ?? 'Laporan pengaduan Saudara dalam proses verifikasi & penelaahan.')
+                                            'nomor_tiket'       => (string) ($info['ticket_number'] ?? $ticketNumber),
+                                            'nama_pelapor'      => (string) ($info['nama_pengadu'] ?? '-'),
+                                            'tanggal_aduan'     => (string) ($info['tanggal_laporan'] ?? date('d-m-Y')),
+                                            'status_laporan'    => (string) ($info['status_laporan'] ?? 'Dalam Proses'),
+                                            'tanggapan_laporan' => (string) ($info['tanggapan'] ?? 'Laporan pengaduan Saudara dalam proses verifikasi & penelaahan.')
                                         ]
                                     ];
                                 } else {
@@ -206,8 +196,7 @@ class WhatsAppFlowV2Controller extends Controller
                                         'version' => '3.0',
                                         'screen'  => 'CEK_STATUS',
                                         'data'    => array_merge($formData, [
-                                            'error_message' => 'Gagal mengambil detail status. Silakan coba kembali.',
-                                            'is_error'      => true
+                                            'error_message' => '⚠️ Gagal mengambil detail status. Silakan coba kembali.'
                                         ])
                                     ];
                                 }
