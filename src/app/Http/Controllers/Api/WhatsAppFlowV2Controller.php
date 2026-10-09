@@ -88,8 +88,9 @@ class WhatsAppFlowV2Controller extends Controller
             } 
             elseif ($rootAction === 'INIT') {
                 $responseData = [
-                    'screen' => 'MENU',
-                    'data'   => []
+                    'version' => '3.0',
+                    'screen'  => 'MENU',
+                    'data'    => (object) []
                 ];
             }
             elseif ($rootAction === 'data_exchange') {
@@ -103,19 +104,19 @@ class WhatsAppFlowV2Controller extends Controller
                         $responseData = [
                             'version' => '3.0',
                             'screen'  => 'IDENTITAS',
-                            'data'    => []
+                            'data'    => (object) []
                         ];
                     } elseif ($pilihan === 'cek_status') {
                         $responseData = [
                             'version' => '3.0',
                             'screen'  => 'CEK_STATUS',
-                            'data'    => [] // <-- HAPUS 'error_message' => ' ', cukup array kosong!
+                            'data'    => (object) []
                         ];
                     } elseif ($pilihan === 'kirim_dokumen') {
                         $responseData = [
                             'version' => '3.0',
                             'screen'  => 'KIRIM_DOKUMEN',
-                            'data'    => []
+                            'data'    => (object) []
                         ];
                     } else {
                         $responseData = [
