@@ -299,15 +299,15 @@ class WhatsAppFlowController extends Controller
         // Validasi lokal
         $errorMessage = null;
         if (!preg_match('/^\d{16}$/', $nik)) {
-            $errorMessage = 'NIK harus 16 digit angka.';
+            $errorMessage = 'Data tidak sesuai.';
         } elseif (trim($name) === '') {
-            $errorMessage = 'Nama wajib diisi.';
+            $errorMessage = 'Data tidak sesuai.';
         } elseif ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $errorMessage = 'Format email tidak valid.';
+            $errorMessage = 'Data tidak sesuai.';
         } elseif (trim($address) === '') {
-            $errorMessage = 'Alamat wajib diisi.';
+            $errorMessage = 'Data tidak sesuai.';
         } elseif (!preg_match('/^628\d{7,13}$/', $cleanPhone)) {
-            $errorMessage = 'Nomor HP tidak valid.';
+            $errorMessage = 'Data tidak sesuai.';
         }
 
         // Jika validasi lokal gagal, tidak perlu idempotency (tidak ada side-effect)
@@ -343,12 +343,12 @@ class WhatsAppFlowController extends Controller
             $this->waLog()->info("Response API Eligibility:", $resData ?? []);
 
             if (!$eligibilityResponse->successful() || (isset($resData['eligible']) && $resData['eligible'] === false)) {
-                $apiErrorMessage = 'Verifikasi gagal. Silakan periksa kembali data Anda.';
+                $apiErrorMessage = 'Data tidak sesuai.';
 
                 if (isset($resData['validations']) && is_array($resData['validations'])) {
                     foreach ($resData['validations'] as $key => $validation) {
                         if (isset($validation['status']) && $validation['status'] === false) {
-                            $apiErrorMessage = $validation['message'] ?? "Kesalahan pada {$key}.";
+                            $apiErrorMessage = $validation['message'] ?? "Data tidak sesuai.";
                             break;
                         }
                     }
