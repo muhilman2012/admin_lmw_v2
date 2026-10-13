@@ -109,7 +109,7 @@ class DukcapilService
     private function evaluateMatch(array $response): array
     {
         if (empty($response['content']) || !isset($response['content'][0])) {
-            return ['is_valid' => false, 'message' => 'Format data kependudukan tidak valid atau NIK tidak ditemukan.'];
+            return ['is_valid' => false, 'message' => 'Data tidak sesuai.'];
         }
 
         $content = $response['content'][0];
@@ -117,7 +117,7 @@ class DukcapilService
         // 1. Cek ketersediaan NIK terlebih dahulu
         $statusNik = $content['NIK'] ?? '';
         if (str_contains($statusNik, 'Tidak Sesuai') || empty($statusNik)) {
-            return ['is_valid' => false, 'message' => 'NIK tidak terdaftar dalam database kependudukan.'];
+            return ['is_valid' => false, 'message' => 'Data tidak sesuai.'];
         }
 
         // 2. Ekstrak skor angka dari string (contoh: "Tidak Sesuai (59)" menjadi 59)
@@ -138,9 +138,9 @@ class DukcapilService
         // Jika gagal, berikan pesan yang spesifik agar user tahu apa yang salah
         $errorMsg = 'Data tidak sesuai.';
         if ($namaScore < $thresholdNama) {
-            $errorMsg = "Nama yang diinput tidak sesuai dengan ejaan KTP.";
+            $errorMsg = "Data tidak sesuai.";
         } elseif ($alamatScore < $thresholdAlamat) {
-            $errorMsg = "Alamat yang diinput terlalu berbeda dengan catatan KTP.";
+            $errorMsg = "Data tidak sesuai.";
         }
 
         return [
