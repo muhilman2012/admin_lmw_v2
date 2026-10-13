@@ -57,36 +57,26 @@ class WhatsAppFlowController extends Controller
     {
         $lockKey    = 'wa_flow_lock:' . $idempotencyKey;
         $resultKey  = 'wa_flow_result:' . $idempotencyKey;
-
         // Coba acquire lock
         if (!Cache::add($lockKey, true, self::IDEMPOTENCY_TTL)) {
-            // Lock sudah ada → ini request duplikat
             $this->waLog()->warning("Duplikat terdeteksi. Key: {$idempotencyKey}");
-
-            // Tunggu sebentar agar proses pertama mungkin sudah selesai
             usleep(500_000); // 500ms
-
-            // Cek apakah response dari proses pertama sudah tersimpan
             $cachedResult = Cache::get($resultKey);
             if ($cachedResult) {
                 $this->waLog()->info("Mengembalikan cached response untuk key: {$idempotencyKey}");
                 return $cachedResult;
             }
-
-            // Proses pertama belum selesai — return null (caller harus handle)
             return null;
         }
-
         try {
-            // Jalankan logika bisnis
             $result = $process();
-
-            // Simpan response sukses ke cache agar retry bisa mendapat response yang sama
-            Cache::put($resultKey, $result, self::IDEMPOTENCY_TTL);
-
+            if (isset($result['data']['error_message']) && !empty($result['data']['error_message'])) {
+                Cache::forget($lockKey);
+            } else {
+                Cache::put($resultKey, $result, self::IDEMPOTENCY_TTL);
+            }
             return $result;
         } catch (\Exception $e) {
-            // Jika gagal, hapus lock agar user bisa retry
             Cache::forget($lockKey);
             Cache::forget($resultKey);
             throw $e;
@@ -280,7 +270,7 @@ class WhatsAppFlowController extends Controller
      * 
      * PROTEKSI: Idempotency berdasarkan NIK + phone (mencegah reporter duplikat).
      */
-    private function handleIdentitas(?string $flowToken, array $formData, array $apiHeaders): array
+        private function handleIdentitas(?string $flowToken, array $formData, array $apiHeaders): array
     {
         $nik  = $formData['nik'] ?? '';
         $name = $formData['name'] ?? '';
@@ -296,7 +286,7 @@ class WhatsAppFlowController extends Controller
             $cleanPhone = '62' . $cleanPhone;
         }
 
-        // Validasi lokal
+        // Validasi format lokal
         $errorMessage = null;
         if (!preg_match('/^\d{16}$/', $nik)) {
             $errorMessage = 'Data tidak sesuai.';
@@ -310,24 +300,25 @@ class WhatsAppFlowController extends Controller
             $errorMessage = 'Data tidak sesuai.';
         }
 
-        // Jika validasi lokal gagal, tidak perlu idempotency (tidak ada side-effect)
         if ($errorMessage !== null) {
             return [
-                'screen' => 'IDENTITAS',
-                'data'   => ['error_message' => $errorMessage],
+                'version' => '3.0',
+                'screen'  => 'IDENTITAS',
+                'data'    => array_merge($formData, [
+                    'error_message' => $errorMessage,
+                    'error_messages' => [
+                        'nik' => $errorMessage,
+                    ],
+                ]),
             ];
         }
 
-        // ┌─────────────────────────────────────────────────────┐
-        // │ IDEMPOTENCY: Cegah pembuatan reporter duplikat      │
-        // │ Key: flow_token + screen, atau fallback NIK + phone │
-        // └─────────────────────────────────────────────────────┘
         $idempotencyKey = $this->makeIdempotencyKey($flowToken, 'IDENTITAS', [
             'nik'   => $nik,
             'phone' => $cleanPhone,
         ]);
 
-        $result = $this->idempotent($idempotencyKey, function () use ($nik, $name, $email, $address, $cleanPhone, $apiHeaders) {
+        $result = $this->idempotent($idempotencyKey, function () use ($nik, $name, $email, $address, $cleanPhone, $apiHeaders, $formData) {
             $payloadLmw = [
                 'nik'          => $nik,
                 'name'         => $name,
@@ -356,9 +347,16 @@ class WhatsAppFlowController extends Controller
 
                 $this->waLog()->warning("Hasil Validasi Ditolak: " . $apiErrorMessage);
 
-                // Validasi API gagal → hapus lock agar user bisa coba lagi dengan data berbeda
-                // (throw exception agar idempotent() menghapus lock)
-                throw new \Exception("VALIDATION_FAILED:" . $apiErrorMessage);
+                return [
+                    'version' => '3.0',
+                    'screen'  => 'IDENTITAS',
+                    'data'    => array_merge($formData, [
+                        'error_message' => $apiErrorMessage,
+                        'error_messages' => [
+                            'nik' => $apiErrorMessage,
+                        ],
+                    ]),
+                ];
             }
 
             $reporterResponse = Http::withHeaders($apiHeaders)
@@ -369,12 +367,12 @@ class WhatsAppFlowController extends Controller
             $this->waLog()->info("Sukses Lolos Validasi. Reporter ID: " . $reporterId);
 
             return [
-                'screen' => 'PENGADUAN',
-                'data'   => ['reporter_id' => (string) $reporterId],
+                'version' => '3.0',
+                'screen'  => 'PENGADUAN',
+                'data'    => ['reporter_id' => (string) $reporterId],
             ];
         });
 
-        // Handle kasus duplikat di mana response belum ter-cache
         if ($result === null) {
             return $this->processingResponse('IDENTITAS', $formData);
         }
@@ -434,9 +432,11 @@ class WhatsAppFlowController extends Controller
                 $errorMessage = ($e->getMessage() === 'FILE_TOO_LARGE')
                     ? "Ukuran KTP maksimal 2MB."
                     : "Gagal memproses KTP.";
-
-                // Re-throw agar lock dihapus dan user bisa retry
-                throw new \Exception("UPLOAD_ERROR:" . $errorMessage);
+                return [
+                    'version' => '3.0',
+                    'screen'  => 'UPLOAD_KTP',
+                    'data'    => array_merge($formData, ['error_message' => $errorMessage]),
+                ];
             }
         });
 
@@ -498,7 +498,12 @@ class WhatsAppFlowController extends Controller
                 $errorMessage = ($e->getMessage() === 'FILE_TOO_LARGE')
                     ? "Ukuran KK maksimal 2MB."
                     : "Gagal memproses KK.";
-                throw new \Exception("UPLOAD_ERROR:" . $errorMessage);
+
+                return [
+                    'version' => '3.0',
+                    'screen'  => 'UPLOAD_KK',
+                    'data'    => array_merge($formData, ['error_message' => $errorMessage]),
+                ];
             }
         });
 
@@ -560,10 +565,15 @@ class WhatsAppFlowController extends Controller
                     }
                 }
             } catch (\Exception $e) {
-                if ($e->getMessage() === 'FILE_TOO_LARGE') {
-                    throw new \Exception("UPLOAD_ERROR:Terdapat file bukti yang ukurannya melebihi 5MB. Silakan kurangi ukurannya.");
-                }
-                throw new \Exception("UPLOAD_ERROR:Server gagal menyimpan dokumen bukti. Pastikan koneksi stabil atau kurangi jumlah file.");
+                $errorMsg = ($e->getMessage() === 'FILE_TOO_LARGE')
+                    ? "Terdapat file bukti yang ukurannya melebihi 5MB. Silakan kurangi ukurannya."
+                    : "Server gagal menyimpan dokumen bukti. Pastikan koneksi stabil atau kurangi jumlah file.";
+
+                return [
+                    'version' => '3.0',
+                    'screen'  => 'UPLOAD_BUKTI',
+                    'data'    => array_merge($formData, ['error_message' => $errorMsg]),
+                ];
             }
 
             $pendukungIdsStr = implode(',', $pendukungDocIds);
