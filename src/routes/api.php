@@ -50,6 +50,8 @@ Route::middleware(['auth:sanctum', VerifyLmwApiToken::class])->group(function ()
         Route::post('/registration', [PublicRegistrationController::class, 'store']);
         Route::get('/calendar-meta', [PublicRegistrationController::class, 'getCalendarMeta']);
     });
+
+    Route::post('/sync/legacy-registrations', [\App\Http\Controllers\Api\LegacySyncController::class, 'syncBulk']);
 });
 
 Route::post('/whatsapp/webhook', [WhatsappWebhookController::class, 'handle']);
