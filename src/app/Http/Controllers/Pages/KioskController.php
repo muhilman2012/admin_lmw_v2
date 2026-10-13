@@ -54,7 +54,7 @@ class KioskController extends Controller
                 $waktuCheckin = $data->updated_at ? $data->updated_at->format('H:i') : '--:--';
                 
                 return response()->json([
-                    'status' => 'error',
+                    'status' => 'error', 
                     'message' => 'Data ini sudah melakukan Check-in pada pukul ' . $waktuCheckin . '. Silakan tunggu panggilan petugas di area ruang tunggu.'
                 ], 422); // 422 Unprocessable Entity
             }
@@ -99,13 +99,14 @@ class KioskController extends Controller
             return DB::transaction(function () use ($request) {
                 
                 // 2. Generate Nomor Urut Antrean (001, 002, dst)
-                // Lock for update mencegah race condition nomor ganda
-                $todayCount = RegistrationQueue::whereDate('visit_date', now()->toDateString())
-                    ->whereIn('status', ['checked_in', 'calling', 'serving', 'served'])
+                $lastQueueNumber = RegistrationQueue::whereDate('visit_date', now()->toDateString())
+                    ->whereNotNull('queue_number')
                     ->lockForUpdate()
-                    ->count();
+                    ->selectRaw('MAX(CAST(queue_number AS UNSIGNED)) as max_queue')
+                    ->value('max_queue');
 
-                $queueNumber = str_pad($todayCount + 1, 3, '0', STR_PAD_LEFT);
+                $nextNumber = ((int) $lastQueueNumber) + 1;
+                $queueNumber = str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
 
                 // 3. Proses Upload Foto KTP ke MinIO/Storage
                 $documentId = null;
@@ -295,10 +296,10 @@ class KioskController extends Controller
 
         try {
             return DB::transaction(function () use ($counterNumber) {
-                
                 $nextQueue = \App\Models\RegistrationQueue::whereDate('visit_date', now()->toDateString())
                     ->where('status', 'checked_in')
-                    ->orderBy('id', 'asc') 
+                    ->whereNotNull('queue_number')
+                    ->orderByRaw('CAST(queue_number AS UNSIGNED) ASC')
                     ->lockForUpdate()
                     ->first(); 
 
