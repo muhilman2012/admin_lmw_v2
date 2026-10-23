@@ -609,15 +609,17 @@ class WhatsAppFlowV2Controller extends Controller
                             ]);
 
                             if ($reportResponse->successful()) {
+                                $ticketNumber = (string) ($reportResponse->json('data.ticket_number') ?? '-');
+                                $category     = (string) ($reportResponse->json('data.category') ?? '-');
                                 $responseData = [
                                     'version' => '3.0',
                                     'screen'  => 'SELESAI',
                                     'data'    => [
-                                        'ticket_number' => (string) ($reportResponse->json('data.ticket_number') ?? '-'),
-                                        'category'      => (string) ($reportResponse->json('data.category') ?? '-')
+                                        'nomor_tiket'   => $ticketNumber,
+                                        'ticket_number' => $ticketNumber,
+                                        'category'      => $category
                                     ]
                                 ];
-
                                 Cache::put($cachedSuccessKey, $responseData, self::LOCK_TTL);
                             } else {
                                 Cache::forget($lockKey);
