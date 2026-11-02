@@ -136,8 +136,8 @@ class WhatsAppFlowV2Controller extends Controller
 
                     if ($ticketNumber === '') {
                         $errorMessage = '⚠️ Nomor tiket wajib diisi.';
-                    } elseif (!preg_match('/^\d{16}$/', $nik)) {
-                        $errorMessage = '⚠️ NIK harus 16 digit angka.';
+                    } elseif (!preg_match('/^[1-9]\d{15}$/', $nik)) {
+                        $errorMessage = '⚠️ NIK harus 16 digit angka dan tidak boleh diawali angka 0.';
                     } else {
                         $errorMessage = null;
                     }
@@ -215,8 +215,8 @@ class WhatsAppFlowV2Controller extends Controller
 
                     if ($ticketNumber === '') {
                         $errorMessage = 'Nomor tiket wajib diisi.';
-                    } elseif (!preg_match('/^\d{16}$/', $nik)) {
-                        $errorMessage = 'NIK harus 16 digit angka.';
+                    } elseif (!preg_match('/^[1-9]\d{15}$/', $nik)) {
+                        $errorMessage = 'NIK harus 16 digit angka dan tidak boleh diawali angka 0.';
                     } else {
                         $errorMessage = null;
                     }
@@ -358,7 +358,7 @@ class WhatsAppFlowV2Controller extends Controller
                 // 5. ALUR PENGADUAN BARU
                 // =================================================================
                 elseif ($screen === 'IDENTITAS') {
-                    $nik      = $formData['nik'] ?? '';
+                    $nik      = trim($formData['nik'] ?? '');
                     $name     = $formData['name'] ?? '';
                     $email    = $formData['email'] ?? '';
                     $address  = $formData['address'] ?? '';
@@ -372,8 +372,9 @@ class WhatsAppFlowV2Controller extends Controller
                     }
 
                     $errorMessage = null;
-                    if (!preg_match('/^\d{16}$/', $nik)) {
-                        $errorMessage = 'NIK harus 16 digit angka.';
+
+                    if (!preg_match('/^[1-9]\d{15}$/', $nik)) {
+                        $errorMessage = 'NIK harus 16 digit angka dan tidak boleh diawali angka 0.';
                     } elseif (trim($name) === '') {
                         $errorMessage = 'Nama wajib diisi.';
                     } elseif ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
