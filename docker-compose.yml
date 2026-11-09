@@ -46,6 +46,8 @@ services:
         volumes:
             - ./src:/var/www
             - ./config/.env:/var/www/.env
+            - /etc/ssl/wapresri/b.wapresri.go.id.key:/etc/nginx/ssl/server.key:ro
+            - /etc/ssl/wapresri/combined_server_chain.crt:/etc/nginx/ssl/combined_server_chain.crt:ro
         ports:
             - "8080:8080"
         networks:
@@ -61,6 +63,13 @@ services:
             APP_ENV: local
             APP_DEBUG: ${APP_DEBUG:-true}
             IS_API_SERVER: 'true'
+
+        healthcheck:
+            test: ["CMD", "curl", "--silent", "--fail", "http://127.0.0.1:8080/fpm-ping"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 30s
 
     lmw-scheduler:
         build:
@@ -78,6 +87,13 @@ services:
             - ./config/supervisord-scheduler.conf:/etc/supervisor/conf.d/supervisord.conf
 
         command: /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
+
+        healthcheck:
+            test: ["CMD-SHELL", "test $$(supervisorctl -c /etc/supervisor/conf.d/supervisord.conf status laravel-jobs laravel-schedule 2>/dev/null | grep -c RUNNING) -eq 2"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 30s
 
         networks:
             - lmw-network
@@ -161,6 +177,12 @@ services:
             - ./src:/var/www
             - ./config/.env:/var/www/.env
         command: php artisan reverb:start --host=0.0.0.0 --port=8081
+        healthcheck:
+            test: ["CMD", "php", "-r", "$$s=@fsockopen('127.0.0.1',8081,$$e,$$m,5); if (!$$s) exit(1); fclose($$s);"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 30s
         env_file: ./config/.env
         ports:
             - "8081:8081"
@@ -172,6 +194,57 @@ services:
         networks:
             - lmw-network
 
+    evolution-api:
+        image: evoapicloud/evolution-api:latest
+        container_name: lmw-wa-engine
+        restart: always
+        ports:
+            - "8082:8080"
+        volumes:
+            - evolution_instances:/evolution/instances
+        environment:
+            - SERVER_URL=http://localhost:8082
+            - DEL_INSTANCE=false
+            
+            # VARIABEL INI WAJIB ADA MESKIPUN DB DIMATIKAN
+            - DATABASE_PROVIDER=mysql
+            - DATABASE_CONNECTION_URI=mysql://root:${DB_PASSWORD}@mysql:3306/evolution
+            
+            # STATUS DB DIMATIKAN
+            - DATABASE_ENABLED=false
+            - DATABASE_SAVE_DATA_INSTANCE=false
+            - DATABASE_SAVE_DATA_NEW_MESSAGE=false
+            - DATABASE_SAVE_MESSAGE_UPDATE=false
+            - DATABASE_SAVE_DATA_CONTACTS=false
+            - DATABASE_SAVE_DATA_CHATS=false
+            - DATABASE_SAVE_DATA_LABELS=false
+            - DATABASE_SAVE_DATA_HISTORIC=false
+            
+            - RABBITMQ_ENABLED=false
+            
+            # REDIS TETAP MENYALA
+            - CACHE_REDIS_ENABLED=true
+            - CACHE_REDIS_URI=redis://lmw-redis:6379/1
+            - CACHE_REDIS_PREFIX_KEY=evolution_v2
+            - CACHE_REDIS_SAVE_INSTANCES=true
+            - CACHE_LOCAL_ENABLED=false
+            
+            - S3_ENABLED=false
+            - AUTHENTICATION_API_KEY=yAak6w5pzF3XzcHUTEbc
+        healthcheck:
+            test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 30s
+        networks:
+            - lmw-network
+        depends_on:
+            mysql:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+
 networks:
     lmw-network:
         driver: bridge
@@ -182,4 +255,6 @@ volumes:
     lmw-redis-data:
         driver: local
     lmw-minio-data:
+        driver: local
+    evolution_instances:
         driver: local
